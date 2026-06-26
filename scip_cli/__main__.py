@@ -18,25 +18,28 @@ def main():
     # refs
     refs_parser = subparsers.add_parser("refs", help="Find references to a symbol")
     refs_parser.add_argument("symbol", help="Symbol name")
-    refs_parser.add_argument("--max-symbols", type=int, default=3, help="Max symbols to resolve (default: 3)")
-    refs_parser.add_argument("--max-refs", type=int, default=10, help="Max refs per symbol (default: 10)")
+    refs_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
 
     # def
     def_parser = subparsers.add_parser("def", help="Find symbol definition")
     def_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
+    def_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     def_parser.add_argument("symbol", help="Symbol name")
 
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")
     search_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
+    search_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     search_parser.add_argument("pattern", help="Search pattern")
 
     # symbols
     symbols_parser = subparsers.add_parser("symbols", help="List symbols in a file")
+    symbols_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     symbols_parser.add_argument("file", help="File path or pattern")
 
     # rdeps
     rdeps_parser = subparsers.add_parser("rdeps", help="Find reverse dependencies of a file")
+    rdeps_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     rdeps_parser.add_argument("file", help="File path or pattern")
 
     # members

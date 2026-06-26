@@ -17,10 +17,14 @@ def main(args):
     try:
         file_path = resolve_one_file(db, args.file)
 
-        symbols = get_file_symbols(db, file_path)
+        limit = args.limit
+        symbols = get_file_symbols(db, file_path, limit=limit + 1)
         if not symbols:
             print(f"No symbols found in '{file_path}'", file=sys.stderr)
             sys.exit(1)
+
+        hit_limit = len(symbols) > limit
+        symbols = symbols[:limit]
 
         for symbol_id, symbol_str, display_name, start_line, end_line in symbols:
             if symbol_str.endswith('/'):
@@ -29,5 +33,8 @@ def main(args):
             short = extract_leaf_name(symbol_str)
             line_info = format_line_range(start_line, end_line, sep="-")
             print(f"{line_info} {kind} {short}")
+
+        if hit_limit:
+            print(f"# Warning: more than {limit} symbols, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

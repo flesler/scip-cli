@@ -189,7 +189,7 @@ def infer_kind(symbol):
     return SymbolKind.UNKNOWN
 
 
-def resolve_symbol(db, name, kind_filter=None):
+def resolve_symbol(db, name, kind_filter=None, limit=None):
     """Resolve bare name to symbol_id(s).
     
     Two-phase resolution: exact leaf match first, then substring fallback.
@@ -198,14 +198,20 @@ def resolve_symbol(db, name, kind_filter=None):
         db: sqlite3 connection
         name: bare symbol name (e.g., "useDictation")
         kind_filter: optional kind filter ('function', 'class', etc)
+        limit: optional limit for results (no limit if None)
     
     Returns:
         List of (symbol_id, symbol, display_name) tuples
     """
     escaped = escape_like(name)
-    rows = db.execute("""
+    
+    # Build LIMIT clause
+    limit_clause = f"LIMIT {limit}" if limit else ""
+    
+    rows = db.execute(f"""
         SELECT id, symbol, display_name FROM global_symbols 
         WHERE symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
+        {limit_clause}
     """, (
         f"%/{escaped}().",
         f"%/{escaped}#",
@@ -216,7 +222,7 @@ def resolve_symbol(db, name, kind_filter=None):
 
     if not results:
         rows = db.execute(
-            "SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\'",
+            f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}",
             (f"%{escaped}%",)
         ).fetchall()
         results = [r for r in rows if name in r[1].split("/")[-1]]
@@ -258,19 +264,26 @@ def resolve_file(db, file_pattern):
     return [r[0] for r in rows]
 
 
-def get_file_symbols(db, relative_path):
+def get_file_symbols(db, relative_path, limit=None):
     """Get all symbols defined in a file.
+    
+    Args:
+        db: sqlite3 connection
+        relative_path: file path
+        limit: optional limit (no limit if None)
     
     Returns:
         List of (symbol_id, symbol, display_name, start_line, end_line) tuples
     """
-    return db.execute("""
+    limit_clause = f"LIMIT {limit}" if limit else ""
+    return db.execute(f"""
         SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
         JOIN documents d ON der.document_id = d.id
         WHERE d.relative_path = ?
         ORDER BY der.start_line
+        {limit_clause}
     """, (relative_path,)).fetchall()
 
 

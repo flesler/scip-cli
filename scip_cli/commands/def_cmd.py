@@ -15,10 +15,14 @@ def main(args):
     """Find the definition of a symbol."""
     db, project_root = setup()
     try:
-        symbols = resolve_symbol(db, args.symbol, args.kind)
+        limit = args.limit
+        symbols = resolve_symbol(db, args.symbol, args.kind, limit=limit + 1)
         if not symbols:
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
+
+        hit_limit = len(symbols) > limit
+        symbols = symbols[:limit]
 
         for symbol_id, symbol_str, display_name in symbols:
             row = get_def_location(db, symbol_id)
@@ -36,5 +40,8 @@ def main(args):
 
             print(f"{rel_path}:{format_line_range(start_line, end_line)}")
             print(source_snippet)
+
+        if hit_limit:
+            print(f"# Warning: more than {limit} symbols match, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

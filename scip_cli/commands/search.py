@@ -78,6 +78,7 @@ def main(args):
     """Search symbols by pattern."""
     db, _ = setup()
     try:
+        limit = args.limit
         # Escape LIKE wildcards in user pattern
         escaped_pattern = escape_like(args.pattern)
         
@@ -95,15 +96,18 @@ def main(args):
             rows = [r for r in rows if infer_kind(r[1]) == args.kind]
             
             # Apply LIMIT after filtering
-            rows = rows[:100]
+            hit_limit = len(rows) > limit
+            rows = rows[:limit]
         else:
-            rows = db.execute("""
+            rows = db.execute(f"""
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line
                 FROM global_symbols gs
                 LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
                 WHERE gs.symbol LIKE ? ESCAPE '\\'
-                LIMIT 100
+                LIMIT {limit + 1}
             """, (f"%{escaped_pattern}%",)).fetchall()
+            hit_limit = len(rows) > limit
+            rows = rows[:limit]
 
         if not rows:
             if args.kind:
@@ -127,5 +131,8 @@ def main(args):
 
             kind_display = kind_to_display(kind)
             print(f"{file_path}:{line} {kind_display} {symbol_name}")
+
+        if hit_limit:
+            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

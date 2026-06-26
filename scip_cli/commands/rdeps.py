@@ -13,6 +13,7 @@ def main(args):
     """Find all files that import from this file."""
     db, _ = setup()
     try:
+        limit = args.limit
         file_path = resolve_one_file(db, args.file)
 
         symbols = get_file_symbols(db, file_path)
@@ -33,7 +34,14 @@ def main(args):
             print(f"No reverse dependencies found for '{file_path}'", file=sys.stderr)
             sys.exit(1)
 
-        for dep_path in sorted(rdeps):
+        sorted_rdeps = sorted(rdeps)
+        hit_limit = len(sorted_rdeps) > limit
+        sorted_rdeps = sorted_rdeps[:limit]
+
+        for dep_path in sorted_rdeps:
             print(dep_path)
+
+        if hit_limit:
+            print(f"# Warning: more than {limit} reverse dependencies, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

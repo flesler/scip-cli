@@ -77,20 +77,20 @@ def main(args):
     """Find all references to a symbol."""
     db, project_root = setup()
     try:
-        symbols = resolve_symbol(db, args.symbol)
+        limit = args.limit
+
+        # Get symbols with LIMIT + 1 to detect if we hit the limit
+        symbols = resolve_symbol(db, args.symbol, limit=limit + 1)
         if not symbols:
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
-        max_symbols = args.max_symbols
-        max_refs = args.max_refs
-
-        symbols_hit_limit = len(symbols) > max_symbols
-        symbols = symbols[:max_symbols]
+        symbols_hit_limit = len(symbols) > limit
+        symbols = symbols[:limit]
 
         all_refs = []
         for symbol_id, symbol_str, display_name in symbols:
-            refs, refs_hit_limit = get_exact_refs(db, symbol_id, project_root, max_refs)
+            refs, refs_hit_limit = get_exact_refs(db, symbol_id, project_root, limit)
             if refs:
                 all_refs.append((symbol_str, refs, refs_hit_limit))
 
@@ -99,13 +99,13 @@ def main(args):
             sys.exit(1)
 
         if symbols_hit_limit:
-            print(f"# Warning: more than {max_symbols} symbols match, showing first {max_symbols}", file=sys.stderr)
+            print(f"# Warning: more than {limit} symbols match, showing first {limit}", file=sys.stderr)
 
-        for i, (symbol_str, refs, refs_hit_limit) in enumerate(all_refs):
+        for symbol_str, refs, refs_hit_limit in all_refs:
             if len(all_refs) > 1:
                 print(f"# {symbol_str}")
             if refs_hit_limit:
-                print(f"# Warning: more than {max_refs} refs for this symbol")
+                print(f"# Warning: more than {limit} refs for this symbol")
             seen = set()
             for path, line in refs:
                 key = (path, line)
