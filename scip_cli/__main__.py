@@ -3,6 +3,7 @@
 import argparse
 import sys
 
+from . import __version__
 from .commands import refs, def_cmd, search, symbols, rdeps, members, skill
 
 
@@ -11,6 +12,7 @@ def main():
         prog="scip-cli",
         description="Fast code intelligence via SCIP indexes"
     )
+    parser.add_argument("--version", action="version", version=f"scip-cli {__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # refs
