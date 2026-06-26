@@ -3,7 +3,7 @@ import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
-from scip_cli.lib import extract_leaf_name, infer_kind, escape_like, resolve_symbol, resolve_file, read_source_lines, detect_language, SymbolKind
+from scip_cli.lib import extract_leaf_name, infer_kind, escape_like, resolve_symbol, resolve_file, read_source_lines, detect_language, SymbolKind, format_line_range
 from scip_cli.commands.search import parse_symbol, is_noisy_symbol
 
 
@@ -391,3 +391,20 @@ class TestReadSourceLines:
 
             lines = read_source_lines(project_root, "nonexistent.ts")
             assert lines is None
+
+
+class TestFormatLineRange:
+    def test_both_defined(self):
+        assert format_line_range(0, 10) == "1:11"
+        assert format_line_range(9, 15) == "10:16"
+
+    def test_only_start_defined(self):
+        assert format_line_range(5, None) == "6:?"
+
+    def test_neither_defined(self):
+        assert format_line_range(None, None) == "??"
+        assert format_line_range(None, 10) == "??"
+
+    def test_custom_separator(self):
+        assert format_line_range(0, 10, sep="-") == "1-11"
+        assert format_line_range(None, None, sep="_") == "??"

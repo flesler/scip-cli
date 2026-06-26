@@ -7,6 +7,7 @@ from ..lib import (
     get_file_symbols,
     infer_kind,
     extract_leaf_name,
+    format_line_range,
 )
 
 
@@ -26,10 +27,7 @@ def main(args):
                 continue
             kind = infer_kind(symbol_str)
             short = extract_leaf_name(symbol_str)
-            if start_line is not None and end_line is not None:
-                line_info = f"{start_line + 1}-{end_line + 1}"
-            else:
-                line_info = "??"
+            line_info = format_line_range(start_line, end_line, sep="-")
             print(f"{line_info} {kind} {short}")
     finally:
         db.close()

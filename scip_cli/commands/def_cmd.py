@@ -7,6 +7,7 @@ from ..lib import (
     read_source_lines,
     infer_kind,
     get_def_location,
+    format_line_range,
 )
 
 
@@ -33,7 +34,7 @@ def main(args):
             else:
                 source_snippet = ''.join(lines).rstrip('\n')
 
-            print(f"{rel_path}:{start_line + 1}:{end_line + 1}")
+            print(f"{rel_path}:{format_line_range(start_line, end_line)}")
             print(source_snippet)
     finally:
         db.close()

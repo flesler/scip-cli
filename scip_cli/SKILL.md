@@ -12,7 +12,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | Question | Use | What you get |
 |----------|-----|--------------|
 | "Where is X defined and what does it do?" | `def X` | Functions: full body. Classes: full definition. Multiple exact matches returned together |
-| "Where is X used/called?" | `refs X` | All file:line locations (~0.03s). Ambiguous bare names → first match only |
+| "Where is X used/called?" | `refs X` | All file:line locations. Ambiguous bare names → first match only |
 | "What's in this file?" | `symbols file` | All symbols — bare filename works (`HistoryTab`, `usePatientEntries`) |
 | "Find symbols by name" | `search name` | Functions, types, interfaces, classes. Use `--kind variable` for consts |
 | "What files depend on this file?" | `rdeps file` | Importers — bare name works |

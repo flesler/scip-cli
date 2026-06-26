@@ -408,6 +408,24 @@ def warn_ambiguous(name, matches, context="symbol"):
     print(f"Ambiguous {context} '{name}' ({len(matches)} matches). Using first match: {label}", file=sys.stderr)
 
 
+def format_line_range(start_line, end_line, sep=":"):
+    """Format a line range as a string, handling None values.
+
+    Args:
+        start_line: 0-indexed start line, or None
+        end_line: 0-indexed end line (inclusive), or None
+        sep: separator between values (default ":" for "start:end")
+
+    Returns:
+        Formatted string like "10:20" or "??" if unavailable
+    """
+    if start_line is not None and end_line is not None:
+        return f"{start_line + 1}{sep}{end_line + 1}"
+    if start_line is not None:
+        return f"{start_line + 1}{sep}?"
+    return "??"
+
+
 def setup():
     """Setup command execution: find project root and get DB connection.
     
