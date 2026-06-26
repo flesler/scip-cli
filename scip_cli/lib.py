@@ -77,8 +77,10 @@ def get_db(project_root=None):
             
             if lang == "typescript":
                 indexer_cmd = ["scip-typescript", "index", "--output", index_scip]
+                npx_cmd = ["npx", "-y", "@sourcegraph/scip-typescript", "index", "--output", index_scip]
             elif lang == "python":
                 indexer_cmd = ["scip-python", "index", ".", "--output", index_scip]
+                npx_cmd = ["npx", "-y", "@sourcegraph/scip-python", "index", ".", "--output", index_scip]
             else:
                 print(f"Error: Unsupported language '{lang}'", file=sys.stderr)
                 sys.exit(1)
@@ -89,6 +91,16 @@ def get_db(project_root=None):
                 capture_output=True,
                 text=True
             )
+            
+            # If command not found, try npx
+            if result.returncode != 0 and "not found" in result.stderr.lower():
+                print(f"Tool not found, trying npx (will download automatically)...", file=sys.stderr)
+                result = subprocess.run(
+                    npx_cmd,
+                    cwd=str(root),
+                    capture_output=True,
+                    text=True
+                )
             
             if result.returncode != 0:
                 print(f"Error: Failed to index project", file=sys.stderr)
@@ -102,6 +114,15 @@ def get_db(project_root=None):
                 capture_output=True,
                 text=True
             )
+            
+            # If command not found, try npx
+            if result.returncode != 0 and "not found" in result.stderr.lower():
+                print(f"Tool not found, trying npx (will download automatically)...", file=sys.stderr)
+                result = subprocess.run(
+                    ["npx", "-y", "@sourcegraph/scip", "expt-convert", index_scip, "--output", str(index_db)],
+                    capture_output=True,
+                    text=True
+                )
             
             if result.returncode != 0:
                 print(f"Error: Failed to convert index", file=sys.stderr)

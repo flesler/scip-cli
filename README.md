@@ -20,11 +20,15 @@ Fast code intelligence CLI for TypeScript/JavaScript projects. Query SCIP indexe
 pip install scip-cli
 ```
 
-### 2. Install prerequisites
+### 2. Install prerequisites (optional)
 
-scip-cli requires two external tools for indexing:
+scip-cli can automatically download the required indexing tools when needed, or you can install them globally for faster performance:
 
-**For TypeScript/JavaScript projects:**
+**Option A: Let scip-cli handle it (recommended)**
+
+Just use scip-cli - it will automatically download the required tools via `npx` on first use. No global installation needed.
+
+**Option B: Install globally for better performance**
 
 ```bash
 # Install scip-typescript (SCIP indexer)
@@ -38,8 +42,8 @@ npm install -g @sourcegraph/scip
 
 ```bash
 scip-cli --help
-scip-typescript --version
-scip --version
+scip-typescript --version  # Only if you chose Option B
+scip --version             # Only if you chose Option B
 ```
 
 ## Prerequisites
