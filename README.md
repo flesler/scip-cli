@@ -149,6 +149,19 @@ scip_cli/
     └── skill.py
 ```
 
+## Development
+
+### Debug Logging
+
+Set `SCIP_CLI_DEBUG=1` to enable SQL query logging to stderr:
+
+```bash
+SCIP_CLI_DEBUG=1 scip-cli refs MyFunction
+# Shows: SQL: SELECT ... | params: (...)
+```
+
+This is useful for testing and debugging SQL queries without exposing a `--debug` flag to users.
+
 ## License
 
 MIT

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Core library for scip-cli: indexing, symbol resolution, and source reading."""
 import hashlib
+import logging
 import os
 import sqlite3
 import subprocess
@@ -8,6 +9,15 @@ import sys
 import tempfile
 from enum import Enum
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+
+def _debug_execute(db, sql, params=()):
+    """Execute SQL with optional debug logging."""
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("SQL: %s | params: %s", sql.strip()[:200], params)
+    return db.execute(sql, params)
 
 
 INDEX_TIMEOUT = 300
@@ -208,23 +218,24 @@ def resolve_symbol(db, name, kind_filter=None, limit=None):
     # Build LIMIT clause
     limit_clause = f"LIMIT {limit}" if limit else ""
     
-    rows = db.execute(f"""
+    sql = f"""
         SELECT id, symbol, display_name FROM global_symbols 
         WHERE symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
         {limit_clause}
-    """, (
+    """
+    params = (
         f"%/{escaped}().",
         f"%/{escaped}#",
         f"%/{escaped}.",
-    )).fetchall()
+    )
+    rows = _debug_execute(db, sql, params).fetchall()
 
     results = list(rows)
 
     if not results:
-        rows = db.execute(
-            f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}",
-            (f"%{escaped}%",)
-        ).fetchall()
+        sql = f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}"
+        params = (f"%{escaped}%",)
+        rows = _debug_execute(db, sql, params).fetchall()
         results = [r for r in rows if name in r[1].split("/")[-1]]
 
     if kind_filter and results:
@@ -243,7 +254,7 @@ def resolve_file(db, file_pattern):
     Returns:
         List of matching relative_paths
     """
-    rows = db.execute(
+    rows = _debug_execute(db, 
         "SELECT relative_path FROM documents WHERE relative_path = ?",
         (file_pattern,)
     ).fetchall()
@@ -257,7 +268,7 @@ def resolve_file(db, file_pattern):
     else:
         pattern = escaped.replace("*", "%")
 
-    rows = db.execute(
+    rows = _debug_execute(db, 
         "SELECT relative_path FROM documents WHERE relative_path LIKE ? ESCAPE '\\'",
         (pattern,)
     ).fetchall()
@@ -276,7 +287,7 @@ def get_file_symbols(db, relative_path, limit=None):
         List of (symbol_id, symbol, display_name, start_line, end_line) tuples
     """
     limit_clause = f"LIMIT {limit}" if limit else ""
-    return db.execute(f"""
+    sql = f"""
         SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -284,7 +295,8 @@ def get_file_symbols(db, relative_path, limit=None):
         WHERE d.relative_path = ?
         ORDER BY der.start_line
         {limit_clause}
-    """, (relative_path,)).fetchall()
+    """
+    return _debug_execute(db, sql, (relative_path,)).fetchall()
 
 
 def get_refs_for_symbols(db, symbol_ids):
@@ -297,7 +309,7 @@ def get_refs_for_symbols(db, symbol_ids):
         return {}
 
     placeholders = ','.join('?' * len(symbol_ids))
-    rows = db.execute(f"""
+    rows = _debug_execute(db, f"""
         SELECT m.symbol_id, d.relative_path, c.start_line
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
@@ -321,12 +333,12 @@ def get_members(db, symbol_id):
         List of (symbol_id, symbol, display_name, start_line, end_line) tuples.
         Function parameters are already filtered out.
     """
-    row = db.execute("SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
+    row = _debug_execute(db, "SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
     if not row:
         return []
     parent_symbol = row[0]
 
-    rows = db.execute("""
+    rows = _debug_execute(db, """
         SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
         FROM global_symbols gs
         LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -337,7 +349,7 @@ def get_members(db, symbol_id):
     if not rows:
         # Escape LIKE metacharacters in parent_symbol before using as prefix
         escaped_parent = escape_like(parent_symbol)
-        rows = db.execute("""
+        rows = _debug_execute(db, """
             SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
             FROM global_symbols gs
             LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -354,7 +366,7 @@ def get_def_location(db, symbol_id):
     Returns:
         Tuple of (relative_path, start_line, end_line) or None
     """
-    return db.execute("""
+    return _debug_execute(db, """
         SELECT d.relative_path, der.start_line, der.end_line
         FROM defn_enclosing_ranges der
         JOIN documents d ON der.document_id = d.id

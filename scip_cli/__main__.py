@@ -1,10 +1,22 @@
 """CLI entry point for scip-cli."""
 import argparse
+import logging
+import os
 import sys
 
 from . import __version__
 from .lib import SymbolKind
 from .commands import refs, def_cmd, search, symbols, rdeps, members, skill, reindex
+
+# Set up debug logging based on SCIP_CLI_DEBUG env var
+if os.environ.get("SCIP_CLI_DEBUG"):
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(name)s: %(message)s",
+        stream=sys.stderr
+    )
+else:
+    logging.disable(logging.DEBUG)
 
 
 def main():
