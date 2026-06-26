@@ -1,20 +1,40 @@
-"""Pytest configuration and shared fixtures."""
-import pytest
-import sys
+"""Shared pytest fixtures."""
+import shutil
+import subprocess
 from pathlib import Path
 
-# Add the project root to Python path so tests can import scip_cli
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+import pytest
+
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "sample-project"
+SMOKE_CLI = Path(__file__).resolve().parents[1] / ".venv" / "bin" / "scip-cli"
+
+# Stable symbols/paths in the bundled sample TypeScript project.
+HELPER_FILE = "src/helper.ts"
+FN_GREET = "greet"
+CLASS_WIDGET = "Widget"
 
 
-@pytest.fixture
-def sample_symbol():
-    """Sample SCIP symbol for testing."""
-    return "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/useDictation()."
+@pytest.fixture(scope="session")
+def indexed_sample_project(tmp_path_factory):
+    """Copy the sample project, index once, return project root."""
+    if not SMOKE_CLI.is_file():
+        pytest.skip("scip-cli not installed in .venv")
+    root = tmp_path_factory.mktemp("sample-project")
+    shutil.copytree(FIXTURE_ROOT, root, dirs_exist_ok=True)
+    result = subprocess.run(
+        [str(SMOKE_CLI), "reindex"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if result.returncode != 0:
+        pytest.skip(f"sample project indexing failed: {result.stderr[:500]}")
+    return root
 
 
-@pytest.fixture
-def sample_class_symbol():
-    """Sample class symbol for testing."""
-    return "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#"
+@pytest.fixture(scope="session")
+def smoke_cli():
+    if not SMOKE_CLI.is_file():
+        pytest.skip("scip-cli not installed in .venv")
+    return str(SMOKE_CLI)

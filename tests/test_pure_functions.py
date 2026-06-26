@@ -3,7 +3,12 @@ import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
-from scip_cli.lib import extract_leaf_name, infer_kind, escape_like, resolve_symbol, resolve_file, read_source_lines, detect_language, SymbolKind, format_line_range
+from scip_cli.output import format_def_body, format_line_range
+from scip_cli.project import detect_language
+from scip_cli.queries import resolve_file, resolve_symbol
+from scip_cli.source import read_source_lines
+from scip_cli.sql import escape_like
+from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind
 from scip_cli.commands.search import parse_symbol, is_noisy_symbol
 from scip_cli.commands.refs import get_exact_refs
 
@@ -29,20 +34,20 @@ class TestDetectLanguage:
 
 class TestExtractLeafName:
     def test_function(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/useDictation()."
-        assert extract_leaf_name(s) == "useDictation"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet()."
+        assert extract_leaf_name(s) == "greet"
 
     def test_class(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#"
-        assert extract_leaf_name(s) == "UseDictationOptions"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#"
+        assert extract_leaf_name(s) == "WidgetOptions"
 
     def test_variable(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/someVar."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/someVar."
         assert extract_leaf_name(s) == "someVar"
 
     def test_type_literal_property(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#typeLiteral0:onFallbackToRecording."
-        assert extract_leaf_name(s) == "onFallbackToRecording"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#typeLiteral0:onVerbose."
+        assert extract_leaf_name(s) == "onVerbose"
 
     def test_class_member_property(self):
         s = "scip-typescript npm battler 1.0.0 src/`GameEngine.ts`/GameEngine#config."
@@ -67,7 +72,7 @@ class TestExtractLeafName:
 
 class TestInferKind:
     def test_function(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/useDictation()."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet()."
         assert infer_kind(s) == SymbolKind.FUNCTION
 
     def test_method(self):
@@ -75,15 +80,15 @@ class TestInferKind:
         assert infer_kind(s) == SymbolKind.METHOD
 
     def test_class(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#"
         assert infer_kind(s) == SymbolKind.CLASS
 
     def test_variable(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/someVar."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/someVar."
         assert infer_kind(s) == SymbolKind.VARIABLE
 
     def test_type_literal_property(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#typeLiteral0:onFallbackToRecording."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#typeLiteral0:onVerbose."
         assert infer_kind(s) == SymbolKind.PROPERTY
 
     def test_getter(self):
@@ -101,19 +106,19 @@ class TestInferKind:
 
 class TestParseSymbol:
     def test_function(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/useDictation()."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet()."
         path, name = parse_symbol(s)
-        assert path == "src/hooks/useDictation.ts"
-        assert name == "useDictation()"
+        assert path == "src/helper.ts"
+        assert name == "greet()"
 
     def test_class(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#"
         path, name = parse_symbol(s)
-        assert path == "src/hooks/useDictation.ts"
-        assert name == "UseDictationOptions#"
+        assert path == "src/helper.ts"
+        assert name == "WidgetOptions#"
 
     def test_nested_path(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/components/ui/`btn.tsx`/Btn#"
+        s = "scip-typescript npm sample-app 1.0 src/components/ui/`btn.tsx`/Btn#"
         path, name = parse_symbol(s)
         assert path == "src/components/ui/btn.tsx"
         assert name == "Btn#"
@@ -136,23 +141,23 @@ class TestParseSymbol:
 
 class TestIsNoisySymbol:
     def test_file_level(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/"
         assert is_noisy_symbol(s) is True
 
     def test_type_literal_property(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#typeLiteral0:onFallbackToRecording."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#typeLiteral0:onVerbose."
         assert is_noisy_symbol(s) is True
 
     def test_function_parameter(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/isNotSupportedError().(err)"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet().(err)"
         assert is_noisy_symbol(s) is True
 
     def test_normal_function(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/useDictation()."
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet()."
         assert is_noisy_symbol(s) is False
 
     def test_normal_class(self):
-        s = "scip-typescript npm rovetia-app 1.2 src/hooks/`useDictation.ts`/UseDictationOptions#"
+        s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#"
         assert is_noisy_symbol(s) is False
 
     def test_normal_method(self):
@@ -287,6 +292,99 @@ class TestResolveSymbol:
             assert len(results) == 0
             conn.close()
 
+    def test_qualified_class_method(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = sqlite3.connect(db_path)
+            conn.execute("""
+                CREATE TABLE global_symbols (
+                    id INTEGER PRIMARY KEY,
+                    symbol TEXT,
+                    display_name TEXT
+                )
+            """)
+            conn.execute(
+                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+                (
+                    "scip-typescript npm test 1.0 src/`widget.ts`/Widget#run().",
+                    "onModuleInit",
+                ),
+            )
+            conn.execute(
+                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+                (
+                    "scip-typescript npm test 1.0 src/`other.module.ts`/OtherModule#onModuleInit().",
+                    "onModuleInit",
+                ),
+            )
+            conn.commit()
+
+            results = resolve_symbol(conn, "Widget.run")
+            assert len(results) == 1
+            assert "Widget#run" in results[0][1]
+            conn.close()
+
+    def test_qualified_excludes_parameters(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = sqlite3.connect(db_path)
+            conn.execute("""
+                CREATE TABLE global_symbols (
+                    id INTEGER PRIMARY KEY,
+                    symbol TEXT,
+                    display_name TEXT
+                )
+            """)
+            conn.execute(
+                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+                (
+                    "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().",
+                    "setBar",
+                ),
+            )
+            conn.execute(
+                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+                (
+                    "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().(eventIds)",
+                    "eventIds",
+                ),
+            )
+            conn.commit()
+
+            results = resolve_symbol(conn, "Foo.setBar")
+            assert len(results) == 1
+            assert ").(" not in results[0][1]
+            conn.close()
+
+
+class TestFormatDefBody:
+    def test_truncates_long_definitions(self):
+        lines = [f"line {i}\n" for i in range(200)]
+        body, truncated, shown_start, shown_end = format_def_body(
+            lines, start_line=10, end_line=209, max_lines=80
+        )
+        assert truncated is True
+        assert body.count("\n") == 79
+        assert shown_start == 10
+        assert shown_end == 89
+
+    def test_unlimited_when_max_lines_zero(self):
+        lines = ["a\n", "b\n", "c\n"]
+        body, truncated, _, shown_end = format_def_body(
+            lines, start_line=0, end_line=2, max_lines=0, max_chars=0
+        )
+        assert truncated is False
+        assert body == "a\nb\nc"
+        assert shown_end == 2
+
+    def test_char_cap_truncates(self):
+        lines = ["x" * 100 + "\n" for _ in range(10)]
+        body, truncated, _, _ = format_def_body(
+            lines, start_line=0, end_line=9, max_lines=0, max_chars=250
+        )
+        assert truncated is True
+        assert body.endswith("...")
+
 
 class TestResolveFile:
     def test_exact_match(self):
@@ -333,6 +431,31 @@ class TestResolveFile:
             results = resolve_file(conn, "test")
             assert len(results) == 1
             assert results[0] == "src/test.ts"
+            conn.close()
+
+    def test_bare_filename_prefers_non_test(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            conn = sqlite3.connect(db_path)
+            conn.execute("""
+                CREATE TABLE documents (
+                    id INTEGER PRIMARY KEY,
+                    relative_path TEXT
+                )
+            """)
+            conn.execute(
+                "INSERT INTO documents (relative_path) VALUES (?)",
+                ("pkg/src/helper.ts",),
+            )
+            conn.execute(
+                "INSERT INTO documents (relative_path) VALUES (?)",
+                ("pkg/src/helper.test.ts",),
+            )
+            conn.commit()
+
+            results = resolve_file(conn, "helper.ts")
+            assert len(results) >= 1
+            assert results[0] == "pkg/src/helper.ts"
             conn.close()
 
     def test_no_match(self):
