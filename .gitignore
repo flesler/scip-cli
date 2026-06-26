@@ -37,6 +37,9 @@ env/
 .DS_Store
 Thumbs.db
 
+# Env/secrets
+.env
+
 # Pytest
 .pytest_cache/
 
