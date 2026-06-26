@@ -2,18 +2,12 @@
 import sys
 import re
 
-from ..lib import (
-    setup,
-    resolve_one_symbol,
-    get_members,
-    get_def_location,
-    infer_kind,
-    extract_leaf_name,
-    read_source_lines,
-    format_line_range,
-    limit_and_warn,
-    SymbolKind,
-)
+from ..cli_args import path_scope_from_args
+from ..output import format_line_range, limit_and_warn
+from ..queries import get_def_location, get_members
+from ..session import resolve_one_symbol, setup
+from ..source import read_source_lines
+from ..symbols import SymbolKind, extract_leaf_name, infer_kind
 
 
 def _member_source_patterns(member_symbol, short, kind):
@@ -42,8 +36,9 @@ def main(args):
     """List members of a class or interface."""
     db, project_root = setup()
     try:
+        path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
-        symbol_id, _, _ = resolve_one_symbol(db, args.symbol)
+        symbol_id, _, _ = resolve_one_symbol(db, args.symbol, path_scope=path_scope)
         members = get_members(db, symbol_id)
 
         members, hit_limit = limit_and_warn(members, limit, "members")
@@ -61,6 +56,8 @@ def main(args):
         source_lines = None
         if needs_lookup and project_root and parent_file and parent_start is not None:
             source_lines = read_source_lines(project_root, parent_file, parent_start, parent_end)
+
+        names_only = getattr(args, "names_only", False)
 
         for member_id, member_symbol, member_name, start_line, end_line in members:
             kind = infer_kind(member_symbol)
@@ -83,6 +80,10 @@ def main(args):
                         start_line = parent_start + i
                         end_line = start_line
                         break
+
+            if names_only:
+                print(short)
+                continue
 
             line_info = format_line_range(start_line, end_line)
             print(f"{line_info} {kind} {short}")

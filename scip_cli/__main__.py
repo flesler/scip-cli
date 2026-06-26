@@ -6,7 +6,8 @@ import sqlite3
 import sys
 
 from . import __version__
-from .lib import SymbolKind
+from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument, add_paths_only_argument
+from .symbols import SymbolKind
 from .commands import refs, def_cmd, search, symbols, rdeps, members, skill, reindex
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
@@ -33,32 +34,52 @@ def main():
     refs_parser = subparsers.add_parser("refs", help="Find references to a symbol")
     refs_parser.add_argument("symbol", help="Symbol name")
     refs_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_path_argument(refs_parser)
+    add_paths_only_argument(refs_parser)
 
     # def
     def_parser = subparsers.add_parser("def", help="Find symbol definition")
     def_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
-    def_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    def_parser.add_argument("--limit", type=int, default=10, help="Max matching symbols (default: 10)")
+    add_path_argument(def_parser)
+    def_parser.add_argument(
+        "--max-lines",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). "
+            "Use 0 for unlimited."
+        ),
+    )
     def_parser.add_argument("symbol", help="Symbol name")
 
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")
     search_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
     search_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_path_argument(search_parser)
+    add_names_only_argument(search_parser)
+    add_paths_only_argument(search_parser)
     search_parser.add_argument("pattern", help="Search pattern")
 
     # symbols
     symbols_parser = subparsers.add_parser("symbols", help="List symbols in a file")
     symbols_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_path_argument(symbols_parser)
     symbols_parser.add_argument("file", help="File path or pattern")
 
     # rdeps
     rdeps_parser = subparsers.add_parser("rdeps", help="Find reverse dependencies of a file")
     rdeps_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_path_argument(rdeps_parser)
     rdeps_parser.add_argument("file", help="File path or pattern")
 
     # members
     members_parser = subparsers.add_parser("members", help="List members of a class/interface")
     members_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_path_argument(members_parser)
+    add_names_only_argument(members_parser)
     members_parser.add_argument("symbol", help="Symbol name")
 
     # skill

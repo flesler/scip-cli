@@ -2,7 +2,9 @@
 import shutil
 import sys
 
-from ..lib import find_project_root, get_cache_dir, get_db
+from ..cache import get_cache_dir
+from ..indexing import get_db
+from ..project import find_project_root
 
 
 def main(args):

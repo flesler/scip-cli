@@ -1,22 +1,19 @@
 """symbols command - list symbols in a file."""
 import sys
 
-from ..lib import (
-    setup,
-    resolve_one_file,
-    get_file_symbols,
-    infer_kind,
-    extract_leaf_name,
-    format_line_range,
-    limit_and_warn,
-)
+from ..cli_args import path_scope_from_args
+from ..output import format_line_range, limit_and_warn
+from ..queries import get_file_symbols
+from ..session import resolve_one_file, setup
+from ..symbols import extract_leaf_name, infer_kind
 
 
 def main(args):
     """List all symbols in a file."""
-    db, _ = setup()
+    db, project_root = setup()
     try:
-        file_path = resolve_one_file(db, args.file)
+        path_scope = path_scope_from_args(args, project_root)
+        file_path = resolve_one_file(db, args.file, path_scope=path_scope)
 
         limit = args.limit
         symbols = get_file_symbols(db, file_path, limit=limit + 1)

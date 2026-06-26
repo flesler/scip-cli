@@ -1,16 +1,16 @@
 """refs command - find all references to a symbol."""
 import sys
 
-from ..lib import (
-    setup,
-    resolve_symbol,
-    read_source_lines,
-    extract_leaf_name,
-    limit_and_warn,
-)
+from ..cli_args import path_scope_from_args
+from ..output import limit_and_warn
+from ..paths import path_in_scope
+from ..queries import resolve_symbol
+from ..session import setup
+from ..source import read_source_lines
+from ..symbols import extract_leaf_name
 
 
-def get_exact_refs(db, symbol_id, project_root, max_refs):
+def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
     """Get references with exact line numbers by reading source files."""
     sym_row = db.execute("SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
     if not sym_row:
@@ -78,10 +78,10 @@ def main(args):
     """Find all references to a symbol."""
     db, project_root = setup()
     try:
+        path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
 
-        # Get symbols with LIMIT + 1 to detect if we hit the limit
-        symbols = resolve_symbol(db, args.symbol, limit=limit + 1)
+        symbols = resolve_symbol(db, args.symbol, limit=limit + 1, path_scope=path_scope)
         if not symbols:
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
@@ -90,7 +90,9 @@ def main(args):
 
         all_refs = []
         for symbol_id, symbol_str, display_name in symbols:
-            refs, refs_hit_limit = get_exact_refs(db, symbol_id, project_root, limit)
+            refs, refs_hit_limit = get_exact_refs(
+                db, symbol_id, project_root, limit, path_scope=path_scope
+            )
             if refs:
                 all_refs.append((symbol_str, refs, refs_hit_limit))
 
@@ -101,15 +103,26 @@ def main(args):
         if symbols_hit_limit:
             print(f"# Warning: more than {limit} symbols match, showing first {limit}", file=sys.stderr)
 
+        paths_only = getattr(args, "paths_only", False)
+        if paths_only:
+            unique_paths = sorted({path for _, refs, _ in all_refs for path, _ in refs})
+            for path in unique_paths:
+                if path_in_scope(path, path_scope):
+                    print(path)
+            return
+
         for symbol_str, refs, refs_hit_limit in all_refs:
             if len(all_refs) > 1:
                 print(f"# {symbol_str}")
             if refs_hit_limit:
-                print(f"# Warning: more than {limit} refs for this symbol")
+                print(
+                    f"# Warning: more than {limit} refs for this symbol",
+                    file=sys.stderr,
+                )
             seen = set()
             for path, line in refs:
                 key = (path, line)
-                if key not in seen:
+                if key not in seen and path_in_scope(path, path_scope):
                     seen.add(key)
                     print(f"{path}:{line}")
     finally:

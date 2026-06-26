@@ -1,0 +1,116 @@
+"""SCIP symbol parsing and kind inference."""
+import re
+from enum import Enum
+
+
+class SymbolKind(str, Enum):
+    """Symbol kinds for filtering and display."""
+
+    FUNCTION = "function"
+    METHOD = "method"
+    CLASS = "class"
+    PROPERTY = "property"
+    VARIABLE = "variable"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def values(cls):
+        return [k.value for k in cls]
+
+    @classmethod
+    def filterable_values(cls):
+        """Values suitable for --kind filtering (excludes UNKNOWN)."""
+        return [k.value for k in cls if k != cls.UNKNOWN]
+
+
+def infer_kind(symbol):
+    """Infer symbol kind from symbol string pattern."""
+    if "#" in symbol and symbol.endswith("()."):
+        return SymbolKind.METHOD
+    if symbol.endswith("()."):
+        return SymbolKind.FUNCTION
+    if symbol.endswith("#"):
+        name = symbol.split("/")[-1].rstrip("#")
+        if name and name[0].isupper():
+            return SymbolKind.CLASS
+    if "#typeLiteral" in symbol and ":" in symbol and symbol.endswith("."):
+        return SymbolKind.PROPERTY
+    if symbol.endswith(".") and not symbol.endswith("()."):
+        return SymbolKind.VARIABLE
+    return SymbolKind.UNKNOWN
+
+
+def parse_qualified_name(name):
+    """Split a dotted symbol query into qualifier segments and leaf name."""
+    if "." not in name:
+        return [], name
+    parts = name.split(".")
+    return parts[:-1], parts[-1]
+
+
+def is_parameter_symbol(symbol_str):
+    """Return True for function/method parameter symbols."""
+    return ").(" in symbol_str
+
+
+def symbol_matches_qualifier(symbol_str, qualifier_parts, leaf):
+    """Return True when a SCIP symbol matches Class.member style qualifiers."""
+    if not qualifier_parts:
+        return True
+
+    tail = symbol_str.split("/")[-1]
+    joined = "#".join(qualifier_parts)
+    if f"{joined}#{leaf}" in tail:
+        return True
+
+    container = qualifier_parts[-1]
+    if f"{container}#{leaf}" in tail:
+        if len(qualifier_parts) == 1:
+            return True
+        prefix = qualifier_parts[:-1]
+        return all(part in symbol_str for part in prefix)
+
+    dotted = ".".join(qualifier_parts)
+    if f"{dotted}.{leaf}" in symbol_str or f"{dotted}/{leaf}" in symbol_str:
+        return True
+
+    if ".py/" in symbol_str and f"{container}#{leaf}" in symbol_str:
+        if len(qualifier_parts) == 1:
+            return True
+        return all(part in symbol_str for part in qualifier_parts[:-1])
+
+    return False
+
+
+def extract_leaf_name(symbol_str):
+    """Extract the leaf name from a SCIP symbol string."""
+    leaf = symbol_str.split("/")[-1].rstrip(".#")
+    if leaf.endswith("()"):
+        leaf = leaf[:-2]
+    if ":" in leaf:
+        leaf = leaf.split(":")[-1]
+    if "#" in leaf:
+        leaf = leaf.split("#")[-1]
+    leaf = leaf.replace("`", "")
+    if leaf.startswith("<get>"):
+        leaf = leaf[5:]
+    elif leaf.startswith("<set>"):
+        leaf = leaf[5:]
+    return leaf
+
+
+def extract_file_path_from_symbol(symbol_str):
+    """Extract the source file path encoded in a SCIP symbol string."""
+    match = re.search(r"`([^`]+)`", symbol_str)
+    if match:
+        filename = match.group(1)
+        before = symbol_str[: match.start()]
+        parts = before.split()
+        if len(parts) >= 5:
+            return " ".join(parts[4:]) + filename
+        return filename
+
+    py_match = re.search(r"(\S+\.py)/", symbol_str)
+    if py_match:
+        return py_match.group(1)
+    return None
