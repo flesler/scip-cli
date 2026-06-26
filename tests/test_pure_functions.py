@@ -8,8 +8,8 @@ from scip_cli.project import detect_language
 from scip_cli.queries import resolve_file, resolve_symbol
 from scip_cli.source import read_source_lines
 from scip_cli.sql import escape_like
-from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind
-from scip_cli.commands.search import parse_symbol, is_noisy_symbol
+from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind, kind_sql_clause
+from scip_cli.commands.search import parse_symbol, is_noisy_symbol, kind_to_display
 from scip_cli.commands.refs import get_exact_refs
 
 
@@ -102,6 +102,15 @@ class TestInferKind:
     def test_python_method(self):
         s = "scip-python pip mypkg 1.0 src/module.py/MyClass#method()."
         assert infer_kind(s) == SymbolKind.METHOD
+
+
+class TestKindHelpers:
+    def test_kind_to_display_uses_value(self):
+        assert kind_to_display(SymbolKind.CLASS) == "class"
+
+    def test_kind_sql_clause_class(self):
+        assert "LIKE '%#'" in kind_sql_clause("class")
+        assert "NOT LIKE '%().'" in kind_sql_clause(SymbolKind.CLASS)
 
 
 class TestParseSymbol:

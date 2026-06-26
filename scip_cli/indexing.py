@@ -285,4 +285,8 @@ def get_db(project_root=None):
         if not db_path:
             raise RuntimeError("No index.db found after indexing")
 
-    return sqlite3.connect(str(db_path))
+    from .sql import configure_read_connection
+
+    conn = sqlite3.connect(str(db_path))
+    configure_read_connection(conn)
+    return conn

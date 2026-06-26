@@ -86,7 +86,7 @@ def main(args):
                 continue
 
             line_info = format_line_range(start_line, end_line)
-            print(f"{line_info} {kind} {short}")
+            print(f"{line_info} {kind.value} {short}")
 
         if hit_limit:
             print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)

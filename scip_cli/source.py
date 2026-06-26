@@ -5,16 +5,34 @@ from pathlib import Path
 from .queries import resolve_document_path
 from .symbols import extract_leaf_name
 
+_resolved_source_paths = {}
+
+
+def _resolve_source_path(project_root, relative_path):
+    """Resolve and validate a project-relative source path (cached per process)."""
+    cache_key = (str(project_root), relative_path)
+    if cache_key in _resolved_source_paths:
+        return _resolved_source_paths[cache_key]
+
+    try:
+        root = Path(project_root).resolve()
+        full_path = (root / relative_path).resolve()
+        full_path.relative_to(root)
+    except (ValueError, RuntimeError):
+        _resolved_source_paths[cache_key] = None
+        return None
+
+    _resolved_source_paths[cache_key] = full_path
+    return full_path
+
 
 def read_source_lines(project_root, relative_path, start_line=None, end_line=None):
     """Read source lines from filesystem."""
+    full_path = _resolve_source_path(project_root, relative_path)
+    if full_path is None:
+        return None
+
     try:
-        root = Path(project_root).resolve()
-        try:
-            full_path = (root / relative_path).resolve()
-            full_path.relative_to(root)
-        except (ValueError, RuntimeError):
-            return None
         with open(full_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             if start_line is not None and end_line is not None:

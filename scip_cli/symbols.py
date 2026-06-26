@@ -23,6 +23,23 @@ class SymbolKind(str, Enum):
         return [k.value for k in cls if k != cls.UNKNOWN]
 
 
+def kind_sql_clause(kind):
+    """Approximate SQL WHERE fragment to pre-filter symbols by kind."""
+    if isinstance(kind, str):
+        kind = SymbolKind(kind)
+    if kind == SymbolKind.FUNCTION:
+        return " AND gs.symbol LIKE '%().' AND gs.symbol NOT LIKE '%#%().'"
+    if kind == SymbolKind.METHOD:
+        return " AND gs.symbol LIKE '%#%' AND gs.symbol LIKE '%().'"
+    if kind == SymbolKind.CLASS:
+        return " AND gs.symbol LIKE '%#' AND gs.symbol NOT LIKE '%().'"
+    if kind == SymbolKind.PROPERTY:
+        return " AND gs.symbol LIKE '%#typeLiteral%'"
+    if kind == SymbolKind.VARIABLE:
+        return " AND gs.symbol LIKE '%.' AND gs.symbol NOT LIKE '%().'"
+    return ""
+
+
 def infer_kind(symbol):
     """Infer symbol kind from symbol string pattern."""
     if "#" in symbol and symbol.endswith("()."):

@@ -3,14 +3,28 @@ import os
 import sys
 
 from .constants import DEFAULT_MAX_DEF_CHARS, DEFAULT_MAX_DEF_LINES
+from .symbols import extract_file_path_from_symbol, extract_leaf_name
+
+
+def _ambiguous_label(match):
+    """Short label for an ambiguous match (leaf name + optional file path)."""
+    if isinstance(match, tuple) and len(match) > 1:
+        symbol_or_path = match[1]
+        if isinstance(symbol_or_path, str) and symbol_or_path.startswith("scip-"):
+            leaf = extract_leaf_name(symbol_or_path)
+            rel_path = extract_file_path_from_symbol(symbol_or_path)
+            if rel_path:
+                return f"{leaf} ({rel_path})"
+            return leaf
+        return symbol_or_path
+    return match
 
 
 def warn_ambiguous(name, matches, context="symbol"):
     """Print warning if multiple matches found."""
     if len(matches) <= 1:
         return
-    first = matches[0]
-    label = first[1] if isinstance(first, tuple) and len(first) > 1 else first
+    label = _ambiguous_label(matches[0])
     print(
         f"Ambiguous {context} '{name}' ({len(matches)} matches). Using first match: {label}",
         file=sys.stderr,

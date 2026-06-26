@@ -50,6 +50,13 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
         min_line = min(c[1] for c in chunks_list)
         max_line = max(c[2] for c in chunks_list)
+        all_single_line = all(c[1] == c[2] for c in chunks_list if c[1] is not None)
+
+        if all_single_line:
+            for _chunk_id, start_line, _end_line in chunks_list:
+                if start_line is not None:
+                    results.append((rel_path, start_line + 1))
+            continue
 
         lines = read_source_lines(project_root, rel_path, min_line, max_line)
         if lines is None:
@@ -113,7 +120,7 @@ def main(args):
 
         for symbol_str, refs, refs_hit_limit in all_refs:
             if len(all_refs) > 1:
-                print(f"# {symbol_str}")
+                print(f"# {extract_leaf_name(symbol_str)}", file=sys.stderr)
             if refs_hit_limit:
                 print(
                     f"# Warning: more than {limit} refs for this symbol",

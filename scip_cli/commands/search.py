@@ -7,7 +7,7 @@ from ..paths import path_filter_sql
 from ..queries import get_def_location, resolve_document_path, resolve_symbol
 from ..session import setup
 from ..sql import escape_like
-from ..symbols import SymbolKind, extract_leaf_name, infer_kind
+from ..symbols import SymbolKind, extract_leaf_name, infer_kind, kind_sql_clause
 
 
 def parse_symbol(symbol):
@@ -51,15 +51,29 @@ def is_noisy_symbol(symbol_str):
 
 
 def kind_to_display(kind):
-    """Convert kind to display format."""
-    kind_map = {
-        SymbolKind.FUNCTION: "Function",
-        SymbolKind.METHOD: "Method",
-        SymbolKind.CLASS: "Class",
-        SymbolKind.PROPERTY: "Property",
-        SymbolKind.VARIABLE: "Variable",
-    }
-    return kind_map.get(kind, "Unknown")
+    """Convert kind to compact display format."""
+    return kind.value if isinstance(kind, SymbolKind) else str(kind)
+
+
+def _search_rows_with_kind(db, sql, params, kind, limit):
+    """Fetch search rows matching kind, stopping once limit is exceeded."""
+    rows = []
+    hit_limit = False
+    cursor = db.execute(sql, params)
+    while True:
+        batch = cursor.fetchmany(500)
+        if not batch:
+            break
+        for row in batch:
+            if infer_kind(row[1]) != kind:
+                continue
+            rows.append(row)
+            if len(rows) > limit:
+                hit_limit = True
+                break
+        if hit_limit or len(rows) > limit:
+            break
+    return rows[:limit], hit_limit
 
 
 def _resolve_file_path(db, symbol_str, doc_path=None):
@@ -98,11 +112,6 @@ def main(args):
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
-        want_doc_path = bool(
-            path_scope
-            or getattr(args, "names_only", False)
-            or getattr(args, "paths_only", False)
-        )
 
         if (
             "." in args.pattern
@@ -134,32 +143,29 @@ def main(args):
 
         escaped_pattern = escape_like(args.pattern)
         path_clause, path_params = path_filter_sql(db, path_scope)
+        kind_clause = kind_sql_clause(args.kind) if args.kind else ""
         join_docs = (
             " LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id"
             " LEFT JOIN documents d ON der.document_id = d.id"
-            if want_doc_path
-            else " LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id"
         )
-        doc_col = ", d.relative_path" if want_doc_path else ""
 
         if args.kind:
-            rows = db.execute(
+            rows, hit_limit = _search_rows_with_kind(
+                db,
                 f"""
-                SELECT gs.id, gs.symbol, gs.display_name, der.start_line{doc_col}
+                SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
                 FROM global_symbols gs
                 {join_docs}
-                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}
+                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}{kind_clause}
             """,
                 (f"%{escaped_pattern}%", *path_params),
-            ).fetchall()
-
-            rows = [r for r in rows if infer_kind(r[1]) == args.kind]
-            hit_limit = len(rows) > limit
-            rows = rows[:limit]
+                args.kind,
+                limit,
+            )
         else:
             rows = db.execute(
                 f"""
-                SELECT gs.id, gs.symbol, gs.display_name, der.start_line{doc_col}
+                SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
                 FROM global_symbols gs
                 {join_docs}
                 WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}
@@ -181,24 +187,14 @@ def main(args):
             sys.exit(1)
 
         results = []
-        for row in rows:
-            if want_doc_path:
-                symbol_id, symbol_str, display_name, start_line, doc_path = row
-            else:
-                symbol_id, symbol_str, display_name, start_line = row
-                doc_path = None
+        for symbol_id, symbol_str, display_name, start_line, doc_path in rows:
             if is_noisy_symbol(symbol_str):
                 continue
 
             kind = infer_kind(symbol_str)
             file_path = _resolve_file_path(db, symbol_str, doc_path)
-            _, symbol_name = parse_symbol(symbol_str)
             line = start_line + 1 if start_line is not None else "?"
-            symbol_name = symbol_name.rstrip(".#")
-            if symbol_name.endswith("()"):
-                symbol_name = symbol_name[:-2]
-            if not symbol_name or symbol_name == "?":
-                symbol_name = extract_leaf_name(symbol_str)
+            symbol_name = extract_leaf_name(symbol_str)
             results.append((file_path, line, kind_to_display(kind), symbol_name))
 
         if not results:
