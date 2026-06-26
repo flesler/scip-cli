@@ -16,8 +16,25 @@ Fast code intelligence CLI for TypeScript/JavaScript and Python projects. Query 
 
 ### 1. Install scip-cli
 
+**From PyPI:**
+
 ```bash
 pip install scip-cli
+```
+
+**From source (local development):**
+
+```bash
+git clone https://github.com/flesler/scip-cli.git
+cd scip-cli
+pip install .
+```
+
+For editable development (where `pip install -e .` fails due to permissions):
+
+```bash
+export PYTHONPATH=/path/to/scip-cli:$PYTHONPATH
+python -m scip_cli --help
 ```
 
 ### 2. Install prerequisites (optional)

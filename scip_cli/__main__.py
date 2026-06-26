@@ -18,6 +18,8 @@ def main():
     # refs
     refs_parser = subparsers.add_parser("refs", help="Find references to a symbol")
     refs_parser.add_argument("symbol", help="Symbol name")
+    refs_parser.add_argument("--max-symbols", type=int, default=3, help="Max symbols to resolve (default: 3)")
+    refs_parser.add_argument("--max-refs", type=int, default=10, help="Max refs per symbol (default: 10)")
 
     # def
     def_parser = subparsers.add_parser("def", help="Find symbol definition")

@@ -12,7 +12,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | Question | Use | What you get |
 |----------|-----|--------------|
 | "Where is X defined and what does it do?" | `def X` | Functions: full body. Classes: full definition. Multiple exact matches returned together |
-| "Where is X used/called?" | `refs X` | All file:line locations. Ambiguous bare names → first match only |
+| "Where is X used/called?" | `refs X` | All file:line locations. Shows refs for all matching symbols (max 3) |
 | "What's in this file?" | `symbols file` | All symbols — bare filename works (`HistoryTab`, `usePatientEntries`) |
 | "Find symbols by name" | `search name` | Functions, types, interfaces, classes. Use `--kind variable` for consts |
 | "What files depend on this file?" | `rdeps file` | Importers — bare name works |
@@ -21,7 +21,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 ## Gotchas
 
 - **Bare names** resolve functions, types (aliases + interfaces), and classes. Consts/variables need `def --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `def methodName`.
-- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `def` returns all; `refs` picks the first and warns. Use `search` with a more specific pattern to disambiguate.
+- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `def` returns all; `refs` returns refs for all matching symbols (max 3, max 10 refs each). Use `search` with a more specific pattern to disambiguate.
 - **First run** in a project may auto-index (one-time wait, ~10-30s for large codebases). JS-only projects (no `tsconfig.json`) are supported automatically.
 
 ## Details
@@ -37,10 +37,15 @@ Kinds: `function`, `method`, `class`, `property`, `variable` — use `--kind` wh
 ### refs
 
 ```bash
-refs <symbol>
+refs [--max-symbols N] [--max-refs N] <symbol>
 ```
 
 Returns `file:line` for each reference. Reads source files to find exact line numbers.
+
+- `--max-symbols`: Max symbols to resolve (default: 3)
+- `--max-refs`: Max refs per symbol (default: 10)
+
+When multiple symbols match, refs are grouped by symbol with `# <symbol>` headers.
 
 ### search
 

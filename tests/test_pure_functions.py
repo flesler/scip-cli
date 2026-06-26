@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from scip_cli.lib import extract_leaf_name, infer_kind, escape_like, resolve_symbol, resolve_file, read_source_lines, detect_language, SymbolKind, format_line_range
 from scip_cli.commands.search import parse_symbol, is_noisy_symbol
+from scip_cli.commands.refs import get_exact_refs
 
 
 class TestDetectLanguage:
@@ -408,3 +409,124 @@ class TestFormatLineRange:
     def test_custom_separator(self):
         assert format_line_range(0, 10, sep="-") == "1-11"
         assert format_line_range(None, None, sep="_") == "??"
+
+
+class TestGetExactRefs:
+    """Tests for get_exact_refs function in refs command."""
+
+    def _create_test_db(self):
+        """Create a test database with minimal schema."""
+        conn = sqlite3.connect(":memory:")
+        conn.executescript("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
+            );
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT
+            );
+            CREATE TABLE chunks (
+                id INTEGER PRIMARY KEY,
+                document_id INTEGER,
+                start_line INTEGER,
+                end_line INTEGER
+            );
+            CREATE TABLE mentions (
+                id INTEGER PRIMARY KEY,
+                symbol_id INTEGER,
+                chunk_id INTEGER,
+                role INTEGER
+            );
+        """)
+        return conn
+
+    def test_no_symbol(self):
+        """Test when symbol doesn't exist."""
+        conn = self._create_test_db()
+        refs, hit_limit = get_exact_refs(conn, 999, "/tmp", 10)
+        assert refs == []
+        assert hit_limit is False
+        conn.close()
+
+    def test_no_mentions(self):
+        """Test when symbol exists but has no references."""
+        conn = self._create_test_db()
+        conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (1, "scip-python test/test `test.py`/foo().", "foo")
+        )
+        conn.commit()
+        refs, hit_limit = get_exact_refs(conn, 1, "/tmp", 10)
+        assert refs == []
+        assert hit_limit is False
+        conn.close()
+
+    def test_single_reference(self):
+        """Test with a single reference."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            conn = self._create_test_db()
+            # Create test file
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text("def foo():\n    pass\n\nfoo()\n")
+
+            # Insert data
+            conn.execute(
+                "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+                (1, "scip-python test/test `test.py`/foo().", "foo")
+            )
+            conn.execute(
+                "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+                (1, "test.py")
+            )
+            conn.execute(
+                "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)",
+                (1, 1, 3, 3)
+            )
+            conn.execute(
+                "INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)",
+                (1, 1, 0)
+            )
+            conn.commit()
+
+            refs, hit_limit = get_exact_refs(conn, 1, tmpdir, 10)
+            assert len(refs) == 1
+            assert refs[0] == ("test.py", 4)  # Line 4 (1-indexed)
+            assert hit_limit is False
+            conn.close()
+
+    def test_max_refs_limit(self):
+        """Test that max_refs limit is respected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            conn = self._create_test_db()
+            # Create test file
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text("foo()\nfoo()\nfoo()\n")
+
+            # Insert symbol
+            conn.execute(
+                "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+                (1, "scip-python test/test `test.py`/foo().", "foo")
+            )
+            conn.execute(
+                "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+                (1, "test.py")
+            )
+            # Insert 3 mentions
+            for i in range(3):
+                conn.execute(
+                    "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)",
+                    (i + 1, 1, i, i)
+                )
+                conn.execute(
+                    "INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)",
+                    (1, i + 1, 0)
+                )
+            conn.commit()
+
+            # Limit to 2 refs
+            refs, hit_limit = get_exact_refs(conn, 1, tmpdir, 2)
+            assert len(refs) == 2
+            assert hit_limit is True
+            conn.close()
