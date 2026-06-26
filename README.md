@@ -1,5 +1,8 @@
 # scip-cli
 
+[![PyPI version](https://badge.fury.io/py/scip-cli.svg)](https://badge.fury.io/py/scip-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Fast code intelligence CLI for TypeScript/JavaScript projects. Query SCIP indexes directly via SQLite for instant results.
 
 ## Features
@@ -11,12 +14,37 @@ Fast code intelligence CLI for TypeScript/JavaScript projects. Query SCIP indexe
 
 ## Installation
 
+### 1. Install scip-cli
+
 ```bash
 pip install scip-cli
 ```
 
+### 2. Install prerequisites
+
+scip-cli requires two external tools for indexing:
+
+**For TypeScript/JavaScript projects:**
+
+```bash
+# Install scip-typescript (SCIP indexer)
+npm install -g @sourcegraph/scip-typescript
+
+# Install scip (SCIP CLI for index conversion)
+npm install -g @sourcegraph/scip
+```
+
+**Verify installation:**
+
+```bash
+scip-cli --help
+scip-typescript --version
+scip --version
+```
+
 ## Prerequisites
 
+- Python 3.7+
 - `scip-typescript` (for indexing TypeScript/JavaScript)
 - `scip` CLI (for converting indexes)
 
