@@ -18,7 +18,7 @@ def main(args):
         target = Path(args.path).expanduser()
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-        print(f"Installed skill to {target}")
+        print(f"Installed skill to {target}", file=sys.stderr)
     else:
         # Print to stdout
         print(content)

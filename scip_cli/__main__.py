@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
 """CLI entry point for scip-cli."""
 import argparse
 import sys
 
 from . import __version__
-from .commands import refs, def_cmd, search, symbols, rdeps, members, skill
+from .lib import SymbolKind
+from .commands import refs, def_cmd, search, symbols, rdeps, members, skill, reindex
 
 
 def main():
@@ -21,12 +21,12 @@ def main():
 
     # def
     def_parser = subparsers.add_parser("def", help="Find symbol definition")
-    def_parser.add_argument("--type", dest="kind", help="Filter by kind (function, class, etc)")
+    def_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
     def_parser.add_argument("symbol", help="Symbol name")
 
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")
-    search_parser.add_argument("--kind", help="Filter by kind")
+    search_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
     search_parser.add_argument("pattern", help="Search pattern")
 
     # symbols
@@ -45,27 +45,35 @@ def main():
     skill_parser = subparsers.add_parser("skill", help="Install or dump the scip-cli SKILL.md")
     skill_parser.add_argument("path", nargs="?", help="Optional file path to write to (creates dirs)")
 
+    # reindex
+    subparsers.add_parser("reindex", help="Force re-indexing of the current project")
+
     args = parser.parse_args()
 
-    if not args.command:
+    # Dispatch to command handlers
+    dispatch = {
+        "refs": refs.main,
+        "def": def_cmd.main,
+        "search": search.main,
+        "symbols": symbols.main,
+        "rdeps": rdeps.main,
+        "members": members.main,
+        "skill": skill.main,
+        "reindex": reindex.main,
+    }
+
+    handler = dispatch.get(args.command)
+    if not handler:
         parser.print_help()
         sys.exit(1)
 
-    # Dispatch to command handlers
-    if args.command == "refs":
-        refs.main(args)
-    elif args.command == "def":
-        def_cmd.main(args)
-    elif args.command == "search":
-        search.main(args)
-    elif args.command == "symbols":
-        symbols.main(args)
-    elif args.command == "rdeps":
-        rdeps.main(args)
-    elif args.command == "members":
-        members.main(args)
-    elif args.command == "skill":
-        skill.main(args)
+    try:
+        handler(args)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(130)
 
 
 if __name__ == "__main__":

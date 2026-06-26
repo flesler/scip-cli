@@ -3,11 +3,11 @@
 [![PyPI version](https://badge.fury.io/py/scip-cli.svg)](https://badge.fury.io/py/scip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Fast code intelligence CLI for TypeScript/JavaScript projects. Query SCIP indexes directly via SQLite for instant results.
+Fast code intelligence CLI for TypeScript/JavaScript and Python projects. Query SCIP indexes directly via SQLite for instant results.
 
 ## Features
 
-- **Fast**: Direct SQLite queries, 100-500x faster than bash wrappers
+- **Fast**: Direct SQLite queries, eliminating skippable overhead
 - **Simple**: Single binary with subcommands
 - **Auto-indexing**: Automatically indexes projects on first query
 - **Token-efficient**: Clean, minimal output optimized for AI consumption
@@ -31,10 +31,13 @@ Just use scip-cli - it will automatically download the required tools via `npx` 
 **Option B: Install globally for better performance**
 
 ```bash
-# Install scip-typescript (SCIP indexer)
+# TypeScript/JavaScript indexer (also handles plain JS via --infer-tsconfig)
 npm install -g @sourcegraph/scip-typescript
 
-# Install scip (SCIP CLI for index conversion)
+# Python indexer
+npm install -g @sourcegraph/scip-python
+
+# SCIP CLI for index conversion
 npm install -g @sourcegraph/scip
 ```
 
@@ -45,12 +48,6 @@ scip-cli --help
 scip-typescript --version  # Only if you chose Option B
 scip --version             # Only if you chose Option B
 ```
-
-## Prerequisites
-
-- Python 3.7+
-- `scip-typescript` (for indexing TypeScript/JavaScript)
-- `scip` CLI (for converting indexes)
 
 ## Usage
 
@@ -68,6 +65,7 @@ scip-cli <command> [arguments]
 - `symbols <file>` - List all symbols in a file
 - `rdeps <file>` - Find files that depend on a file
 - `members <symbol>` - List members of a class/interface
+- `reindex` - Force re-indexing of the current project
 - `skill [path]` - Install or dump the SKILL.md
 
 ### Examples
@@ -97,20 +95,24 @@ scip-cli skill ~/.claude/skills/scip/SKILL.md
 
 ## How It Works
 
-1. On first query, automatically indexes the project using `scip-typescript`
-2. Converts the SCIP index to SQLite using `scip expt-convert`
-3. Caches the database in `~/.cache/scip-query/projects/<hash>/index.db`
-4. Subsequent queries are instant SQLite lookups
+1. On first query, automatically detects project language from `package.json` (TS/JS) or `pyproject.toml`/`setup.py` (Python)
+2. Indexes using `scip-typescript` (adds `--infer-tsconfig` for JS-only projects) or `scip-python`
+3. Converts the SCIP index to SQLite using `scip expt-convert`
+4. Caches the database in `~/.cache/scip-cli/projects/<hash>/index.db`
+5. Subsequent queries are instant SQLite lookups
 
 ## Performance
 
-Compared to bash wrappers:
+Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli is a lightweight Python reimplementation optimized for speed. Compared to the original bash wrapper scripts:
+
 - `refs`: 6.4s → 0.03s (213x faster)
 - `def`: 2.8s → 0.05s (56x faster)
 - `search`: 2.6s → 0.03s (87x faster)
 - `symbols`: 0.3s → 0.02s (15x faster)
 - `rdeps`: 0.2s → 0.02s (10x faster)
 - `members`: 3.1s → 0.03s (103x faster)
+
+The speedup comes from direct SQLite queries instead of shell command chains, eliminating subprocess overhead.
 
 ## Architecture
 
@@ -126,6 +128,7 @@ scip_cli/
     ├── symbols.py
     ├── rdeps.py
     ├── members.py
+    ├── reindex.py
     └── skill.py
 ```
 

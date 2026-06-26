@@ -1,9 +1,9 @@
 ---
 name: scip-cli
-description: Read when needing to find symbols, definitions, references, or members in TypeScript/JavaScript code
+description: Read when needing to find symbols, definitions, references, or members in TypeScript/JavaScript or Python code
 ---
 
-TypeScript/JavaScript only (.ts, .tsx, .js, .jsx) — not GraphQL, CSS, or other files.
+TypeScript/JavaScript (.ts, .tsx, .js, .jsx) and Python (.py) — not GraphQL, CSS, or other files.
 
 All commands are sub-commands of `scip-cli`. Run from the project root.
 
@@ -20,20 +20,19 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 
 ## Gotchas
 
-- **Bare names** resolve functions, types (aliases + interfaces), and classes. Consts/variables need `def --type variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `def methodName`.
-- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `def` returns all; `refs` picks the first and warns. Use `search` or a qualified `src:…` name to disambiguate.
-- **First run** in a project may auto-index (one-time wait, ~10-30s for large codebases).
-- **Precision escape hatch**: qualified names like `src:hooks:usePatientEntries:usePatientEntries()` always work.
+- **Bare names** resolve functions, types (aliases + interfaces), and classes. Consts/variables need `def --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `def methodName`.
+- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `def` returns all; `refs` picks the first and warns. Use `search` with a more specific pattern to disambiguate.
+- **First run** in a project may auto-index (one-time wait, ~10-30s for large codebases). JS-only projects (no `tsconfig.json`) are supported automatically.
 
 ## Details
 
 ### def
 
 ```bash
-def [--type <kind>] <symbol>
+def [--kind <kind>] <symbol>
 ```
 
-Kinds: `function`, `class`, `interface`, `type`, `method`, `variable` — use `--type` when the bare name isn't in the default set above.
+Kinds: `function`, `method`, `class`, `property`, `variable` — use `--kind` when the bare name isn't in the default set above.
 
 ### refs
 
