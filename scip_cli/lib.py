@@ -142,6 +142,12 @@ def _index_project(root, lang, cache_dir):
         if result.returncode != 0:
             print(result.stderr, file=sys.stderr)
             raise RuntimeError("Failed to convert index")
+        
+        # scip expt-convert may ignore --output and write to cwd, so move if needed
+        tmp_db = Path(tmpdir) / "index.db"
+        if tmp_db.exists() and not index_db.exists():
+            import shutil
+            shutil.move(str(tmp_db), str(index_db))
 
 
 def get_db(project_root=None):
@@ -215,8 +221,13 @@ def resolve_symbol(db, name, kind_filter=None, limit=None):
     """
     escaped = escape_like(name)
     
-    # Build LIMIT clause
-    limit_clause = f"LIMIT {limit}" if limit else ""
+    # Build LIMIT clause with parameter to avoid SQL injection
+    if limit:
+        limit_clause = "LIMIT ?"
+        limit_param = (limit,)
+    else:
+        limit_clause = ""
+        limit_param = ()
     
     sql = f"""
         SELECT id, symbol, display_name FROM global_symbols 
@@ -227,14 +238,14 @@ def resolve_symbol(db, name, kind_filter=None, limit=None):
         f"%/{escaped}().",
         f"%/{escaped}#",
         f"%/{escaped}.",
-    )
+    ) + limit_param
     rows = _debug_execute(db, sql, params).fetchall()
 
     results = list(rows)
 
     if not results:
         sql = f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}"
-        params = (f"%{escaped}%",)
+        params = (f"%{escaped}%",) + limit_param
         rows = _debug_execute(db, sql, params).fetchall()
         results = [r for r in rows if name in r[1].split("/")[-1]]
 
@@ -412,8 +423,14 @@ def read_source_lines(project_root, relative_path, start_line=None, end_line=Non
         List of lines, or None if file cannot be read or path escapes project root
     """
     try:
-        full_path = Path(project_root).resolve() / relative_path
-        if not full_path.resolve().is_relative_to(Path(project_root).resolve()):
+        # Resolve project root once and validate relative_path doesn't escape
+        root = Path(project_root).resolve()
+        # Normalize the path and ensure it's within project root
+        try:
+            full_path = (root / relative_path).resolve()
+            # Use relative_to which raises ValueError if path is outside root
+            full_path.relative_to(root)
+        except (ValueError, RuntimeError):
             return None
         with open(full_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()

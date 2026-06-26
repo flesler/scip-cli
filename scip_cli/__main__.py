@@ -2,6 +2,7 @@
 import argparse
 import logging
 import os
+import sqlite3
 import sys
 
 from . import __version__
@@ -93,6 +94,12 @@ def main():
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(130)
+    except sqlite3.Error as e:
+        print(f"Database error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except OSError as e:
+        print(f"System error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

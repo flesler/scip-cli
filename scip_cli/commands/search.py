@@ -99,13 +99,13 @@ def main(args):
             hit_limit = len(rows) > limit
             rows = rows[:limit]
         else:
-            rows = db.execute(f"""
+            rows = db.execute("""
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line
                 FROM global_symbols gs
                 LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
                 WHERE gs.symbol LIKE ? ESCAPE '\\'
-                LIMIT {limit + 1}
-            """, (f"%{escaped_pattern}%",)).fetchall()
+                LIMIT ?
+            """, (f"%{escaped_pattern}%", limit + 1)).fetchall()
             hit_limit = len(rows) > limit
             rows = rows[:limit]
 

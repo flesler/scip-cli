@@ -6,6 +6,7 @@ from ..lib import (
     resolve_symbol,
     read_source_lines,
     extract_leaf_name,
+    limit_and_warn,
 )
 
 
@@ -85,8 +86,7 @@ def main(args):
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
-        symbols_hit_limit = len(symbols) > limit
-        symbols = symbols[:limit]
+        symbols, symbols_hit_limit = limit_and_warn(symbols, limit, "symbols")
 
         all_refs = []
         for symbol_id, symbol_str, display_name in symbols:
