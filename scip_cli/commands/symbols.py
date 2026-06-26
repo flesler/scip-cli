@@ -8,6 +8,7 @@ from ..lib import (
     infer_kind,
     extract_leaf_name,
     format_line_range,
+    limit_and_warn,
 )
 
 
@@ -23,8 +24,7 @@ def main(args):
             print(f"No symbols found in '{file_path}'", file=sys.stderr)
             sys.exit(1)
 
-        hit_limit = len(symbols) > limit
-        symbols = symbols[:limit]
+        symbols, hit_limit = limit_and_warn(symbols, limit, "symbols")
 
         for symbol_id, symbol_str, display_name, start_line, end_line in symbols:
             if symbol_str.endswith('/'):
@@ -35,6 +35,6 @@ def main(args):
             print(f"{line_info} {kind} {short}")
 
         if hit_limit:
-            print(f"# Warning: more than {limit} symbols, showing first {limit}", file=sys.stderr)
+            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

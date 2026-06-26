@@ -6,6 +6,7 @@ from ..lib import (
     resolve_one_file,
     get_file_symbols,
     get_refs_for_symbols,
+    limit_and_warn,
 )
 
 
@@ -35,13 +36,12 @@ def main(args):
             sys.exit(1)
 
         sorted_rdeps = sorted(rdeps)
-        hit_limit = len(sorted_rdeps) > limit
-        sorted_rdeps = sorted_rdeps[:limit]
+        sorted_rdeps, hit_limit = limit_and_warn(sorted_rdeps, limit, "reverse dependencies")
 
         for dep_path in sorted_rdeps:
             print(dep_path)
 
         if hit_limit:
-            print(f"# Warning: more than {limit} reverse dependencies, showing first {limit}", file=sys.stderr)
+            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

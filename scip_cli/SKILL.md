@@ -79,7 +79,7 @@ Default `--limit` is 10.
 ### members
 
 ```bash
-members <symbol>
+members [--limit N] <symbol>
 ```
 
 Returns `startLine:endLine kind name` for each member. Note: limited by database coverage — `enclosing_symbol` data is sparse for many indexers.

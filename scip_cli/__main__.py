@@ -56,6 +56,7 @@ def main():
 
     # members
     members_parser = subparsers.add_parser("members", help="List members of a class/interface")
+    members_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     members_parser.add_argument("symbol", help="Symbol name")
 
     # skill

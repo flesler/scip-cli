@@ -8,6 +8,7 @@ from ..lib import (
     infer_kind,
     get_def_location,
     format_line_range,
+    limit_and_warn,
 )
 
 
@@ -21,8 +22,7 @@ def main(args):
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
-        hit_limit = len(symbols) > limit
-        symbols = symbols[:limit]
+        symbols, hit_limit = limit_and_warn(symbols, limit, "symbols")
 
         for symbol_id, symbol_str, display_name in symbols:
             row = get_def_location(db, symbol_id)

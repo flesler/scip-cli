@@ -451,6 +451,21 @@ def format_line_range(start_line, end_line, sep=":"):
     return "??"
 
 
+def limit_and_warn(items, limit, label="results"):
+    """Trim a list to limit and print warning if exceeded.
+
+    Args:
+        items: list to trim
+        limit: max items to return
+        label: descriptive label for warning message
+
+    Returns:
+        Tuple of (trimmed_items, hit_limit)
+    """
+    hit_limit = len(items) > limit
+    return items[:limit], hit_limit
+
+
 def setup():
     """Setup command execution: find project root and get DB connection.
     

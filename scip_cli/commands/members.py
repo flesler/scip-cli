@@ -11,6 +11,7 @@ from ..lib import (
     extract_leaf_name,
     read_source_lines,
     format_line_range,
+    limit_and_warn,
     SymbolKind,
 )
 
@@ -41,8 +42,11 @@ def main(args):
     """List members of a class or interface."""
     db, project_root = setup()
     try:
+        limit = args.limit
         symbol_id, _, _ = resolve_one_symbol(db, args.symbol)
         members = get_members(db, symbol_id)
+
+        members, hit_limit = limit_and_warn(members, limit, "members")
 
         if not members:
             print(f"No members found for '{args.symbol}'", file=sys.stderr)
@@ -82,5 +86,8 @@ def main(args):
 
             line_info = format_line_range(start_line, end_line)
             print(f"{line_info} {kind} {short}")
+
+        if hit_limit:
+            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()
