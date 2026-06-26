@@ -12,6 +12,22 @@ Fast code intelligence CLI for TypeScript/JavaScript and Python projects. Query 
 - **Auto-indexing**: Automatically indexes projects on first query
 - **Token-efficient**: Clean, minimal output optimized for AI consumption
 
+## For AI Agents
+
+If you're an AI agent, run this to see the quick reference:
+
+```bash
+scip-cli skill
+```
+
+Or install it to your skills folder:
+
+```bash
+scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
+```
+
+This enables commands like `def`, `refs`, `search`, `symbols`, `rdeps`, and `members` - just ask "where is X?" or "find references to X".
+
 ## Installation
 
 ### 1. Install scip-cli
@@ -107,7 +123,7 @@ scip-cli rdeps src/hooks/useDictation.ts
 scip-cli members UseDictationOptions
 
 # Install skill file
-scip-cli skill ~/.claude/skills/scip/SKILL.md
+scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 ```
 
 ## How It Works
