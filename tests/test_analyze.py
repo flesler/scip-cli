@@ -33,6 +33,19 @@ class TestProjectAnalyze:
         lines = project_checks.hotspots(db, limit=5)
         assert any("foo" in line for line in lines)
 
+    def test_hotspots_scoped_to_directory(self):
+        db = mini_codebase_db()
+        all_lines = project_checks.hotspots(db, limit=20)
+        scoped = project_checks.hotspots(db, limit=20, scope="src/cycle")
+        assert scoped
+        assert all("cycle/" in line for line in scoped)
+        assert len(scoped) <= len(all_lines)
+
+    def test_cycles_scoped_to_directory(self):
+        db = mini_codebase_db()
+        lines = project_checks.cycles(db, limit=10, scope="src/cycle")
+        assert any("cycle/a.ts" in line and "cycle/b.ts" in line for line in lines)
+
     def test_cycles_finds_mutual_dependency(self):
         db = mini_codebase_db()
         lines = project_checks.cycles(db, limit=10)
@@ -67,10 +80,39 @@ class TestFileAnalyze:
         lines = file_checks.file_consumers(db, "src/lib.ts", limit=10)
         assert any("consumer.ts" in line for line in lines)
 
-    def test_run_all_returns_six_sections(self):
+    def test_run_all_includes_coupling(self):
         db = mini_codebase_db()
         sections = file_checks.run_all(db, "src/lib.ts", limit=5)
-        assert len(sections) == 6
+        titles = [title for title, _lines in sections]
+        assert "Coupling partners" in titles
+
+
+class TestAnalyzeTargets:
+    def test_resolve_directory_from_index_prefix(self, tmp_path):
+        from scip_cli.analyze.targets import list_dir_files, resolve_analyze_target
+
+        db = mini_codebase_db()
+        resolved = resolve_analyze_target(db, "src/cycle", tmp_path, None)
+        assert resolved.kind == "dir"
+        assert resolved.scope == "src/cycle"
+        files = list_dir_files(db, "src/cycle")
+        assert files == ["src/cycle/a.ts", "src/cycle/b.ts"]
+
+    def test_resolve_single_file(self, tmp_path):
+        from scip_cli.analyze.targets import resolve_analyze_target
+
+        db = mini_codebase_db()
+        resolved = resolve_analyze_target(db, "src/lib.ts", tmp_path, None)
+        assert resolved.kind == "file"
+        assert resolved.scope == "src/lib.ts"
+
+    def test_resolve_symbol_when_not_file_or_dir(self, tmp_path):
+        from scip_cli.analyze.targets import resolve_analyze_target
+
+        db = mini_codebase_db()
+        resolved = resolve_analyze_target(db, "foo", tmp_path, None)
+        assert resolved.kind == "symbol"
+        assert resolved.symbol_name == "foo"
 
 
 class TestSymbolAnalyze:

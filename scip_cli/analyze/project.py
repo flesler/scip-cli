@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+
+from ..paths import path_filter_sql, path_filter_sql_any, path_in_scope
 from .common import (
     DEFAULT_LIMIT,
     SYM_DEF_JOIN,
@@ -24,7 +27,23 @@ _FILE_EDGES_SQL = """
 """
 
 
-def bottlenecks(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def _scope_suffix(scope: str | None) -> str:
+    return f" [{scope}]" if scope else ""
+
+
+def _cycle_touches_scope(cycle_line: str, scope: str) -> bool:
+    parts = re.split(r"\s<->\s|\s->\s", cycle_line)
+    return any(path_in_scope(part.strip(), scope) for part in parts if part.strip())
+
+
+def bottlenecks(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
     rows = fetch_all(
         db,
         f"""
@@ -57,11 +76,11 @@ def bottlenecks(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) 
         {SYM_DEF_JOIN}
         JOIN fan_in fi ON fi.symbol_id = gs.id
         JOIN fan_out fo ON fo.symbol_id = gs.id
-        WHERE fi.fan_in >= 1 AND fo.fan_out >= 1
+        WHERE fi.fan_in >= 1 AND fo.fan_out >= 1{scope_clause}
         ORDER BY score DESC, fi.fan_in DESC
         LIMIT ?
         """,
-        (limit * 5,),
+        (*scope_params, limit * 5),
     )
     lines = [
         f"{short_name(symbol)}  score={score}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
@@ -71,7 +90,14 @@ def bottlenecks(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) 
     return lines[:limit]
 
 
-def hotspots(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def hotspots(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
     rows = fetch_all(
         db,
         f"""
@@ -83,12 +109,12 @@ def hotspots(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> 
         JOIN documents ref_d ON c.document_id = ref_d.id
         JOIN global_symbols gs ON m.symbol_id = gs.id
         {SYM_DEF_JOIN}
-        WHERE m.role != 1
+        WHERE m.role != 1{scope_clause}
         GROUP BY gs.id
         ORDER BY ref_count DESC
         LIMIT ?
         """,
-        (limit * 5,),
+        (*scope_params, limit * 5),
     )
     lines = [
         f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
@@ -98,7 +124,13 @@ def hotspots(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> 
     return lines[:limit]
 
 
-def cycles(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def cycles(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -141,10 +173,19 @@ def cycles(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> li
         path = row[0]
         if path not in lines and not cycle_path_noise(path, include_tests=include_tests):
             lines.append(path)
+    if scope:
+        lines = [line for line in lines if _cycle_touches_scope(line, scope)]
     return lines[:limit]
 
 
-def stale_types(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def stale_types(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
     rows = fetch_all(
         db,
         f"""
@@ -157,13 +198,13 @@ def stale_types(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) 
         LEFT JOIN documents ref_d ON c.document_id = ref_d.id
         WHERE gs.symbol LIKE '%#'
           AND gs.symbol NOT LIKE '%().'
-          AND gs.symbol NOT LIKE '%#typeLiteral%'
+          AND gs.symbol NOT LIKE '%#typeLiteral%'{scope_clause}
         GROUP BY gs.id
         HAVING consumers <= 1
         ORDER BY consumers ASC, def_d.relative_path
         LIMIT ?
         """,
-        (limit * 5,),
+        (*scope_params, limit * 5),
     )
     lines = [
         f"{short_name(symbol)}  consumers={consumers}  ({path})"
@@ -173,7 +214,14 @@ def stale_types(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) 
     return lines[:limit]
 
 
-def dead_exports(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def dead_exports(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
     rows = fetch_all(
         db,
         f"""
@@ -188,11 +236,11 @@ def dead_exports(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False)
             WHERE m.symbol_id = gs.id
               AND m.role != 1
               AND c.document_id != def_d.id
-        )
+        ){scope_clause}
         ORDER BY loc DESC, def_d.relative_path
         LIMIT ?
         """,
-        (limit * 5,),
+        (*scope_params, limit * 5),
     )
     lines = [
         f"{short_name(symbol)}  loc={loc}  ({path})"
@@ -202,7 +250,14 @@ def dead_exports(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False)
     return lines[:limit]
 
 
-def top_coupling(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
+def top_coupling(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql_any(db, scope, "def_d", "ref_d")
     rows = fetch_all(
         db,
         f"""
@@ -214,12 +269,12 @@ def top_coupling(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False)
         JOIN documents ref_d ON c.document_id = ref_d.id
         JOIN global_symbols gs ON m.symbol_id = gs.id
         {SYM_DEF_JOIN}
-        WHERE m.role != 1 AND def_d.id != ref_d.id
+        WHERE m.role != 1 AND def_d.id != ref_d.id{scope_clause}
         GROUP BY def_d.id, ref_d.id
         ORDER BY shared DESC
         LIMIT ?
         """,
-        (limit * 5,),
+        (*scope_params, limit * 5),
     )
     lines = [
         f"{file1}  <->  {file2}  shared={shared}"
@@ -229,13 +284,20 @@ def top_coupling(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False)
     return lines[:limit]
 
 
-def run_all(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[tuple[str, list[str]]]:
-    opts = {"include_tests": include_tests}
+def run_all(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[tuple[str, list[str]]]:
+    suffix = _scope_suffix(scope)
+    opts = {"include_tests": include_tests, "scope": scope}
     return [
-        section("Bottlenecks (fan-in x fan-out)", bottlenecks(db, limit, **opts)),
-        section("Hotspots (most referenced)", hotspots(db, limit, **opts)),
-        section("Cycles (file dependencies)", cycles(db, limit, **opts)),
-        section("Stale types (≤1 external consumer)", stale_types(db, limit, **opts)),
-        section("Dead exports (no external refs)", dead_exports(db, limit, **opts)),
-        section("Top coupling (file pairs)", top_coupling(db, limit, **opts)),
+        section(f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks(db, limit, **opts)),
+        section(f"Hotspots (most referenced){suffix}", hotspots(db, limit, **opts)),
+        section(f"Cycles (file dependencies){suffix}", cycles(db, limit, **opts)),
+        section(f"Stale types (≤1 external consumer){suffix}", stale_types(db, limit, **opts)),
+        section(f"Dead exports (no external refs){suffix}", dead_exports(db, limit, **opts)),
+        section(f"Top coupling (file pairs){suffix}", top_coupling(db, limit, **opts)),
     ]

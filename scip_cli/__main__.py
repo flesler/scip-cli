@@ -112,7 +112,7 @@ def main():
     analyze_parser.add_argument(
         "target",
         nargs="?",
-        help="Omit for project-wide; file path for file checks; symbol name for symbol checks",
+        help="Omit for project-wide; directory for scoped project + per-file; file or symbol for focused checks",
     )
     add_path_argument(analyze_parser)
     add_limit_argument(analyze_parser, default=20, help_suffix="rows per section")

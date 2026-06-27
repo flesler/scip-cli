@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, section, short_name
+from .symbol import symbol_pressure
 
 
 def change_surface(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -177,7 +178,53 @@ def coupling_for(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
     return [f"{other}  shared={shared}" for other, shared in rows]
 
 
+def top_symbol_pressure(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    """Pressure metrics for the most-consumed exports in a file."""
+    cap = min(5, limit)
+    rows = fetch_all(
+        db,
+        """
+        SELECT gs.id,
+               COUNT(DISTINCT CASE WHEN ref_d.id != def_d.id THEN ref_d.id END) AS consumers
+        FROM global_symbols gs
+        JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
+        JOIN documents def_d ON der.document_id = def_d.id
+        LEFT JOIN mentions m ON m.symbol_id = gs.id AND m.role != 1
+        LEFT JOIN chunks c ON m.chunk_id = c.id
+        LEFT JOIN documents ref_d ON c.document_id = ref_d.id
+        WHERE def_d.relative_path = ?
+        GROUP BY gs.id
+        HAVING consumers > 0
+        ORDER BY consumers DESC, der.start_line
+        LIMIT ?
+        """,
+        (relative_path, cap),
+    )
+    lines: list[str] = []
+    for sym_id, consumers in rows:
+        pressure = symbol_pressure(db, sym_id)
+        if pressure and not pressure[0].startswith("("):
+            lines.append(f"consumers={consumers}  {pressure[0]}")
+    return lines
+
+
 def run_all(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
+    sections = [
+        section(f"Change surface ({relative_path})", change_surface(db, relative_path, limit)),
+        section("Unused imports", unused_imports(db, relative_path, limit)),
+        section("File consumers", file_consumers(db, relative_path, limit)),
+        section("Dead exports in file", dead_in_file(db, relative_path, limit)),
+        section("Imports summary", imports_summary(db, relative_path, limit)),
+        section("Coupling partners", coupling_for(db, relative_path, limit)),
+    ]
+    top = top_symbol_pressure(db, relative_path, limit)
+    if top:
+        sections.append(section("Top symbols (by external consumers)", top))
+    return sections
+
+
+def run_all_sections_only(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
+    """Per-file sections without top-symbols (directory batch)."""
     return [
         section(f"Change surface ({relative_path})", change_surface(db, relative_path, limit)),
         section("Unused imports", unused_imports(db, relative_path, limit)),

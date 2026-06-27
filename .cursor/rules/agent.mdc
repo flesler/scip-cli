@@ -5,81 +5,80 @@ alwaysApply: true
 
 # scip-cli agent
 
-**Work from repo root.** Command usage, flags, and gotchas live in `scip_cli/SKILL.md` — run once after setup:
+**Work from repo root.** CLI usage, flags, and user gotchas: `scip-cli skill` (source: `scip_cli/SKILL.md`). Read once per task — do not duplicate SKILL here.
+
+Use **`.venv/bin/scip-cli`** / **`.venv/bin/pytest`**. Uncommitted code: `PYTHONPATH=$PWD python -m scip_cli …` if the venv binary is stale.
+
+## Bootstrap
 
 ```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pre-commit install
 scip-cli skill
 ```
 
-Do not duplicate SKILL content here; read it (or the command output) when implementing or testing CLI behavior.
+Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `SCIP_CLI_DEBUG=1` (SQL to stderr, truncated).
 
-## Bootstrap (from scratch)
-
-```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-pre-commit install                 # ruff + ruff-format + pytest on commit
-scip-cli --version
-scip-cli skill                     # familiarize with subcommands and gotchas
-```
-
-- Use **`.venv/bin/scip-cli`** / **`.venv/bin/pytest`** — global `pip install scip-cli` may be stale.
-- **Node.js + `npx`** required for integration tests (real `scip-typescript` indexing).
-- Optional: `SCIP_CLI_DEBUG=1` for SQL logging to stderr.
-
-## Test / lint / format
+## Lint / test
 
 | Task | Command |
 |------|---------|
 | Full suite | `.venv/bin/pytest` |
-| E2e only (fast loop) | `.venv/bin/pytest tests/test_e2e.py` |
-| Integration marker | `.venv/bin/pytest -m integration` |
-| Lint | `.venv/bin/ruff check .` |
-| Format | `.venv/bin/ruff format .` |
-| Fix lint | `.venv/bin/ruff check --fix .` |
+| E2e loop | `.venv/bin/pytest tests/test_e2e.py` |
+| Lint / format | `.venv/bin/ruff check .` / `ruff format .` |
 
-**Pre-commit** (`.pre-commit-config.yaml`): `ruff --fix`, `ruff-format`, then full `pytest`. Run `pre-commit run --all-files` before pushing if you skipped hooks.
+Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command changes.
 
-## Dogfood / health check
+## Improving this repo (do this before review subagents)
+
+**Dogfood on the repo itself** — faster and more honest than spawning reviewers:
 
 ```bash
 .venv/bin/scip-cli reindex
 .venv/bin/scip-cli analyze --limit 25
-.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20
+.venv/bin/scip-cli analyze scip_cli --limit 15              # directory
+.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20   # file (+ scoped project)
 ```
 
-See README **Finding easy wins with analyze** and `dogfood.md`. Test paths skipped by default; `--include-tests` to include.
+Interpretation: README § *Finding easy wins with analyze*. Target = omit (project), directory, file, or symbol — not `--path` for scope.
 
-## Iterate / code review
+| Priority | Section | Action |
+|----------|---------|--------|
+| 1 | **Cycles** | Break production file dependency cycles (`cache`↔`scope` was one) |
+| 2 | **Dead exports** | Cross-file unused symbols — verify with `rg`, then delete; ignore `scip_cli/analyze/*` section helpers |
+| 3 | **Stale types** | Low-consumer classes — merge or justify |
+| 4 | **Top coupling** | Split or clarify module boundaries |
 
-Reviewers and explore agents: run `scip-cli skill` (or `python -m scip_cli skill`) first for quickstart context before auditing commands vs docs.
+`analyze` skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include. **Cannot** find same-file-only dead code — use `rg` after analyze hints. Reindex after large edits.
 
-## Test layout (not in SKILL)
+Do **not** spawn broad code-review agents until this pass is done (or explain why skipped).
 
-- `tests/fixtures/sample-project/` — minimal TS project, indexed once per session
-- `tests/e2e_harness.py` — in-process CLI (`cli.run("code", "greet")`)
-- `tests/fixture_catalog.py` — stable symbol/path constants
-- `tests/analyze_db.py` — synthetic DB for analyze SQL unit tests
-- `dogfood.md` — future improvements from real usage (not a changelog)
+## TDD
 
-## TDD (preferred for commands)
+1. **Red** — `tests/test_e2e.py` + `fixture_catalog` constants.
+2. **Green** — `scip_cli/commands/*.py`.
+3. **Refactor** — unit tests for pure helpers only.
 
-1. **Red** — add a case to `tests/test_e2e.py` using `cli` + `fixture_catalog`.
-2. **Green** — implement in `scip_cli/commands/*.py`.
-3. **Refactor** — unit tests for pure helpers only; don't mock what the fixture covers.
+- **E2e** (`cli` fixture): in-process `main()`, TS project indexed once per session — default for behavior.
+- **Unit**: `:memory:` SQLite, `tests/analyze_db.py`, merge/index prune tests.
+- **No subprocess** for CLI tests; no `reindex` in e2e (mutates `~/.cache/scip-cli`).
+- New symbols: extend `tests/fixtures/sample-project/` + `fixture_catalog.py`.
 
-```python
-def test_my_behavior(self, cli):
-    r = cli.run("code", FN_GREET, "--snippet")
-    assert r.returncode == 0
-    assert "function greet" in r.stdout
-```
+## Codebase map (contributors)
 
-- **E2e** (`cli`): real index — default for behavior changes.
-- **Unit** (`:memory:` / `AnalyzeDbBuilder`): merge, formatters, SQL edge cases.
-- Skip subprocess; use `run_cli` / `CliRunner`.
-- Extend `sample-project` + `fixture_catalog` for new symbols.
-- `reindex` not in e2e (mutates cache).
+| Area | Path | Notes |
+|------|------|-------|
+| Commands | `scip_cli/commands/` | Thin; SQL in `queries.py` / `analyze/` |
+| Index build | `scip_cli/indexing.py` | `index.db.next` → promote; flock; `>10` tsconfigs log progress |
+| Variable prune | postprocess + `merge.py` | Omit const/let/var on **COPY**, not DELETE — no `variable` kind |
+| Session | `scip_cli/session.py` | `setup()`, `resolve_one_symbol` (limit 2 for ambiguity) |
+| Analyze filters | `scip_cli/analyze/common.py` | `is_test_path`, `analyze_noise` (`_` helpers) |
 
-Iterate with `pytest tests/test_e2e.py`; full `pytest` before committing.
+`todo.md` = tracked work; `dogfood.md` = future ideas only. Wishlist/backlog in `docs/` per workspace rules.
+
+## Docs touch points
+
+- User install + analyze guide → `README.md`
+- Agent/user CLI reference → `scip_cli/SKILL.md` (must match `__main__.py` flags)
+- After flag changes: update SKILL + README command list; run `scip-cli skill` to verify output

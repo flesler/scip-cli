@@ -47,3 +47,36 @@ def path_filter_sql(db, scope: str | None, doc_alias: str = "d") -> tuple[str, l
 
     escaped = escape_like(scope.rstrip("/"))
     return f" AND ({col} = ? OR {col} LIKE ? ESCAPE '\\')", [scope, f"{escaped}/%"]
+
+
+def path_filter_sql_any(db, scope: str | None, *doc_aliases: str) -> tuple[str, list]:
+    """AND-clause: row matches when any document alias column falls in scope."""
+    if not scope:
+        return "", []
+
+    parts: list[str] = []
+    params: list = []
+    for alias in doc_aliases:
+        clause, clause_params = path_filter_sql(db, scope, doc_alias=alias)
+        if not clause:
+            continue
+        parts.append(clause.removeprefix(" AND ").strip())
+        params.extend(clause_params)
+    if not parts:
+        return "", []
+    if len(parts) == 1:
+        return f" AND {parts[0]}", params
+    return " AND (" + " OR ".join(parts) + ")", params
+
+
+def list_indexed_paths_in_scope(db, scope: str) -> list[str]:
+    """Repo-relative document paths under scope (file or directory), sorted."""
+    clause, params = path_filter_sql(db, scope, doc_alias="d")
+    if not clause:
+        return []
+    rows = debug_execute(
+        db,
+        f"SELECT d.relative_path FROM documents d WHERE 1=1{clause} ORDER BY d.relative_path",
+        params,
+    ).fetchall()
+    return [row[0] for row in rows]

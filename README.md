@@ -214,15 +214,16 @@ scip-cli analyze --limit 25
 | **Top coupling** | Files that share many symbols — refactor boundaries or split modules |
 | **Hotspots / bottlenecks** | High fan-in hubs — stabilize APIs, add tests, or reduce blast radius before edits |
 
-**Per-file drill-down** on hubs or suspects:
+**Per-file or package drill-down** on hubs or suspects:
 
 ```bash
-scip-cli analyze scip_cli/queries.py --limit 20
+scip-cli analyze scip_cli/queries.py --limit 20   # file: scoped project + per-file + top symbols
+scip-cli analyze scip_cli --limit 15              # directory: scoped project + each file under it
 ```
 
 `Dead exports in file` lists same-module symbols with no *external* refs — module-private `_helpers` are filtered out. Remaining rows are worth a manual `rg` check.
 
-**Defaults:** project-wide analyze skips `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze (`analyze path/to/file`) always analyzes that file.
+**Defaults:** project-wide and directory analyze skip `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze always includes that file.
 
 **Limits:** “Dead export” means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Re-run `reindex` after large changes; the index is a snapshot.
 

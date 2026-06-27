@@ -117,8 +117,15 @@ Returns `startLine:endLine kind name` for each member. Members are found via SCI
 analyze [--limit N] [--path PATH] [--include-tests] [target]
 ```
 
-Project-wide (no target): bottlenecks, hotspots, cycles, stale types, dead exports, coupling. File path → change-surface, dead exports in file, consumers. Symbol → pressure, dependencies, affected.
+| Target | Output |
+| ------ | ------ |
+| *(omit)* | Project-wide dashboards only |
+| **directory** (`scip_cli`, `src/pkg/`) | Scoped project dashboards + per-file sections for each indexed file under the dir |
+| **file** | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
+| **symbol** | Symbol pressure, consumers, dependencies, affected |
 
-**Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli/hot_file.py` on suspects. Skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); use `--include-tests` to include them.
+Directory detection uses the filesystem when present, otherwise an indexed path prefix. `--path` narrows ambiguous file/symbol resolution only (not directory scope — pass the dir as `target`).
 
-**Easy pickings:** **Cycles** and **dead exports** (production paths only) — cross-file cleanup candidates. **Stale types** — low-use classes. Ignore `analyze/*` helpers in dead exports (same-file section runners). “Dead” = no refs from *other* files in the index, not `vulture`. `--path` scopes file/symbol targets only, not project-wide runs.
+**Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.
+
+**Easy pickings:** **Cycles** and **dead exports** (production paths) — cross-file cleanup. **Stale types** — low-use classes. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from *other* files in the index, not `vulture`.
