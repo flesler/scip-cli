@@ -53,11 +53,16 @@ def limit_and_warn(items, limit, label="results"):
 def resolve_max_def_lines(cli_value=None):
     """Resolve per-definition line cap for def output (0 = unlimited)."""
     if cli_value is not None:
+        if cli_value < 0:
+            raise RuntimeError(f"--max-lines must be >= 0, got {cli_value}")
         return cli_value
     env = os.environ.get("SCIP_CLI_MAX_DEF_LINES")
     if env is not None:
         try:
-            return int(env)
+            value = int(env)
+            if value < 0:
+                raise RuntimeError(f"SCIP_CLI_MAX_DEF_LINES must be >= 0, got {value}")
+            return value
         except ValueError:
             raise RuntimeError(f"Invalid SCIP_CLI_MAX_DEF_LINES: expected an integer, got {env!r}") from None
     return DEFAULT_MAX_DEF_LINES

@@ -10,7 +10,7 @@ from pathlib import Path
 def merge_sqlite_indexes(part_paths: list[Path], output_path: Path) -> None:
     """Combine partial index databases into a single queryable database."""
     if not part_paths:
-        raise ValueError("No partial indexes to merge")
+        raise ValueError("at least one input is required")
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
