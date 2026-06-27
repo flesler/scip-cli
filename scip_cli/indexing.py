@@ -21,6 +21,11 @@ INDEX_TIMEOUT = 300
 DEFAULT_MAX_HEAP_MB = 8192
 SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 
+# Pinned SCIP tool versions (minor version lock, patch bumps only).
+# Revisit these periodically to confirm compatibility before bumping.
+SCIP_TYPESCRIPT_VERSION = "0.4.0"
+SCIP_PYTHON_VERSION = "0.6.6"
+
 
 def default_index_workers() -> int:
     """Default parallel TypeScript project indexers (merge stays single-threaded)."""
@@ -102,20 +107,21 @@ def typescript_projects(root: Path) -> list[Path]:
     return sorted(merged.values(), key=str)
 
 
-def run_with_fallback(binary, npx_package, cwd, args, env=None):
+def run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None):
     """Try binary first, fallback to npx if not found."""
     run_env = env if env is not None else os.environ.copy()
+    npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
     try:
         result = _run_subprocess([binary, *args], cwd, env=run_env)
         if result.returncode == 0:
             return result
         if "not found" in result.stderr.lower():
             print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-            return _run_subprocess(["npx", "-y", npx_package, *args], cwd, env=run_env)
+            return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
         return result
     except FileNotFoundError:
         print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-        return _run_subprocess(["npx", "-y", npx_package, *args], cwd, env=run_env)
+        return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
 
 
 def _scip_version(binary):
@@ -241,6 +247,7 @@ def _index_one_ts_project(root, project, work_dir, env):
         str(root),
         index_args,
         env=env,
+        npx_version=SCIP_TYPESCRIPT_VERSION,
     )
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
@@ -366,6 +373,7 @@ def _index_project(root, lang, cache_dir, *, replace=False):
                 str(root),
                 ["index", ".", "--output", index_scip],
                 env=env,
+                npx_version=SCIP_PYTHON_VERSION,
             )
         else:
             raise RuntimeError(f"Unsupported language '{lang}'")
