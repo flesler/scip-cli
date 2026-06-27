@@ -124,7 +124,7 @@ analyze [--limit N] [--path PATH] [--include-tests] [target]
 | **file** | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
 | **symbol** | Symbol pressure, consumers, dependencies, affected |
 
-Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced symbols, dead exports, stale types; `[medium]` same-file-only, test-only consumers, change surface; `[low]` coupling, bottlenecks, hotspots.
+Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced, dead exports, stale types; `[medium]` same-file-only, change surface (file); `[low]` test-only consumers (noisy on Python), coupling, bottlenecks, hotspots.
 
 `--priority high` or `--priority high,medium` (also `1`/`2`/`3`) skips lower tiers.
 

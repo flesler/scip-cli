@@ -313,6 +313,11 @@ def symbols_test_only_consumers(
         JOIN chunks c ON m.chunk_id = c.id
         JOIN documents ref_d ON c.document_id = ref_d.id
         WHERE ref_d.id != def_d.id{scope_clause}
+          AND NOT EXISTS (
+              SELECT 1 FROM mentions m2
+              JOIN chunks c2 ON m2.chunk_id = c2.id
+              WHERE m2.symbol_id = gs.id AND m2.role = 0 AND c2.document_id = def_d.id
+          )
         GROUP BY gs.id
         HAVING COUNT(DISTINCT ref_d.id) > 0
         ORDER BY def_d.relative_path, gs.symbol
@@ -416,7 +421,12 @@ def run_all(
         Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
         Check("stale_types", Priority.HIGH, f"Stale types (≤1 external consumer){suffix}", stale_types),
         Check("same_file_only", Priority.MEDIUM, f"Same-file only (consider _prefix){suffix}", same_file_only),
-        Check("test_only", Priority.MEDIUM, f"Test-only consumers{suffix}", symbols_test_only_consumers),
+        Check(
+            "test_only",
+            Priority.LOW,
+            f"Test-only consumers (index may miss same-file calls){suffix}",
+            symbols_test_only_consumers,
+        ),
         Check("top_coupling", Priority.LOW, f"Top coupling (file pairs){suffix}", top_coupling),
         Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
         Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),

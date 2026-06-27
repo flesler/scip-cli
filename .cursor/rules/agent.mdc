@@ -81,7 +81,8 @@ Only skip step 1 when the issue is **outside the index** (runtime, CLI UX, docs 
 | `analyze/*` section runners “dead” | no external refs | noise filter in `common.py` | **Filtered** — framework pattern |
 | Unused import | `role=2` mention, no in-file use | `[high] Unused imports` (per file) | **Caught** on file target |
 | Hub before editing (`resolve_symbol`, `queries.py`) | fan-in / consumer count | `[medium] Change surface` / `[low] Hotspots` | **Caught** on file target; project hubs are low tier |
-| Symbol only used from tests | consumers all under `tests/` | `[medium] Test-only consumers` | **Caught** |
+| Symbol only used from tests | consumers all under `tests/` | `[low] Test-only consumers` | **Partial** — Python index often omits same-file `role=0`; verify with `rg` |
+| Indexer omits same-file Python calls | no `role=0` for in-module use | unreferenced / test-only false positives | **Index gap** — not fixable in SQL alone; demoted test-only to low |
 | Duplicate / parallel helpers | — | — | **Not in index** — `rg`, not analyze |
 
 Add new rows to `dogfood.md` when you find another gap; implement the SQL check before the next manual review pass.

@@ -211,17 +211,26 @@ scip-cli analyze --limit 25
 scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 ```
 
-Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order. **High** = cycles, dead exports, stale types (nuke candidates). **Medium** = change-surface context. **Low** = coupling, bottlenecks, hotspots (informational).
+Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
+
+| Tier | Project sections | Action |
+| ---- | ---------------- | ------ |
+| **high** | Cycles, unreferenced, dead exports, stale types | Nuke or fix cycles; delete unused; `_` prefix |
+| **medium** | Same-file only, change surface (file target) | Module-private by usage |
+| **low** | Test-only consumers, coupling, bottlenecks, hotspots | Noisy on Python (index omits many same-file calls); verify with `rg` |
+
+Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
 
 **What to look at first**
 
 | Section | Easy pickings |
 | ------- | ------------- |
 | **Cycles** | Import/mention cycles between production files — break the edge or extract shared code |
-| **Dead exports** | Symbols with no refs from other files — delete or make private (`_`); skip `scip_cli/analyze/*` section helpers (same-file only) |
+| **Unreferenced** | No usage in the index at all — delete |
+| **Dead exports** | No external refs — delete or `_` prefix |
 | **Stale types** | Classes/types with ≤1 external consumer — merge, inline, or document why they stay |
-| **Top coupling** | Files that share many symbols — refactor boundaries or split modules |
-| **Hotspots / bottlenecks** | High fan-in hubs — stabilize APIs, add tests, or reduce blast radius before edits |
+| **Same-file only** | Used only inside defining file — rename to `_` |
+| **Test-only consumers** | Cross-file refs are all from tests — promote to e2e or accept as internal |
 
 **Per-file or package drill-down** on hubs or suspects:
 

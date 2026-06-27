@@ -82,11 +82,14 @@ class TestProjectAnalyze:
         db = mini_codebase_db()
         lines = project_checks.symbols_test_only_consumers(db, limit=20)
         assert any("testOnlyFn" in line for line in lines)
+        assert not any("moduleUsed" in line for line in lines)
 
     def test_run_all_returns_nine_sections(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=5)
         assert len(sections) == 9
+        titles = [title for title, _lines in sections]
+        assert sum(1 for t in titles if "[low]" in t) == 4
         titles = [title for title, _lines in sections]
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
