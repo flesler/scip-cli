@@ -73,6 +73,7 @@ def bottlenecks(
             GROUP BY der.symbol_id
         )
         SELECT gs.symbol, def_d.relative_path, fi.fan_in, fo.fan_out,
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
                fi.fan_in * fo.fan_out AS score
         FROM global_symbols gs
         {SYM_DEF_JOIN}
@@ -85,8 +86,8 @@ def bottlenecks(
         (*scope_params, limit * 5),
     )
     lines = [
-        f"{short_name(symbol)}  score={score}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
-        for symbol, path, fan_in, fan_out, score in rows
+        f"{short_name(symbol)}  score={score}  loc={loc}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
+        for symbol, path, fan_in, fan_out, loc, score in rows
         if not analyze_noise(path, symbol, include_tests=include_tests)
     ]
     return lines[:limit]

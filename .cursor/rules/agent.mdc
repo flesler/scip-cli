@@ -87,6 +87,22 @@ Only skip step 1 when the issue is **outside the index** (runtime, CLI UX, docs 
 
 Add new rows to `dogfood.md` when you find another gap; implement the SQL check before the next manual review pass.
 
+### Size / complexity checks (assessed — don’t promote to high/medium)
+
+SQLite has **line ranges** (`defn_enclosing_ranges`) so LOC is cheap. That does **not** mean “big function” belongs next to dead exports.
+
+| Idea | In index? | Verdict |
+|------|-----------|---------|
+| **LOC ≥ N** alone | Yes | **LOW at best** — noisy (`main`, argparse, legitimate parsers). Not a nuke candidate. |
+| **LOC + fan-in** (large hub) | Yes | **Already covered** by `[low] Bottlenecks` (fan-in × fan-out). Add `loc=` to that output if helpful; don’t duplicate as medium. |
+| **LOC + consumers** on file target | Yes | **Change surface** (medium) already sorts by consumers with line ranges — drill there. |
+| **Symbol pressure** | Yes | **Per-symbol** `analyze Foo` shows `loc × fan_in × fan_out`. |
+| **God class / many members** | Yes | Use `members Class` — not analyze. |
+| **File byte size / cyclomatic complexity** | No | Out of scope for SCIP index. |
+| **Fat file (many symbols)** | Yes | Low value; coupling/hotspots approximate module heat. |
+
+**Rule:** size-only checks stay **low or file-drill-down**; never high/medium unless paired with a **structural smell** (cycle, dead export, zero production consumers). Prefer enriching existing low-tier lines (e.g. show `loc` on bottlenecks) over a new dashboard section.
+
 ## TDD
 
 1. **Red** — `tests/test_e2e.py` + `fixture_catalog` constants.
