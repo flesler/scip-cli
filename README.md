@@ -99,7 +99,7 @@ scip-cli <command> [arguments]
 ### Commands
 
 - `refs <symbol>` - Find all references to a symbol (`--path` to scope)
-- `code <symbol>` - Find symbol definition with source code (`--path`, `--max-lines`, `--snippet`)
+- `code <symbol>` - Find symbol definition with source code (`--path`, `--max-lines`, `--full`, `--offset`, `--snippet`, `--line-numbers`)
 - `search <pattern>` - Search symbols by name pattern (`--path`)
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)

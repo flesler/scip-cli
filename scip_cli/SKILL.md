@@ -31,12 +31,12 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 ### code
 
 ```bash
-code [--kind <kind>] [--limit N] [--max-lines N] [--path PATH] [--snippet] <symbol>
+code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path PATH] [--snippet] [--line-numbers] <symbol>
 ```
 
 Kinds: `function`, `method`, `class`, `property`, `variable` — use `--kind` when the bare name isn't in the default set above.
 
-`--limit` caps how many matching symbols are shown (default 10). `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--max-lines 0` for the full body. `--snippet` shows only file, line range, and first line (not full body). Override default via `SCIP_CLI_MAX_DEF_LINES`.
+`--limit` caps how many matching symbols are shown (default 10). `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (equivalent to `--max-lines 0`). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines (useful for pagination with `--max-lines`). `--line-numbers` prefixes each line with its line number. Override default via `SCIP_CLI_MAX_DEF_LINES`.
 
 For large classes, prefer `members ClassName` first, then `code Class.method` for one member.
 

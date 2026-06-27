@@ -63,6 +63,12 @@ def main():
         action="store_true",
         help="Show only file, line range, and first line (not full body)",
     )
+    code_parser.add_argument(
+        "--line-numbers",
+        "-n",
+        action="store_true",
+        help="Prefix each line with its line number",
+    )
     code_parser.add_argument("symbol", help="Symbol name")
 
     # search

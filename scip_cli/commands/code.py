@@ -31,6 +31,7 @@ def main(args):
         snippet_mode = getattr(args, "snippet", False)
         full_mode = getattr(args, "full", False)
         offset = getattr(args, "offset", 0)
+        line_numbers = getattr(args, "line_numbers", False)
 
         if snippet_mode:
             max_def_lines = 1
@@ -54,6 +55,8 @@ def main(args):
                     print(f"{rel_path}:{format_line_range(start_line, end_line)} [file not found]")
                     continue
                 first_line = lines[0].rstrip()
+                if line_numbers:
+                    first_line = f"{start_line + 1}|{first_line}"
                 print(f"{rel_path}:{format_line_range(start_line, end_line)} {first_line}")
                 continue
 
@@ -65,7 +68,7 @@ def main(args):
                 )
 
             source_snippet, truncated, shown_start, shown_end = format_def_body(
-                lines, start_line, end_line, max_lines=max_def_lines, offset=offset
+                lines, start_line, end_line, max_lines=max_def_lines, offset=offset, line_numbers=line_numbers
             )
 
             print(f"{rel_path}:{format_line_range(start_line, end_line)}")

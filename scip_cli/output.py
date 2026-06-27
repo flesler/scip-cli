@@ -68,7 +68,7 @@ def resolve_max_def_lines(cli_value=None):
     return DEFAULT_MAX_DEF_LINES
 
 
-def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None, offset=0):
+def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None, offset=0, line_numbers=False):
     """Format definition source with optional truncation for agent-safe output."""
     if lines is None:
         return "(could not read source)", False, start_line, end_line
@@ -78,6 +78,8 @@ def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None,
 
     if max_lines == 0 and max_chars == 0:
         body = "".join(lines).rstrip("\n")
+        if line_numbers:
+            body = _add_line_numbers(body, start_line)
         return body, False, start_line, end_line
 
     selected = list(lines)
@@ -98,8 +100,21 @@ def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None,
         body = body[:max_chars].rstrip("\n") + "\n..."
         truncated = True
 
+    if line_numbers:
+        body = _add_line_numbers(body, start_line)
+
     shown_end = start_line + len(selected) - 1 if selected else start_line
     return body, truncated, start_line, shown_end
+
+
+def _add_line_numbers(body, start_line):
+    """Prefix each line with its line number."""
+    lines = body.split("\n")
+    numbered = []
+    for i, line in enumerate(lines):
+        line_num = start_line + i + 1
+        numbered.append(f"{line_num}|{line}")
+    return "\n".join(numbered)
 
 
 def print_def_truncation_notice(
