@@ -8,7 +8,7 @@ from ..cache import (
     index_db_path,
     promote_next_index,
 )
-from ..indexing import _index_project
+from ..indexing import _index_project, log_index_complete
 from ..paths import normalize_path_scope
 from ..project import find_project_root_and_language
 from ..scope import save_index_scope
@@ -25,8 +25,6 @@ def main(args):
         scope_paths = [normalize_path_scope(path, root) for path in path_args]
         save_index_scope(root, scope_paths)
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
-    else:
-        save_index_scope(root, None)
 
     cache_dir = get_cache_dir(root)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -36,9 +34,8 @@ def main(args):
         print(f"Error: No supported project markers found in {root}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Re-indexing {root} ({lang})...", file=sys.stderr)
     try:
-        _index_project(root, lang, cache_dir, replace=True)
+        _index_project(root, lang, cache_dir, replace=True, log=False)
     except RuntimeError as e:
         cleanup_in_progress_index(cache_dir)
         print(f"Error: {e}", file=sys.stderr)
@@ -51,5 +48,4 @@ def main(args):
         sys.exit(1)
 
     promote_next_index(cache_dir)
-    print(f"Updated {index_db_path(cache_dir, replace=False)}", file=sys.stderr)
-    print("Re-indexing complete", file=sys.stderr)
+    log_index_complete(index_db_path(cache_dir, replace=False), lang.value)

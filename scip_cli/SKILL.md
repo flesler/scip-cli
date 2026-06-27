@@ -14,14 +14,14 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | "Where is X defined and what does it do?" | `code X`             | Definition snippet (capped at 80 lines by default). Use `members Class` for large classes |
 | "Where is X used/called?"                 | `refs X`            | All file:line locations. Shows refs for all matching symbols. Use `--limit` to cap        |
 | "What's in this file?"                    | `symbols file`      | All symbols — bare filename works (`helper.ts`, `widget.ts`)                     |
-| "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes. Use `--kind variable` for consts                   |
+| "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes |
 | "What files depend on this file?"         | `rdeps file`        | Importers — bare name works                                                               |
 | "What methods does this class have?"      | `members ClassName` | All methods/fields with line ranges                                                       |
 | "Health / risk / stale code?"             | `analyze`           | Multi-section SQL dashboard — omit target (project), pass file, or symbol                 |
 
 ## Gotchas
 
-- **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Type/object fields use the same form: `search Options.verbose`, `code Options.verbose`. Consts/variables need `code --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `code methodName`.
+- **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Type/object fields use the same form: `search Options.verbose`, `code Options.verbose`. Consts/let/var are not kept in the index (too many rows, single-line defs) — use `rg` or read the file. Class methods need `members ClassName`, not bare `code methodName`.
 - **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code` returns all matches; `refs` returns refs for all matching symbols. Use `--limit N` to cap results, or use `search` with a more specific pattern to disambiguate.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use `--path packages/api` (or any file/dir) to scope queries.
@@ -35,7 +35,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path PATH] [--snippet] [--line-numbers] <symbol> [<symbol> ...]
 ```
 
-Kinds: `function`, `method`, `class`, `property`, `variable` — use `--kind` when the bare name isn't in the default set above.
+Kinds: `function`, `method`, `class`, `property` — use `--kind` when the bare name isn't in the default set above.
 
 `--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (equivalent to `--max-lines 0`). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines (useful for pagination with `--max-lines`). `--line-numbers` prefixes each line with its line number. Override default via `SCIP_CLI_MAX_DEF_LINES`.
 

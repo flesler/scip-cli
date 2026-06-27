@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from .queries import resolve_document_path
+from .queries import get_def_location, resolve_document_path
 from .symbols import extract_leaf_name
 
 _resolved_source_paths = {}
@@ -64,3 +64,11 @@ def fallback_def_location(db, project_root, symbol_str):
         if any(re.match(pattern, line) for pattern in patterns):
             return rel_path, index, index
     return None
+
+
+def resolve_def_location(db, project_root, symbol_id, symbol_str):
+    """Index location, then source-file scan when defn_enclosing_ranges is missing."""
+    row = get_def_location(db, symbol_id)
+    if row:
+        return row
+    return fallback_def_location(db, project_root, symbol_str)

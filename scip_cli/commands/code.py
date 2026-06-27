@@ -12,9 +12,9 @@ from ..output import (
     resolve_max_def_lines,
     symbol_output_label,
 )
-from ..queries import get_def_location, resolve_symbol
+from ..queries import resolve_symbol
 from ..session import setup
-from ..source import fallback_def_location, read_source_lines
+from ..source import read_source_lines, resolve_def_location
 
 
 def _resolve_symbol_groups(db, names, kind, limit, path_scope):
@@ -56,9 +56,7 @@ def main(args):
         printed = 0
         for query_name, symbols in groups:
             for symbol_id, symbol_str, _display_name in symbols:
-                row = get_def_location(db, symbol_id)
-                if not row:
-                    row = fallback_def_location(db, project_root, symbol_str)
+                row = resolve_def_location(db, project_root, symbol_id, symbol_str)
                 if not row:
                     continue
 
@@ -85,6 +83,9 @@ def main(args):
                         f"Warning: offset {offset} is beyond definition (lines {start_line + 1}-{end_line + 1})",
                         file=sys.stderr,
                     )
+                    print(f"{rel_path}:{format_line_range(start_line, end_line)}")
+                    printed += 1
+                    continue
 
                 source_snippet, truncated, shown_start, shown_end = format_def_body(
                     lines, start_line, end_line, max_lines=max_def_lines, offset=offset, line_numbers=line_numbers
@@ -93,7 +94,7 @@ def main(args):
                 print(f"{rel_path}:{format_line_range(start_line, end_line)}")
                 print(source_snippet)
                 if truncated:
-                    print_def_truncation_notice(rel_path, start_line, end_line, shown_start, shown_end)
+                    print_def_truncation_notice(query_name, shown_end, end_line)
                 printed += 1
 
         if printed == 0:

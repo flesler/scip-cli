@@ -91,6 +91,35 @@ class TestMergeSqliteIndexes:
         assert docs == [("src/a.ts",), ("src/b.ts",)]
         assert symbols == 2
 
+    def test_merge_skips_variable_symbols(self, tmp_path):
+        first = tmp_path / "first.db"
+        second = tmp_path / "second.db"
+        output = tmp_path / "merged.db"
+        _make_db(first, "src/a.ts", "scheme a/foo().")
+        conn = sqlite3.connect(second)
+        conn.executescript(SCHEMA)
+        conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/b.ts",))
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scheme b/message.", "message"),
+        )
+        conn.execute(
+            "INSERT INTO chunks (document_id, chunk_index, start_line, end_line, occurrences) "
+            "VALUES (1, 0, 0, 0, X'00')"
+        )
+        conn.execute("INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (1, 1, 0)")
+        conn.commit()
+        conn.close()
+
+        merge_sqlite_indexes([first, second], output)
+
+        conn = sqlite3.connect(output)
+        symbols = [row[0] for row in conn.execute("SELECT symbol FROM global_symbols").fetchall()]
+        conn.close()
+
+        assert len(symbols) == 1
+        assert symbols[0].endswith("foo().")
+
     def test_merge_reuses_duplicate_symbols(self, tmp_path):
         first = tmp_path / "first.db"
         second = tmp_path / "second.db"

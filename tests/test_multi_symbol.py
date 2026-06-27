@@ -49,7 +49,7 @@ class TestMultiSymbolCode:
                 return_value=[(1, "sym", "greet")],
             ),
             patch(
-                "scip_cli.commands.code.get_def_location",
+                "scip_cli.commands.code.resolve_def_location",
                 return_value=("src/helper.ts", 4, 6),
             ),
             patch(
@@ -88,8 +88,8 @@ class TestMultiSymbolCode:
             patch("scip_cli.commands.code.path_scope_from_args", return_value=None),
             patch("scip_cli.commands.code.resolve_symbol", side_effect=fake_resolve),
             patch(
-                "scip_cli.commands.code.get_def_location",
-                side_effect=lambda _db, sym_id: {
+                "scip_cli.commands.code.resolve_def_location",
+                side_effect=lambda _db, _root, sym_id, _sym: {
                     1: ("src/helper.ts", 4, 6),
                     2: ("src/widget.ts", 3, 5),
                 }[sym_id],
@@ -133,7 +133,7 @@ class TestMultiSymbolCode:
             patch("scip_cli.commands.code.path_scope_from_args", return_value=None),
             patch("scip_cli.commands.code.resolve_symbol", side_effect=fake_resolve),
             patch(
-                "scip_cli.commands.code.get_def_location",
+                "scip_cli.commands.code.resolve_def_location",
                 return_value=("src/helper.ts", 4, 6),
             ),
             patch(

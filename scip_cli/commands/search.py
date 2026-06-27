@@ -6,8 +6,9 @@ import sys
 from ..cli_args import path_scope_from_args
 from ..output import limit_and_warn
 from ..paths import path_filter_sql
-from ..queries import get_def_location, resolve_document_path, resolve_symbol
+from ..queries import resolve_document_path, resolve_symbol
 from ..session import setup
+from ..source import resolve_def_location
 from ..sql import escape_like
 from ..symbols import SymbolKind, extract_leaf_name, infer_kind, kind_sql_clause
 
@@ -108,16 +109,19 @@ def _qualified_pattern(pattern: str) -> bool:
     return "." in pattern and "/" not in pattern and "*" not in pattern
 
 
-def _search_results_from_symbols(db, symbols, limit):
+def _search_results_from_symbols(db, project_root, symbols, limit):
     """Turn resolve_symbol rows into search result tuples."""
     symbols = limit_and_warn(symbols, limit, "results")
     results = []
     for symbol_id, symbol_str, _display_name in symbols:
-        row = get_def_location(db, symbol_id)
-        start_line = row[1] if row else None
-        file_path = row[0] if row else _resolve_file_path(db, symbol_str)
+        loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
+        if loc:
+            file_path, start_line, _end_line = loc
+            line = start_line + 1
+        else:
+            file_path = _resolve_file_path(db, symbol_str)
+            line = "?"
         kind = infer_kind(symbol_str)
-        line = start_line + 1 if start_line is not None else "?"
         short = extract_leaf_name(symbol_str)
         results.append((file_path, line, kind_to_display(kind), short))
     return results
@@ -142,11 +146,11 @@ def main(args):
             like_patterns.append(pattern)
 
         if resolved_symbols and not like_patterns:
-            results = _search_results_from_symbols(db, resolved_symbols, limit)
+            results = _search_results_from_symbols(db, project_root, resolved_symbols, limit)
             _print_search_results(results, args)
             return
 
-        prefill = _search_results_from_symbols(db, resolved_symbols, limit) if resolved_symbols else []
+        prefill = _search_results_from_symbols(db, project_root, resolved_symbols, limit) if resolved_symbols else []
         patterns = like_patterns
         if not patterns:
             if prefill:
@@ -212,13 +216,18 @@ def main(args):
             sys.exit(1)
 
         results = []
-        for _symbol_id, symbol_str, _display_name, start_line, doc_path in rows:
+        for symbol_id, symbol_str, _display_name, start_line, doc_path in rows:
             if is_noisy_symbol(symbol_str):
                 continue
 
             kind = infer_kind(symbol_str)
-            file_path = _resolve_file_path(db, symbol_str, doc_path)
-            line = start_line + 1 if start_line is not None else "?"
+            loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
+            if loc:
+                file_path, resolved_start, _end = loc
+                line = resolved_start + 1
+            else:
+                file_path = _resolve_file_path(db, symbol_str, doc_path)
+                line = start_line + 1 if start_line is not None else "?"
             symbol_name = extract_leaf_name(symbol_str)
             results.append((file_path, line, kind_to_display(kind), symbol_name))
 

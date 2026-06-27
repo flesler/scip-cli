@@ -84,9 +84,9 @@ class TestInferKind:
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#"
         assert infer_kind(s) == SymbolKind.CLASS
 
-    def test_variable(self):
+    def test_pruned_const_is_unknown(self):
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/someVar."
-        assert infer_kind(s) == SymbolKind.VARIABLE
+        assert infer_kind(s) == SymbolKind.UNKNOWN
 
     def test_type_literal_property(self):
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#typeLiteral0:onVerbose."
@@ -125,11 +125,6 @@ class TestKindHelpers:
 
     def test_kind_sql_clause_property(self):
         assert "#typeLiteral" in kind_sql_clause(SymbolKind.PROPERTY)
-
-    def test_kind_sql_clause_variable(self):
-        clause = kind_sql_clause("variable")
-        assert "LIKE '%.'" in clause
-        assert "NOT LIKE '%().'" in clause
 
     def test_kind_sql_clause_unknown_kind(self):
         assert kind_sql_clause(SymbolKind.UNKNOWN) == ""

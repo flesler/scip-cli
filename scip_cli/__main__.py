@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import shutil
 import sqlite3
 import sys
 
@@ -24,7 +25,7 @@ def main():
         description="Fast code intelligence via SCIP indexes",
         epilog="AI agents: run 'scip-cli skill' for quick reference",
     )
-    parser.add_argument("--version", action="version", version=f"scip-cli {__version__}")
+    parser.add_argument("--version", action="store_true", help="Show version and install path")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # refs
@@ -125,6 +126,11 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.version:
+        exe = shutil.which("scip-cli") or sys.argv[0]
+        print(f"scip-cli {__version__} ({exe})")
+        return
 
     # Dispatch to command handlers
     dispatch = {

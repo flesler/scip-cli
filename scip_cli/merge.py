@@ -6,6 +6,8 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+from .symbols import sql_exclude_variable_symbols
+
 
 def merge_sqlite_indexes(part_paths: list[Path], output_path: Path) -> None:
     """Combine partial index databases into a single queryable database."""
@@ -47,10 +49,11 @@ def _merge_one_database(dest: sqlite3.Connection, part_path: Path) -> None:
             JOIN documents dest ON dest.relative_path = src.relative_path
         """)
 
-        dest.execute("""
+        dest.execute(f"""
             INSERT OR IGNORE INTO global_symbols (symbol, display_name, kind)
             SELECT symbol, display_name, kind
             FROM src.global_symbols
+            WHERE {sql_exclude_variable_symbols("symbol")}
         """)
         dest.execute("""
             INSERT INTO symbol_map (old_id, new_id)

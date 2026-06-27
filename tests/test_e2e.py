@@ -28,6 +28,8 @@ class TestCliBasics:
         result = run_cli(["--version"])
         assert result.returncode == 0
         assert "scip-cli" in result.stdout
+        assert "(" in result.stdout
+        assert ")" in result.stdout
 
     def test_skill_outputs_markdown(self):
         result = run_cli(["skill"])
@@ -45,6 +47,8 @@ class TestSearch:
         result = cli.run("search", f"{TYPE_OPTIONS}.{FIELD_VERBOSE}", "--limit", "3")
         assert result.returncode == 0
         assert FIELD_VERBOSE in result.stdout
+        assert ":? " not in result.stdout
+        assert f"{HELPER_FILE}:2" in result.stdout
 
     def test_multi_pattern_qualified_and_bare(self, cli):
         result = cli.run("search", METHOD_RUN, FN_GREET, "--limit", "5")

@@ -129,23 +129,13 @@ def _add_line_numbers(body, start_line):
     return "\n".join(numbered)
 
 
-def print_def_truncation_notice(
-    rel_path,
-    start_line,
-    end_line,
-    shown_start,
-    shown_end,
-):
-    """Print stderr guidance when a definition body was truncated."""
-    total = end_line - start_line + 1
-    shown = shown_end - shown_start + 1
-    omitted = total - shown
-    if omitted <= 0:
+def print_def_truncation_notice(query_name, shown_end, def_end_line):
+    """Print stderr hint when a definition body was truncated."""
+    if shown_end >= def_end_line:
         return
+    next_offset = shown_end + 1
     print(
-        f"# Warning: definition truncated for '{rel_path}' "
-        f"(showing lines {shown_start + 1}-{shown_end + 1} of "
-        f"{start_line + 1}-{end_line + 1}; {omitted} lines omitted). "
-        f"Use `scip-cli code --full --offset {shown_end + 1} <symbol>` to see the rest.",
+        f"Warning: truncated at line {shown_end + 1}/{def_end_line + 1}. "
+        f"Continue: code --offset {next_offset} {query_name}",
         file=sys.stderr,
     )

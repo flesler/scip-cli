@@ -9,9 +9,11 @@ import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Optional
 
 from .cache import find_db, get_cache_dir, index_db_path
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
+from .debug import debug_log
 from .discover import discover_typescript_projects
 from .merge import merge_sqlite_indexes
 from .scip_tool import ensure_scip_binary
@@ -19,6 +21,7 @@ from .scope import load_index_scope, projects_matching_scope
 
 INDEX_TIMEOUT = 300
 DEFAULT_MAX_HEAP_MB = 8192
+PROGRESS_LOG_MIN_PROJECTS = 10
 SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 
 # Pinned SCIP tool versions (minor version lock, patch bumps only).
@@ -33,6 +36,33 @@ def default_index_workers() -> int:
 
 
 _scip_version_warned = False
+
+
+def format_db_size(db_path: Path) -> str:
+    """Human-readable SQLite file size."""
+    nbytes = Path(db_path).stat().st_size
+    if nbytes < 1024:
+        return f"{nbytes} B"
+    if nbytes < 1024 * 1024:
+        return f"{nbytes / 1024:.1f} KB"
+    return f"{nbytes / (1024 * 1024):.1f} MB"
+
+
+def log_index_complete(
+    db_path: Path,
+    lang: str,
+    *,
+    projects: Optional[int] = None,
+    skipped: int = 0,
+) -> None:
+    """One-line stderr summary after a successful index write."""
+    size = format_db_size(db_path)
+    suffix = ""
+    if projects is not None and projects > 1:
+        suffix = f", {projects} tsconfigs"
+        if skipped:
+            suffix += f", {skipped} skipped"
+    print(f"Indexed {db_path} ({size}, {lang}{suffix})", file=sys.stderr)
 
 
 def _run_subprocess(cmd, cwd, env=None):
@@ -111,17 +141,20 @@ def run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None
     """Try binary first, fallback to npx if not found."""
     run_env = env if env is not None else os.environ.copy()
     npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
+
+    def run_npx():
+        debug_log("Tool not found, trying npx (will download automatically)...")
+        return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
+
     try:
         result = _run_subprocess([binary, *args], cwd, env=run_env)
         if result.returncode == 0:
             return result
         if "not found" in result.stderr.lower():
-            print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-            return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
+            return run_npx()
         return result
     except FileNotFoundError:
-        print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-        return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
+        return run_npx()
 
 
 def _scip_version(binary):
@@ -174,43 +207,102 @@ def _convert_scip_to_db(scip_path, db_path):
     if not db_path.exists():
         raise RuntimeError("Failed to convert index")
 
-    _trim_unused_columns(db_path)
+    _postprocess_index(db_path)
 
 
-def _trim_unused_columns(db_path):
-    """Remove columns we never use to reduce database size."""
+def _postprocess_index(db_path):
+    """Shrink index: drop unused columns and omit prunable symbol rows (copy-filter, no DELETE)."""
     conn = sqlite3.connect(str(db_path))
     try:
-        # documents: we only use relative_path, not text/language/position_encoding
-        conn.execute("""
-            CREATE TABLE documents_new (
-                id INTEGER PRIMARY KEY,
-                relative_path TEXT NOT NULL UNIQUE
-            )
-        """)
-        conn.execute("INSERT INTO documents_new SELECT id, relative_path FROM documents")
-        conn.execute("DROP TABLE documents")
-        conn.execute("ALTER TABLE documents_new RENAME TO documents")
-
-        # global_symbols: we only use id, symbol, display_name, kind
-        conn.execute("""
-            CREATE TABLE global_symbols_new (
-                id INTEGER PRIMARY KEY,
-                symbol TEXT NOT NULL UNIQUE,
-                display_name TEXT,
-                kind INTEGER
-            )
-        """)
-        conn.execute("""
-            INSERT INTO global_symbols_new
-            SELECT id, symbol, display_name, kind FROM global_symbols
-        """)
-        conn.execute("DROP TABLE global_symbols")
-        conn.execute("ALTER TABLE global_symbols_new RENAME TO global_symbols")
-
+        _trim_unused_columns(conn)
+        _trim_mentions_to_known_symbols(conn)
+        _trim_defn_to_known_symbols(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _trim_unused_columns(conn):
+    """Remove columns we never use; omit variable symbols while rebuilding global_symbols."""
+    conn.execute("""
+        CREATE TABLE documents_new (
+            id INTEGER PRIMARY KEY,
+            relative_path TEXT NOT NULL UNIQUE
+        )
+    """)
+    conn.execute("INSERT INTO documents_new SELECT id, relative_path FROM documents")
+    conn.execute("DROP TABLE documents")
+    conn.execute("ALTER TABLE documents_new RENAME TO documents")
+
+    from .symbols import sql_exclude_variable_symbols
+
+    exclude = sql_exclude_variable_symbols("symbol")
+    conn.execute("""
+        CREATE TABLE global_symbols_new (
+            id INTEGER PRIMARY KEY,
+            symbol TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            kind INTEGER
+        )
+    """)
+    conn.execute(f"""
+        INSERT INTO global_symbols_new
+        SELECT id, symbol, display_name, kind FROM global_symbols
+        WHERE {exclude}
+    """)
+    conn.execute("DROP TABLE global_symbols")
+    conn.execute("ALTER TABLE global_symbols_new RENAME TO global_symbols")
+
+
+def _trim_mentions_to_known_symbols(conn):
+    """Copy mentions that reference retained symbols (drops variable refs without DELETE)."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentions' LIMIT 1").fetchone():
+        return
+    conn.execute("""
+        CREATE TABLE mentions_new (
+            chunk_id INTEGER NOT NULL,
+            symbol_id INTEGER NOT NULL,
+            role INTEGER NOT NULL,
+            PRIMARY KEY (chunk_id, symbol_id, role)
+        )
+    """)
+    conn.execute("""
+        INSERT INTO mentions_new (chunk_id, symbol_id, role)
+        SELECT m.chunk_id, m.symbol_id, m.role
+        FROM mentions m
+        JOIN global_symbols g ON g.id = m.symbol_id
+    """)
+    conn.execute("DROP TABLE mentions")
+    conn.execute("ALTER TABLE mentions_new RENAME TO mentions")
+
+
+def _trim_defn_to_known_symbols(conn):
+    """Copy defn rows for retained symbols only."""
+    if not conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='defn_enclosing_ranges' LIMIT 1"
+    ).fetchone():
+        return
+    conn.execute("""
+        CREATE TABLE defn_enclosing_ranges_new (
+            id INTEGER PRIMARY KEY,
+            document_id INTEGER NOT NULL,
+            symbol_id INTEGER NOT NULL,
+            start_line INTEGER NOT NULL,
+            start_char INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            end_char INTEGER NOT NULL
+        )
+    """)
+    conn.execute("""
+        INSERT INTO defn_enclosing_ranges_new (
+            id, document_id, symbol_id, start_line, start_char, end_line, end_char
+        )
+        SELECT d.id, d.document_id, d.symbol_id, d.start_line, d.start_char, d.end_line, d.end_char
+        FROM defn_enclosing_ranges d
+        JOIN global_symbols g ON g.id = d.symbol_id
+    """)
+    conn.execute("DROP TABLE defn_enclosing_ranges")
+    conn.execute("ALTER TABLE defn_enclosing_ranges_new RENAME TO defn_enclosing_ranges")
 
 
 def _typescript_index_args(root, output_scip, projects):
@@ -268,12 +360,15 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
         part_dbs: list[Path] = []
         skipped = 0
         total = len(projects)
+        show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
-        if use_parallel:
+        if show_progress and use_parallel:
             print(
                 f"Indexing {total} TypeScript projects ({workers} workers; merge is serial)...",
                 file=sys.stderr,
             )
+
+        if use_parallel:
             completed = 0
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = {
@@ -287,30 +382,21 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
                     for index, project in enumerate(projects, start=1)
                 }
                 for future in as_completed(futures):
-                    index = futures[future]
                     label, db_path, error = future.result()
                     completed += 1
                     if db_path is None:
                         skipped += 1
-                        print(
-                            f"Warning: skipped {label}: {error}",
-                            file=sys.stderr,
-                        )
+                        print(f"Warning: skipped {label}: {error}", file=sys.stderr)
                     else:
-                        part_dbs.append((index, db_path))
-                        print(
-                            f"Indexed {completed}/{total}: {label}",
-                            file=sys.stderr,
-                        )
+                        part_dbs.append((futures[future], db_path))
+                        if show_progress:
+                            print(f"Indexed {completed}/{total}: {label}", file=sys.stderr)
             part_dbs = [db for _, db in sorted(part_dbs, key=lambda item: item[0])]
         else:
             for index, project in enumerate(projects, start=1):
                 label = "." if project == Path(".") else str(project)
-                if total > 1:
-                    print(
-                        f"Indexing TypeScript project {index}/{total}: {label}",
-                        file=sys.stderr,
-                    )
+                if show_progress:
+                    print(f"Indexing {index}/{total}: {label}", file=sys.stderr)
                 label, db_path, error = _index_one_ts_project(
                     root,
                     project,
@@ -326,26 +412,15 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
         if not part_dbs:
             raise RuntimeError("Failed to index project")
 
-        indexed = len(part_dbs)
-        if total > 1 and not use_parallel:
-            print(
-                f"Indexed {indexed}/{total} TypeScript projects" + (f" ({skipped} skipped)" if skipped else ""),
-                file=sys.stderr,
-            )
-        elif total > 1 and use_parallel:
-            print(
-                f"Finished indexing {indexed}/{total} TypeScript projects"
-                + (f" ({skipped} skipped)" if skipped else ""),
-                file=sys.stderr,
-            )
-
         if len(part_dbs) == 1:
             shutil.copy2(part_dbs[0], output_db)
         else:
             merge_sqlite_indexes(part_dbs, output_db)
 
+        return output_db, len(part_dbs), skipped, total
 
-def _index_project(root, lang, cache_dir, *, replace=False):
+
+def _index_project(root, lang, cache_dir, *, replace=False, log=True):
     """Run the language-specific indexer and convert to DB."""
     from .project import Language
 
@@ -356,13 +431,15 @@ def _index_project(root, lang, cache_dir, *, replace=False):
 
     if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
-        if len(projects) > 1:
-            print(
-                f"Indexing {len(projects)} TypeScript projects",
-                file=sys.stderr,
+        output_db, _indexed, skipped, total = _index_typescript(root, cache_dir, projects, env, replace=replace)
+        if log:
+            log_index_complete(
+                output_db,
+                lang.value,
+                projects=total if total > 1 else None,
+                skipped=skipped,
             )
-        _index_typescript(root, cache_dir, projects, env, replace=replace)
-        return
+        return output_db
 
     with tempfile.TemporaryDirectory() as tmpdir:
         index_scip = os.path.join(tmpdir, "index.scip")
@@ -382,7 +459,11 @@ def _index_project(root, lang, cache_dir, *, replace=False):
             print(result.stderr, file=sys.stderr)
             raise RuntimeError("Failed to index project")
 
-        _convert_scip_to_db(index_scip, index_db_path(cache_dir, replace=replace))
+        out = index_db_path(cache_dir, replace=replace)
+        _convert_scip_to_db(index_scip, out)
+        if log:
+            log_index_complete(out, lang.value)
+        return out
 
 
 def get_db(project_root=None):
@@ -401,7 +482,6 @@ def get_db(project_root=None):
         if lang is None:
             raise RuntimeError(f"No supported project markers found in {root}")
 
-        print(f"Auto-indexing {root} ({lang})...", file=sys.stderr)
         cache_dir = get_cache_dir(root)
         _index_project(root, lang, cache_dir)
 

@@ -11,7 +11,6 @@ class SymbolKind(str, Enum):
     METHOD = "method"
     CLASS = "class"
     PROPERTY = "property"
-    VARIABLE = "variable"
     UNKNOWN = "unknown"
 
     @classmethod
@@ -36,9 +35,24 @@ def kind_sql_clause(kind):
         return " AND gs.symbol LIKE '%#' AND gs.symbol NOT LIKE '%().'"
     if kind == SymbolKind.PROPERTY:
         return " AND gs.symbol LIKE '%#typeLiteral%'"
-    if kind == SymbolKind.VARIABLE:
-        return " AND gs.symbol LIKE '%.' AND gs.symbol NOT LIKE '%().'"
     return ""
+
+
+def is_variable_symbol(symbol_str: str) -> bool:
+    """Module/local const let var — high row count, low query value."""
+    if symbol_str.endswith("/") or ").(" in symbol_str or "#typeLiteral" in symbol_str:
+        return False
+    return symbol_str.endswith(".") and not symbol_str.endswith("().")
+
+
+def sql_exclude_variable_symbols(column: str = "symbol") -> str:
+    """SQL expression: true when column is not a prunable const/let/var."""
+    c = column
+    return (
+        f"NOT ({c} LIKE '%.' AND {c} NOT LIKE '%().' "
+        f"AND {c} NOT LIKE '%#typeLiteral%' AND {c} NOT LIKE '%).(%' "
+        f"AND {c} NOT LIKE '%/')"
+    )
 
 
 def infer_kind(symbol):
@@ -53,8 +67,6 @@ def infer_kind(symbol):
             return SymbolKind.CLASS
     if "#typeLiteral" in symbol and ":" in symbol and symbol.endswith("."):
         return SymbolKind.PROPERTY
-    if symbol.endswith(".") and not symbol.endswith("()."):
-        return SymbolKind.VARIABLE
     return SymbolKind.UNKNOWN
 
 
