@@ -37,8 +37,8 @@ def _merge_one_database(dest: sqlite3.Connection, part_path: Path) -> None:
         dest.execute("BEGIN")
 
         dest.execute("""
-            INSERT OR IGNORE INTO documents (language, relative_path, position_encoding, text)
-            SELECT language, relative_path, position_encoding, text FROM src.documents
+            INSERT OR IGNORE INTO documents (relative_path)
+            SELECT relative_path FROM src.documents
         """)
         dest.execute("""
             INSERT INTO doc_map (old_id, new_id)
@@ -48,12 +48,8 @@ def _merge_one_database(dest: sqlite3.Connection, part_path: Path) -> None:
         """)
 
         dest.execute("""
-            INSERT OR IGNORE INTO global_symbols (
-                symbol, display_name, kind, documentation, signature,
-                enclosing_symbol, relationships
-            )
-            SELECT symbol, display_name, kind, documentation, signature,
-                   enclosing_symbol, relationships
+            INSERT OR IGNORE INTO global_symbols (symbol, display_name, kind)
+            SELECT symbol, display_name, kind
             FROM src.global_symbols
         """)
         dest.execute("""

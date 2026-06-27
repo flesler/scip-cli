@@ -168,6 +168,44 @@ def _convert_scip_to_db(scip_path, db_path):
     if not db_path.exists():
         raise RuntimeError("Failed to convert index")
 
+    _trim_unused_columns(db_path)
+
+
+def _trim_unused_columns(db_path):
+    """Remove columns we never use to reduce database size."""
+    conn = sqlite3.connect(str(db_path))
+    try:
+        # documents: we only use relative_path, not text/language/position_encoding
+        conn.execute("""
+            CREATE TABLE documents_new (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT NOT NULL UNIQUE
+            )
+        """)
+        conn.execute("INSERT INTO documents_new SELECT id, relative_path FROM documents")
+        conn.execute("DROP TABLE documents")
+        conn.execute("ALTER TABLE documents_new RENAME TO documents")
+
+        # global_symbols: we only use id, symbol, display_name, kind
+        conn.execute("""
+            CREATE TABLE global_symbols_new (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT NOT NULL UNIQUE,
+                display_name TEXT,
+                kind INTEGER
+            )
+        """)
+        conn.execute("""
+            INSERT INTO global_symbols_new
+            SELECT id, symbol, display_name, kind FROM global_symbols
+        """)
+        conn.execute("DROP TABLE global_symbols")
+        conn.execute("ALTER TABLE global_symbols_new RENAME TO global_symbols")
+
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def _typescript_index_args(root, output_scip, projects):
     args = ["index", "--output", str(output_scip)]

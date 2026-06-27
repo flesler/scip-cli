@@ -10,10 +10,7 @@ from scip_cli.merge import merge_sqlite_indexes
 SCHEMA = """
 CREATE TABLE documents (
     id INTEGER PRIMARY KEY,
-    language TEXT,
-    relative_path TEXT NOT NULL UNIQUE,
-    position_encoding TEXT,
-    text TEXT
+    relative_path TEXT NOT NULL UNIQUE
 );
 CREATE TABLE chunks (
     id INTEGER PRIMARY KEY,
@@ -27,11 +24,7 @@ CREATE TABLE global_symbols (
     id INTEGER PRIMARY KEY,
     symbol TEXT NOT NULL UNIQUE,
     display_name TEXT,
-    kind INTEGER,
-    documentation TEXT,
-    signature BLOB,
-    enclosing_symbol TEXT,
-    relationships BLOB
+    kind INTEGER
 );
 CREATE TABLE mentions (
     chunk_id INTEGER NOT NULL,
@@ -55,8 +48,8 @@ def _make_db(path: Path, relative_path: str, symbol: str) -> None:
     conn = sqlite3.connect(path)
     conn.executescript(SCHEMA)
     conn.execute(
-        "INSERT INTO documents (language, relative_path) VALUES (?, ?)",
-        ("typescript", relative_path),
+        "INSERT INTO documents (relative_path) VALUES (?)",
+        (relative_path,),
     )
     conn.execute(
         "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
@@ -136,8 +129,8 @@ class TestMergeSqliteIndexes:
         conn = sqlite3.connect(first)
         conn.executescript(SCHEMA)
         conn.execute(
-            "INSERT INTO documents (language, relative_path) VALUES (?, ?)",
-            ("typescript", "src/shared.ts"),
+            "INSERT INTO documents (relative_path) VALUES (?)",
+            ("src/shared.ts",),
         )
         conn.execute(
             "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
@@ -160,8 +153,8 @@ class TestMergeSqliteIndexes:
         conn = sqlite3.connect(second)
         conn.executescript(SCHEMA)
         conn.execute(
-            "INSERT INTO documents (language, relative_path) VALUES (?, ?)",
-            ("typescript", "src/shared.ts"),
+            "INSERT INTO documents (relative_path) VALUES (?)",
+            ("src/shared.ts",),
         )
         conn.execute(
             "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
