@@ -14,7 +14,7 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
     """Get references with exact line numbers by reading source files."""
     sym_row = db.execute("SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
     if not sym_row:
-        return [], False
+        return []
 
     leaf = extract_leaf_name(sym_row[0])
 
@@ -27,12 +27,12 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
         LIMIT ?
     """, (symbol_id, max_refs + 1)).fetchall()
 
-    hit_limit = len(chunks) > max_refs
-    if hit_limit:
+    if len(chunks) > max_refs:
         chunks = chunks[:max_refs]
+        print(f"# Warning: more than {max_refs} references, truncating", file=sys.stderr)
 
     if not chunks:
-        return [], False
+        return []
 
     by_doc = {}
     for chunk_id, doc_id, start_line, end_line, rel_path in chunks:
@@ -42,7 +42,7 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
     results = []
 
-    for doc_id, info in by_doc.items():
+    for _doc_id, info in by_doc.items():
         rel_path = info['path']
         chunks_list = info['chunks']
         if not chunks_list:
@@ -60,12 +60,12 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
         lines = read_source_lines(project_root, rel_path, min_line, max_line)
         if lines is None:
-            for chunk_id, start_line, end_line in chunks_list:
+            for _chunk_id, start_line, _end_line in chunks_list:
                 if start_line is not None:
                     results.append((rel_path, start_line + 1))
             continue
 
-        for chunk_id, start_line, end_line in chunks_list:
+        for _chunk_id, start_line, end_line in chunks_list:
             if start_line is None:
                 continue
             offset = min_line
@@ -78,7 +78,7 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
             if not found:
                 results.append((rel_path, start_line + 1))
 
-    return results, hit_limit
+    return results
 
 
 def main(args):
@@ -93,39 +93,29 @@ def main(args):
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
-        symbols, symbols_hit_limit = limit_and_warn(symbols, limit, "symbols")
+        symbols = limit_and_warn(symbols, limit, "symbols")
 
         all_refs = []
-        for symbol_id, symbol_str, display_name in symbols:
-            refs, refs_hit_limit = get_exact_refs(
-                db, symbol_id, project_root, limit, path_scope=path_scope
-            )
+        for symbol_id, symbol_str, _display_name in symbols:
+            refs = get_exact_refs(db, symbol_id, project_root, limit, path_scope=path_scope)
             if refs:
-                all_refs.append((symbol_str, refs, refs_hit_limit))
+                all_refs.append((symbol_str, refs))
 
         if not all_refs:
             print(f"No references found for '{args.symbol}'", file=sys.stderr)
             sys.exit(1)
 
-        if symbols_hit_limit:
-            print(f"# Warning: more than {limit} symbols match, showing first {limit}", file=sys.stderr)
-
         paths_only = getattr(args, "paths_only", False)
         if paths_only:
-            unique_paths = sorted({path for _, refs, _ in all_refs for path, _ in refs})
+            unique_paths = sorted({path for _, refs in all_refs for path, _ in refs})
             for path in unique_paths:
                 if path_in_scope(path, path_scope):
                     print(path)
             return
 
-        for symbol_str, refs, refs_hit_limit in all_refs:
+        for symbol_str, refs in all_refs:
             if len(all_refs) > 1:
                 print(f"# {extract_leaf_name(symbol_str)}", file=sys.stderr)
-            if refs_hit_limit:
-                print(
-                    f"# Warning: more than {limit} refs for this symbol",
-                    file=sys.stderr,
-                )
             seen = set()
             for path, line in refs:
                 key = (path, line)

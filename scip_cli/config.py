@@ -32,9 +32,8 @@ def load_project_config(project_root: Path) -> ProjectSettings:
         raise RuntimeError(f"Invalid {CONFIG_FILENAME}: expected a JSON object")
 
     max_heap_mb = data.get("maxHeapMb")
-    if max_heap_mb is not None:
-        if type(max_heap_mb) is not int or max_heap_mb <= 0:
-            raise RuntimeError(f"Invalid {CONFIG_FILENAME}: maxHeapMb must be a positive integer")
+    if max_heap_mb is not None and (type(max_heap_mb) is not int or max_heap_mb <= 0):
+        raise RuntimeError(f"Invalid {CONFIG_FILENAME}: maxHeapMb must be a positive integer")
 
     index_roots = data.get("indexRoots", [])
     if not isinstance(index_roots, list) or not all(isinstance(p, str) for p in index_roots):

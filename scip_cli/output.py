@@ -42,9 +42,10 @@ def format_line_range(start_line, end_line, sep=":"):
 
 
 def limit_and_warn(items, limit, label="results"):
-    """Trim a list to limit and return whether the limit was exceeded."""
-    hit_limit = len(items) > limit
-    return items[:limit], hit_limit
+    """Trim a list to limit and print a warning if truncated."""
+    if len(items) > limit:
+        print(f"# Warning: more than {limit} {label}, showing first {limit}", file=sys.stderr)
+    return items[:limit]
 
 
 def resolve_max_def_lines(cli_value=None):

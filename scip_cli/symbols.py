@@ -109,9 +109,7 @@ def extract_leaf_name(symbol_str):
     if "#" in leaf:
         leaf = leaf.split("#")[-1]
     leaf = leaf.replace("`", "")
-    if leaf.startswith("<get>"):
-        leaf = leaf[5:]
-    elif leaf.startswith("<set>"):
+    if leaf.startswith("<get>") or leaf.startswith("<set>"):
         leaf = leaf[5:]
     return leaf
 

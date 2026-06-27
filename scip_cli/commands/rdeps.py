@@ -25,8 +25,8 @@ def main(args):
         refs = get_refs_for_symbols(db, symbol_ids)
 
         rdeps = set()
-        for symbol_id, ref_list in refs.items():
-            for ref_path, ref_line in ref_list:
+        for _symbol_id, ref_list in refs.items():
+            for ref_path, _ref_line in ref_list:
                 if ref_path != file_path and path_in_scope(ref_path, path_scope):
                     rdeps.add(ref_path)
 
@@ -35,12 +35,9 @@ def main(args):
             sys.exit(1)
 
         sorted_rdeps = sorted(rdeps)
-        sorted_rdeps, hit_limit = limit_and_warn(sorted_rdeps, limit, "reverse dependencies")
+        sorted_rdeps = limit_and_warn(sorted_rdeps, limit, "reverse dependencies")
 
         for dep_path in sorted_rdeps:
             print(dep_path)
-
-        if hit_limit:
-            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

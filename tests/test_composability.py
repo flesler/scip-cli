@@ -88,11 +88,10 @@ class TestMachineOutputFlags:
             names_only=True,
             paths_only=False,
         )
-        with patch("scip_cli.commands.search.setup", return_value=(db, Path("/proj"))):
-            with patch(
-                "scip_cli.commands.search.path_scope_from_args", return_value=None
-            ):
-                search.main(args)
+        with patch("scip_cli.commands.search.setup", return_value=(db, Path("/proj"))), patch(
+            "scip_cli.commands.search.path_scope_from_args", return_value=None
+        ):
+            search.main(args)
         out = capsys.readouterr().out.strip().splitlines()
         assert "foo" in out
         assert all(" " not in line or line == "foo" for line in out)
@@ -108,11 +107,10 @@ class TestMachineOutputFlags:
             names_only=False,
             paths_only=True,
         )
-        with patch("scip_cli.commands.search.setup", return_value=(db, Path("/proj"))):
-            with patch(
-                "scip_cli.commands.search.path_scope_from_args", return_value=None
-            ):
-                search.main(args)
+        with patch("scip_cli.commands.search.setup", return_value=(db, Path("/proj"))), patch(
+            "scip_cli.commands.search.path_scope_from_args", return_value=None
+        ):
+            search.main(args)
         out = capsys.readouterr().out.strip().splitlines()
         assert out == ["pkg/a.ts"]
         db.close()
@@ -131,15 +129,13 @@ class TestMachineOutputFlags:
         (project_root / "pkg" / "a.ts").write_text("const x = foo()\n", encoding="utf-8")
         (project_root / "pkg" / "b.ts").write_text("foo()\n", encoding="utf-8")
 
-        with patch("scip_cli.commands.refs.setup", return_value=(db, project_root)):
-            with patch(
-                "scip_cli.commands.refs.path_scope_from_args", return_value=None
-            ):
-                with patch(
-                    "scip_cli.commands.refs.resolve_symbol",
-                    return_value=[(1, "sym", "foo")],
-                ):
-                    refs.main(args)
+        with patch("scip_cli.commands.refs.setup", return_value=(db, project_root)), patch(
+            "scip_cli.commands.refs.path_scope_from_args", return_value=None
+        ), patch(
+            "scip_cli.commands.refs.resolve_symbol",
+            return_value=[(1, "sym", "foo")],
+        ):
+            refs.main(args)
         out = capsys.readouterr().out.strip().splitlines()
         assert out == ["pkg/a.ts", "pkg/b.ts"]
         db.close()
@@ -156,26 +152,22 @@ class TestMachineOutputFlags:
         db.commit()
 
         args = SimpleNamespace(symbol="MyClass", limit=10, path=None, names_only=True)
-        with patch("scip_cli.commands.members.setup", return_value=(db, Path("/proj"))):
-            with patch(
-                "scip_cli.commands.members.path_scope_from_args", return_value=None
-            ):
-                with patch(
-                    "scip_cli.commands.members.resolve_one_symbol",
-                    return_value=(1, "parent#", "MyClass"),
-                ):
-                    with patch(
-                        "scip_cli.commands.members.get_members",
-                        return_value=[
-                            (2, "parent#run().", "run", 1, 1),
-                            (3, "parent#stop().", "stop", 2, 2),
-                        ],
-                    ):
-                        with patch(
-                            "scip_cli.commands.members.get_def_location",
-                            return_value=("pkg/a.ts", 0, 10),
-                        ):
-                            members.main(args)
+        with patch("scip_cli.commands.members.setup", return_value=(db, Path("/proj"))), patch(
+            "scip_cli.commands.members.path_scope_from_args", return_value=None
+        ), patch(
+            "scip_cli.commands.members.resolve_one_symbol",
+            return_value=(1, "parent#", "MyClass"),
+        ), patch(
+            "scip_cli.commands.members.get_members",
+            return_value=[
+                (2, "parent#run().", "run", 1, 1),
+                (3, "parent#stop().", "stop", 2, 2),
+            ],
+        ), patch(
+            "scip_cli.commands.members.get_def_location",
+            return_value=("pkg/a.ts", 0, 10),
+        ):
+            members.main(args)
         out = capsys.readouterr().out.strip().splitlines()
         assert out == ["run", "stop"]
         db.close()

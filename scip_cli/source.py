@@ -33,7 +33,7 @@ def read_source_lines(project_root, relative_path, start_line=None, end_line=Non
         return None
 
     try:
-        with open(full_path, "r", encoding="utf-8") as f:
+        with open(full_path, encoding="utf-8") as f:
             lines = f.readlines()
             if start_line is not None and end_line is not None:
                 return lines[start_line : end_line + 1]

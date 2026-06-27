@@ -27,10 +27,10 @@ def main(args):
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
-        symbols, hit_limit = limit_and_warn(symbols, limit, "symbols")
+        symbols = limit_and_warn(symbols, limit, "symbols")
         max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
 
-        for symbol_id, symbol_str, display_name in symbols:
+        for symbol_id, symbol_str, _display_name in symbols:
             row = get_def_location(db, symbol_id)
             if not row:
                 row = fallback_def_location(db, project_root, symbol_str)
@@ -50,8 +50,5 @@ def main(args):
                 print_def_truncation_notice(
                     rel_path, start_line, end_line, shown_start, shown_end
                 )
-
-        if hit_limit:
-            print(f"# Warning: more than {limit} symbols match, showing first {limit}", file=sys.stderr)
     finally:
         db.close()

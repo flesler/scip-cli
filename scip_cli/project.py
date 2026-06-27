@@ -1,6 +1,17 @@
 """Project root detection and language identification."""
 import os
+from enum import Enum
 from pathlib import Path
+
+
+class Language(str, Enum):
+    """Supported project languages."""
+    TYPESCRIPT = "typescript"
+    PYTHON = "python"
+
+    @classmethod
+    def values(cls):
+        return [lang.value for lang in cls]
 
 
 def find_project_root(start_dir=None):
@@ -17,13 +28,13 @@ def find_project_root(start_dir=None):
 def detect_language(project_root):
     """Detect language from project markers.
 
-    Returns: 'typescript' (TypeScript/JavaScript via scip-typescript), 'python', or None.
+    Returns: Language enum value or None.
     """
     root = Path(project_root)
     if (root / "package.json").exists():
-        return "typescript"
+        return Language.TYPESCRIPT.value
     if (root / "tsconfig.json").exists():
-        return "typescript"
+        return Language.TYPESCRIPT.value
     if (root / "pyproject.toml").exists() or (root / "setup.py").exists():
-        return "python"
+        return Language.PYTHON.value
     return None

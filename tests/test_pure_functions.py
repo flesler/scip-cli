@@ -1,16 +1,16 @@
 """Tests for pure functions in scip_cli."""
-import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
+
+from scip_cli.commands.refs import get_exact_refs
+from scip_cli.commands.search import is_noisy_symbol, kind_to_display, parse_symbol
 from scip_cli.output import format_def_body, format_line_range
 from scip_cli.project import detect_language
 from scip_cli.queries import resolve_file, resolve_symbol
 from scip_cli.source import read_source_lines
 from scip_cli.sql import escape_like
 from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind, kind_sql_clause
-from scip_cli.commands.search import parse_symbol, is_noisy_symbol, kind_to_display
-from scip_cli.commands.refs import get_exact_refs
 
 
 class TestDetectLanguage:
@@ -598,9 +598,8 @@ class TestGetExactRefs:
     def test_no_symbol(self):
         """Test when symbol doesn't exist."""
         conn = self._create_test_db()
-        refs, hit_limit = get_exact_refs(conn, 999, "/tmp", 10)
+        refs = get_exact_refs(conn, 999, "/tmp", 10)
         assert refs == []
-        assert hit_limit is False
         conn.close()
 
     def test_no_mentions(self):
@@ -611,9 +610,8 @@ class TestGetExactRefs:
             (1, "scip-python test/test `test.py`/foo().", "foo")
         )
         conn.commit()
-        refs, hit_limit = get_exact_refs(conn, 1, "/tmp", 10)
+        refs = get_exact_refs(conn, 1, "/tmp", 10)
         assert refs == []
-        assert hit_limit is False
         conn.close()
 
     def test_single_reference(self):
@@ -643,10 +641,9 @@ class TestGetExactRefs:
             )
             conn.commit()
 
-            refs, hit_limit = get_exact_refs(conn, 1, tmpdir, 10)
+            refs = get_exact_refs(conn, 1, tmpdir, 10)
             assert len(refs) == 1
             assert refs[0] == ("test.py", 4)  # Line 4 (1-indexed)
-            assert hit_limit is False
             conn.close()
 
     def test_max_refs_limit(self):
@@ -679,7 +676,6 @@ class TestGetExactRefs:
             conn.commit()
 
             # Limit to 2 refs
-            refs, hit_limit = get_exact_refs(conn, 1, tmpdir, 2)
+            refs = get_exact_refs(conn, 1, tmpdir, 2)
             assert len(refs) == 2
-            assert hit_limit is True
             conn.close()

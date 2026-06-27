@@ -7,8 +7,8 @@ import sys
 
 from . import __version__
 from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument
+from .commands import def_cmd, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
-from .commands import refs, def_cmd, search, symbols, rdeps, members, skill, reindex
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
 if os.environ.get("SCIP_CLI_DEBUG"):

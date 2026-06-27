@@ -1,13 +1,12 @@
 """Tests for cache directory naming."""
 import json
-from pathlib import Path
 
 from scip_cli.cache import (
     find_db,
     get_cache_dir,
     index_db_path,
-    promote_next_index,
     project_cache_slug,
+    promote_next_index,
 )
 from scip_cli.scope import save_index_scope
 

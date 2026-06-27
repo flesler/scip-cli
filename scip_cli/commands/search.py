@@ -1,8 +1,9 @@
 """search command - search symbols by pattern."""
-import sys
 import re
+import sys
 
 from ..cli_args import path_scope_from_args
+from ..output import limit_and_warn
 from ..paths import path_filter_sql
 from ..queries import get_def_location, resolve_document_path, resolve_symbol
 from ..session import setup
@@ -45,9 +46,7 @@ def is_noisy_symbol(symbol_str):
         return True
     if "typeLiteral" in symbol_str and infer_kind(symbol_str) != SymbolKind.PROPERTY:
         return True
-    if ").(" in symbol_str:
-        return True
-    return False
+    return ").(" in symbol_str
 
 
 def kind_to_display(kind):
@@ -58,7 +57,6 @@ def kind_to_display(kind):
 def _search_rows_with_kind(db, sql, params, kind, limit):
     """Fetch search rows matching kind, stopping once limit is exceeded."""
     rows = []
-    hit_limit = False
     cursor = db.execute(sql, params)
     while True:
         batch = cursor.fetchmany(500)
@@ -69,11 +67,10 @@ def _search_rows_with_kind(db, sql, params, kind, limit):
                 continue
             rows.append(row)
             if len(rows) > limit:
-                hit_limit = True
                 break
-        if hit_limit or len(rows) > limit:
+        if len(rows) > limit:
             break
-    return rows[:limit], hit_limit
+    return limit_and_warn(rows, limit, "results")
 
 
 def _resolve_file_path(db, symbol_str, doc_path=None):
@@ -122,10 +119,9 @@ def main(args):
                 db, args.pattern, args.kind, limit=limit + 1, path_scope=path_scope
             )
             if symbols:
-                hit_limit = len(symbols) > limit
-                symbols = symbols[:limit]
+                symbols = limit_and_warn(symbols, limit, "results")
                 results = []
-                for symbol_id, symbol_str, display_name in symbols:
+                for symbol_id, symbol_str, _display_name in symbols:
                     row = get_def_location(db, symbol_id)
                     start_line = row[1] if row else None
                     file_path = row[0] if row else _resolve_file_path(db, symbol_str)
@@ -134,11 +130,6 @@ def main(args):
                     short = extract_leaf_name(symbol_str)
                     results.append((file_path, line, kind_to_display(kind), short))
                 _print_search_results(results, args)
-                if hit_limit:
-                    print(
-                        f"# Warning: more than {limit} results, showing first {limit}",
-                        file=sys.stderr,
-                    )
                 return
 
         escaped_pattern = escape_like(args.pattern)
@@ -150,7 +141,7 @@ def main(args):
         )
 
         if args.kind:
-            rows, hit_limit = _search_rows_with_kind(
+            rows = _search_rows_with_kind(
                 db,
                 f"""
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
@@ -173,8 +164,7 @@ def main(args):
             """,
                 (f"%{escaped_pattern}%", *path_params, limit + 1),
             ).fetchall()
-            hit_limit = len(rows) > limit
-            rows = rows[:limit]
+            rows = limit_and_warn(rows, limit, "results")
 
         if not rows:
             if args.kind:
@@ -187,7 +177,7 @@ def main(args):
             sys.exit(1)
 
         results = []
-        for symbol_id, symbol_str, display_name, start_line, doc_path in rows:
+        for _symbol_id, symbol_str, _display_name, start_line, doc_path in rows:
             if is_noisy_symbol(symbol_str):
                 continue
 
@@ -202,11 +192,5 @@ def main(args):
             sys.exit(1)
 
         _print_search_results(results, args)
-
-        if hit_limit:
-            print(
-                f"# Warning: more than {limit} results, showing first {limit}",
-                file=sys.stderr,
-            )
     finally:
         db.close()

@@ -1,6 +1,6 @@
 """members command - list members of a class/interface."""
-import sys
 import re
+import sys
 
 from ..cli_args import path_scope_from_args
 from ..output import format_line_range, limit_and_warn
@@ -19,7 +19,8 @@ def _member_source_patterns(member_symbol, short, kind):
     elif "<set>" in member_symbol:
         ts_pattern = rf'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*set\s+{re.escape(short)}\s*\('
     else:
-        ts_pattern = rf'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*{re.escape(short)}\s*\??\s*[:=(]'
+        prefix = r'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*'
+        ts_pattern = rf'{prefix}{re.escape(short)}\s*\??\s*[:=(]'
 
     py_pattern = None
     if kind == SymbolKind.METHOD:
@@ -41,7 +42,7 @@ def main(args):
         symbol_id, _, _ = resolve_one_symbol(db, args.symbol, path_scope=path_scope)
         members = get_members(db, symbol_id)
 
-        members, hit_limit = limit_and_warn(members, limit, "members")
+        members = limit_and_warn(members, limit, "members")
 
         if not members:
             print(f"No members found for '{args.symbol}'", file=sys.stderr)
@@ -59,7 +60,7 @@ def main(args):
 
         names_only = getattr(args, "names_only", False)
 
-        for member_id, member_symbol, member_name, start_line, end_line in members:
+        for _member_id, member_symbol, _member_name, start_line, end_line in members:
             kind = infer_kind(member_symbol)
             short = extract_leaf_name(member_symbol)
 
@@ -87,8 +88,5 @@ def main(args):
 
             line_info = format_line_range(start_line, end_line)
             print(f"{line_info} {kind.value} {short}")
-
-        if hit_limit:
-            print(f"# Warning: more than {limit} results, showing first {limit}", file=sys.stderr)
     finally:
         db.close()
