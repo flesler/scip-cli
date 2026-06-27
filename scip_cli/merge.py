@@ -27,149 +27,82 @@ def merge_sqlite_indexes(part_paths: list[Path], output_path: Path) -> None:
 
 
 def _merge_one_database(dest: sqlite3.Connection, part_path: Path) -> None:
-    part = sqlite3.connect(part_path)
-    part.row_factory = sqlite3.Row
+    dest.execute("ATTACH DATABASE ? AS src", (str(part_path),))
     try:
-        document_map = _merge_documents(dest, part)
-        symbol_map = _merge_symbols(dest, part)
-        chunk_map = _merge_chunks(dest, part, document_map)
-        _merge_mentions(dest, part, chunk_map, symbol_map)
-        _merge_definitions(dest, part, document_map, symbol_map)
-    finally:
-        part.close()
+        dest.execute("CREATE TEMPORARY TABLE doc_map (old_id INTEGER, new_id INTEGER)")
+        dest.execute("CREATE TEMPORARY TABLE symbol_map (old_id INTEGER, new_id INTEGER)")
+        dest.execute("CREATE TEMPORARY TABLE chunk_map (old_id INTEGER, new_id INTEGER)")
 
+        dest.execute("BEGIN")
 
-def _merge_documents(dest: sqlite3.Connection, part: sqlite3.Connection) -> dict[int, int]:
-    mapping: dict[int, int] = {}
-    for row in part.execute("SELECT * FROM documents"):
-        existing = dest.execute(
-            "SELECT id FROM documents WHERE relative_path = ?",
-            (row["relative_path"],),
-        ).fetchone()
-        if existing:
-            mapping[row["id"]] = existing[0]
-            continue
-        cursor = dest.execute(
-            """
-            INSERT INTO documents (language, relative_path, position_encoding, text)
-            VALUES (?, ?, ?, ?)
-            """,
-            (row["language"], row["relative_path"], row["position_encoding"], row["text"]),
-        )
-        mapping[row["id"]] = cursor.lastrowid
-    return mapping
+        dest.execute("""
+            INSERT OR IGNORE INTO documents (language, relative_path, position_encoding, text)
+            SELECT language, relative_path, position_encoding, text FROM src.documents
+        """)
+        dest.execute("""
+            INSERT INTO doc_map (old_id, new_id)
+            SELECT src.id, dest.id
+            FROM src.documents src
+            JOIN documents dest ON dest.relative_path = src.relative_path
+        """)
 
-
-def _merge_symbols(dest: sqlite3.Connection, part: sqlite3.Connection) -> dict[int, int]:
-    mapping: dict[int, int] = {}
-    for row in part.execute("SELECT * FROM global_symbols"):
-        existing = dest.execute(
-            "SELECT id FROM global_symbols WHERE symbol = ?",
-            (row["symbol"],),
-        ).fetchone()
-        if existing:
-            mapping[row["id"]] = existing[0]
-            continue
-        cursor = dest.execute(
-            """
-            INSERT INTO global_symbols (
+        dest.execute("""
+            INSERT OR IGNORE INTO global_symbols (
                 symbol, display_name, kind, documentation, signature,
                 enclosing_symbol, relationships
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                row["symbol"],
-                row["display_name"],
-                row["kind"],
-                row["documentation"],
-                row["signature"],
-                row["enclosing_symbol"],
-                row["relationships"],
-            ),
-        )
-        mapping[row["id"]] = cursor.lastrowid
-    return mapping
+            )
+            SELECT symbol, display_name, kind, documentation, signature,
+                   enclosing_symbol, relationships
+            FROM src.global_symbols
+        """)
+        dest.execute("""
+            INSERT INTO symbol_map (old_id, new_id)
+            SELECT src.id, dest.id
+            FROM src.global_symbols src
+            JOIN global_symbols dest ON dest.symbol = src.symbol
+        """)
 
+        dest.execute("""
+            INSERT OR IGNORE INTO chunks (document_id, chunk_index, start_line, end_line, occurrences)
+            SELECT dm.new_id, src.chunk_index, src.start_line, src.end_line, src.occurrences
+            FROM src.chunks src
+            JOIN doc_map dm ON dm.old_id = src.document_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM chunks 
+                WHERE document_id = dm.new_id 
+                AND chunk_index = src.chunk_index
+            )
+        """)
+        dest.execute("""
+            INSERT INTO chunk_map (old_id, new_id)
+            SELECT src.id, dest.id
+            FROM src.chunks src
+            JOIN doc_map dm ON dm.old_id = src.document_id
+            JOIN chunks dest ON dest.document_id = dm.new_id AND dest.chunk_index = src.chunk_index
+        """)
 
-def _merge_chunks(
-    dest: sqlite3.Connection,
-    part: sqlite3.Connection,
-    document_map: dict[int, int],
-) -> dict[int, int]:
-    mapping: dict[int, int] = {}
-    existing: dict[tuple[int, int], int] = {
-        (row[0], row[1]): row[2]
-        for row in dest.execute("SELECT document_id, chunk_index, id FROM chunks")
-    }
-    for row in part.execute("SELECT * FROM chunks"):
-        document_id = document_map.get(row["document_id"])
-        if document_id is None:
-            continue
-        key = (document_id, row["chunk_index"])
-        if key in existing:
-            mapping[row["id"]] = existing[key]
-            continue
-        cursor = dest.execute(
-            """
-            INSERT INTO chunks (document_id, chunk_index, start_line, end_line, occurrences)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                document_id,
-                row["chunk_index"],
-                row["start_line"],
-                row["end_line"],
-                row["occurrences"],
-            ),
-        )
-        mapping[row["id"]] = cursor.lastrowid
-        existing[key] = cursor.lastrowid
-    return mapping
-
-
-def _merge_mentions(
-    dest: sqlite3.Connection,
-    part: sqlite3.Connection,
-    chunk_map: dict[int, int],
-    symbol_map: dict[int, int],
-) -> None:
-    for row in part.execute("SELECT * FROM mentions"):
-        chunk_id = chunk_map.get(row["chunk_id"])
-        symbol_id = symbol_map.get(row["symbol_id"])
-        if chunk_id is None or symbol_id is None:
-            continue
-        dest.execute(
-            """
+        dest.execute("""
             INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role)
-            VALUES (?, ?, ?)
-            """,
-            (chunk_id, symbol_id, row["role"]),
-        )
+            SELECT cm.new_id, sm.new_id, src.role
+            FROM src.mentions src
+            JOIN chunk_map cm ON cm.old_id = src.chunk_id
+            JOIN symbol_map sm ON sm.old_id = src.symbol_id
+        """)
 
-
-def _merge_definitions(
-    dest: sqlite3.Connection,
-    part: sqlite3.Connection,
-    document_map: dict[int, int],
-    symbol_map: dict[int, int],
-) -> None:
-    for row in part.execute("SELECT * FROM defn_enclosing_ranges"):
-        document_id = document_map.get(row["document_id"])
-        symbol_id = symbol_map.get(row["symbol_id"])
-        if document_id is None or symbol_id is None:
-            continue
-        dest.execute(
-            """
-            INSERT INTO defn_enclosing_ranges (
+        dest.execute("""
+            INSERT OR IGNORE INTO defn_enclosing_ranges (
                 document_id, symbol_id, start_line, start_char, end_line, end_char
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                document_id,
-                symbol_id,
-                row["start_line"],
-                row["start_char"],
-                row["end_line"],
-                row["end_char"],
-            ),
-        )
+            )
+            SELECT dm.new_id, sm.new_id, src.start_line, src.start_char, src.end_line, src.end_char
+            FROM src.defn_enclosing_ranges src
+            JOIN doc_map dm ON dm.old_id = src.document_id
+            JOIN symbol_map sm ON sm.old_id = src.symbol_id
+        """)
+
+        dest.execute("COMMIT")
+
+        dest.execute("DROP TABLE doc_map")
+        dest.execute("DROP TABLE symbol_map")
+        dest.execute("DROP TABLE chunk_map")
+    finally:
+        dest.execute("DETACH DATABASE src")
