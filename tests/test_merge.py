@@ -131,6 +131,78 @@ class TestMergeSqliteIndexes:
         conn.close()
         assert chunk_count == 1
 
+    def test_merge_preserves_mentions_on_duplicate_chunks(self, tmp_path):
+        first = tmp_path / "first.db"
+        second = tmp_path / "second.db"
+        output = tmp_path / "merged.db"
+
+        conn = sqlite3.connect(first)
+        conn.executescript(SCHEMA)
+        conn.execute(
+            "INSERT INTO documents (language, relative_path) VALUES (?, ?)",
+            ("typescript", "src/shared.ts"),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scheme a/symA().", "symA"),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scheme a/symB().", "symB"),
+        )
+        conn.execute(
+            """
+            INSERT INTO chunks (document_id, chunk_index, start_line, end_line, occurrences)
+            VALUES (1, 0, 0, 0, X'00')
+            """
+        )
+        conn.execute("INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (1, 1, 0)")
+        conn.commit()
+        conn.close()
+
+        conn = sqlite3.connect(second)
+        conn.executescript(SCHEMA)
+        conn.execute(
+            "INSERT INTO documents (language, relative_path) VALUES (?, ?)",
+            ("typescript", "src/shared.ts"),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scheme b/symB().", "symB"),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scheme b/symC().", "symC"),
+        )
+        conn.execute(
+            """
+            INSERT INTO chunks (document_id, chunk_index, start_line, end_line, occurrences)
+            VALUES (1, 0, 0, 0, X'00')
+            """
+        )
+        conn.execute("INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (1, 2, 0)")
+        conn.commit()
+        conn.close()
+
+        merge_sqlite_indexes([first, second], output)
+
+        conn = sqlite3.connect(output)
+        mention_count = conn.execute("SELECT COUNT(*) FROM mentions").fetchone()[0]
+        symbols = {
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT gs.symbol FROM mentions m
+                JOIN global_symbols gs ON m.symbol_id = gs.id
+                """
+            )
+        }
+        conn.close()
+
+        assert mention_count == 2
+        assert "scheme a/symA()." in symbols
+        assert "scheme b/symC()." in symbols
+
     def test_merge_requires_inputs(self):
         with pytest.raises(ValueError):
             merge_sqlite_indexes([], Path("out.db"))

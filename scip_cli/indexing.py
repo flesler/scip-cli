@@ -8,11 +8,12 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from .cache import find_db, get_cache_dir
+from .cache import find_db, get_cache_dir, warn_if_stale_index, write_index_meta
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
-from .constants import DEFAULT_MAX_HEAP_MB, INDEX_TIMEOUT, SCIP_INSTALL_URL
+from .constants import DEFAULT_MAX_HEAP_MB, INDEX_TIMEOUT, SCIP_INSTALL_URL, default_index_workers
 from .discover import discover_typescript_projects
 from .merge import merge_sqlite_indexes
 from .project import detect_language, find_project_root
@@ -166,62 +167,136 @@ def _typescript_index_args(root, output_scip, projects):
     return args
 
 
+def _index_workers():
+    """Parallel workers for per-project scip-typescript runs (merge stays serial)."""
+    env_val = os.environ.get("SCIP_CLI_INDEX_WORKERS")
+    if env_val is not None:
+        try:
+            return max(1, int(env_val))
+        except ValueError:
+            raise RuntimeError(
+                f"Invalid SCIP_CLI_INDEX_WORKERS: expected an integer, got {env_val!r}"
+            ) from None
+    return default_index_workers()
+
+
+def _index_one_ts_project(root, project, work_dir, env):
+    """Index one TypeScript project into work_dir/index.db."""
+    root = Path(root)
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    label = "." if project == Path(".") else str(project)
+    part_scip = work_dir / "index.scip"
+    index_args = _typescript_index_args(root, part_scip, [project])
+    result = run_with_fallback(
+        "scip-typescript",
+        "@sourcegraph/scip-typescript",
+        str(root),
+        index_args,
+        env=env,
+    )
+    if result.returncode != 0:
+        return label, None, result.stderr.strip() or "indexing failed"
+    _convert_scip_to_db(part_scip, work_dir)
+    return label, work_dir / "index.db", None
+
+
 def _index_typescript(root, cache_dir, projects, env):
     """Index one or more TypeScript projects and write cache_dir/index.db."""
     root = Path(root)
     cache_dir = Path(cache_dir)
+    workers = _index_workers()
+    use_parallel = len(projects) > 1 and workers > 1
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         part_dbs: list[Path] = []
         skipped = 0
+        total = len(projects)
 
-        for index, project in enumerate(projects, start=1):
-            label = "." if project == Path(".") else str(project)
-            if len(projects) > 1:
-                print(
-                    f"Indexing TypeScript project {index}/{len(projects)}: {label}",
-                    file=sys.stderr,
-                )
-
-            part_scip = tmpdir_path / f"part-{index}.scip"
-            index_args = _typescript_index_args(root, part_scip, [project])
-            result = run_with_fallback(
-                "scip-typescript",
-                "@sourcegraph/scip-typescript",
-                str(root),
-                index_args,
-                env=env,
+        if use_parallel:
+            print(
+                f"Indexing {total} TypeScript projects ({workers} workers; merge is serial)...",
+                file=sys.stderr,
             )
-            if result.returncode != 0:
-                skipped += 1
-                print(
-                    f"Warning: skipped {label}: {result.stderr.strip() or 'indexing failed'}",
-                    file=sys.stderr,
+            completed = 0
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(
+                        _index_one_ts_project,
+                        root,
+                        project,
+                        tmpdir_path / f"part-{index}",
+                        env,
+                    ): index
+                    for index, project in enumerate(projects, start=1)
+                }
+                for future in as_completed(futures):
+                    index = futures[future]
+                    label, db_path, error = future.result()
+                    completed += 1
+                    if db_path is None:
+                        skipped += 1
+                        print(
+                            f"Warning: skipped {label}: {error}",
+                            file=sys.stderr,
+                        )
+                    else:
+                        part_dbs.append((index, db_path))
+                        print(
+                            f"Indexed {completed}/{total}: {label}",
+                            file=sys.stderr,
+                        )
+            part_dbs = [db for _, db in sorted(part_dbs, key=lambda item: item[0])]
+        else:
+            for index, project in enumerate(projects, start=1):
+                label = "." if project == Path(".") else str(project)
+                if total > 1:
+                    print(
+                        f"Indexing TypeScript project {index}/{total}: {label}",
+                        file=sys.stderr,
+                    )
+                label, db_path, error = _index_one_ts_project(
+                    root,
+                    project,
+                    tmpdir_path / f"part-{index}",
+                    env,
                 )
-                continue
-
-            part_cache = tmpdir_path / f"part-{index}"
-            _convert_scip_to_db(part_scip, part_cache)
-            part_dbs.append(part_cache / "index.db")
+                if db_path is None:
+                    skipped += 1
+                    print(f"Warning: skipped {label}: {error}", file=sys.stderr)
+                    continue
+                part_dbs.append(db_path)
 
         if not part_dbs:
             raise RuntimeError("Failed to index project")
 
         indexed = len(part_dbs)
-        total = len(projects)
-        if total > 1:
+        if total > 1 and not use_parallel:
             print(
                 f"Indexed {indexed}/{total} TypeScript projects"
+                + (f" ({skipped} skipped)" if skipped else ""),
+                file=sys.stderr,
+            )
+        elif total > 1 and use_parallel:
+            print(
+                f"Finished indexing {indexed}/{total} TypeScript projects"
                 + (f" ({skipped} skipped)" if skipped else ""),
                 file=sys.stderr,
             )
 
         if len(part_dbs) == 1:
             shutil.copy2(part_dbs[0], cache_dir / "index.db")
-            return
+        else:
+            merge_sqlite_indexes(part_dbs, cache_dir / "index.db")
 
-        merge_sqlite_indexes(part_dbs, cache_dir / "index.db")
+        write_index_meta(
+            cache_dir,
+            language="typescript",
+            project_count=indexed,
+            skipped=skipped,
+            parallel_workers=workers if use_parallel else 1,
+        )
 
 
 def _index_project(root, lang, cache_dir):
@@ -259,6 +334,7 @@ def _index_project(root, lang, cache_dir):
             raise RuntimeError("Failed to index project")
 
         _convert_scip_to_db(index_scip, cache_dir)
+        write_index_meta(cache_dir, language=lang, project_count=1, skipped=0, parallel_workers=1)
 
 
 def get_db(project_root=None):
@@ -284,6 +360,8 @@ def get_db(project_root=None):
         db_path = find_db(project_root)
         if not db_path:
             raise RuntimeError("No index.db found after indexing")
+    else:
+        warn_if_stale_index(db_path.parent)
 
     from .sql import configure_read_connection
 

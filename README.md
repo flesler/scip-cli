@@ -55,18 +55,21 @@ python -m scip_cli --help
 
 ### 2. Install prerequisites (optional)
 
-scip-cli can automatically download the required indexing tools when needed, or you can install them globally for faster performance:
+On **first index**, scip-cli runs language indexers and builds a SQLite cache. You can let it fetch tools on demand, or install them globally ahead of time so the first run does not download via `npx`:
 
 **Option A: Zero extra setup (recommended)**
 
 Install `scip-cli` and run it. On first index, scip-cli will:
 
-- Download `scip-typescript` / `scip-python` via `npx` when needed
+- Download `scip-typescript` / `scip-python` via `npx` when not already on PATH
 - Download the `scip` converter binary from [GitHub releases](https://github.com/scip-code/scip/releases) into `~/.cache/scip-cli/bin/` when not already on PATH
+- Walk the repo for `tsconfig*.json` project roots (TypeScript monorepos), run `scip-typescript` per project (parallel by default), convert each partial index, then merge into one `index.db`
 
-No `.scip-cli.json` required — TypeScript monorepos are discovered by walking the repo for `tsconfig*.json` files (skipping `node_modules`, `.git`, etc.).
+No `.scip-cli.json` required for discovery. Subsequent queries read the cached database only.
 
-**Option B: Install globally for better performance**
+**Option B: Install indexers globally ahead of time**
+
+Same indexing steps as Option A; this only avoids `npx` download on the first run:
 
 ```bash
 # TypeScript/JavaScript indexer (also handles plain JS via --infer-tsconfig)
@@ -156,10 +159,10 @@ scip-cli members Widget --names-only | xargs -I{} scip-cli def Widget.{}
 
 1. On first query, automatically detects project language from `package.json` (TS/JS) or `pyproject.toml`/`setup.py` (Python)
 2. For TypeScript monorepos, walks the repository for `tsconfig*.json` project roots (nested ancestors deduped; root included only when its `include` is broad)
-3. Indexes using `scip-typescript` (adds `--infer-tsconfig` for JS-only projects) or `scip-python`
-4. Converts the SCIP index to SQLite using `scip expt-convert`
-5. Caches the database in `~/.cache/scip-cli/projects/<project-hash>-<config-hash>/index.db`
-6. Subsequent queries are instant SQLite lookups
+3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), or `scip-python` for Python
+4. Converts each SCIP output to SQLite with `scip expt-convert`, then merges partial databases when needed
+5. Caches the result in `~/.cache/scip-cli/projects/<project-hash>-<config-hash>/index.db`
+6. Subsequent queries are SQLite lookups against that cache (not re-indexing)
 
 ## Configuration
 
@@ -168,16 +171,18 @@ Optional `.scip-cli.json` in the project root:
 ```json
 {
   "maxHeapMb": 8192,
-  "indexRoots": ["packages/api", "services/worker"],
+  "indexRoots": ["packages/core", "apps/worker"],
   "onlyIndexRoots": false
 }
 ```
 
 - `maxHeapMb` — Node heap for `scip-typescript` / `scip-python` (default **8192 MB** when omitted). Overridden by `SCIP_CLI_MAX_HEAP_MB`. This is the V8 heap cap, not total RAM usage.
-- `indexRoots` — extra TypeScript project directories to index, merged with auto-discovered projects.
-- `onlyIndexRoots` — skip auto-discovery and index only `indexRoots` (faster for focused work).
+- `indexRoots` — extra TypeScript project directories to include on **first index**, merged with auto-discovered projects.
+- `onlyIndexRoots` — skip auto-discovery and index **only** `indexRoots` (smaller initial index when you only care about part of a monorepo).
 
-Changing `.scip-cli.json` indexing options (`indexRoots`, `onlyIndexRoots`) uses a separate cache entry automatically. Run `scip-cli reindex` to refresh an existing cache after code changes.
+`SCIP_CLI_INDEX_WORKERS` controls parallel `scip-typescript` runs during first index (default: up to 8). Merge into one database is always serial.
+
+Changing `.scip-cli.json` indexing options (`indexRoots`, `onlyIndexRoots`) uses a separate cache entry automatically. Run `scip-cli reindex` after code changes — the cache does not auto-invalidate when sources change.
 
 This is separate from `.scipquery.json`, which belongs to [scip-query](https://github.com/PlunderStruck/scip-query) and configures its analyzers, watch mode, and diff-gate — not read by scip-cli.
 

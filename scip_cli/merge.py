@@ -97,9 +97,9 @@ def _merge_chunks(
     document_map: dict[int, int],
 ) -> dict[int, int]:
     mapping: dict[int, int] = {}
-    existing = {
-        (row[0], row[1])
-        for row in dest.execute("SELECT document_id, chunk_index FROM chunks")
+    existing: dict[tuple[int, int], int] = {
+        (row[0], row[1]): row[2]
+        for row in dest.execute("SELECT document_id, chunk_index, id FROM chunks")
     }
     for row in part.execute("SELECT * FROM chunks"):
         document_id = document_map.get(row["document_id"])
@@ -107,6 +107,7 @@ def _merge_chunks(
             continue
         key = (document_id, row["chunk_index"])
         if key in existing:
+            mapping[row["id"]] = existing[key]
             continue
         cursor = dest.execute(
             """
@@ -122,7 +123,7 @@ def _merge_chunks(
             ),
         )
         mapping[row["id"]] = cursor.lastrowid
-        existing.add(key)
+        existing[key] = cursor.lastrowid
     return mapping
 
 

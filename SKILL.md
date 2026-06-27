@@ -22,7 +22,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 
 - **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `def Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Consts/variables need `def --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `def methodName`.
 - **Ambiguous types** (e.g. `Opts` in multiple hooks) — `def` returns all matches; `refs` returns refs for all matching symbols. Use `--limit N` to cap results, or use `search` with a more specific pattern to disambiguate.
-- **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). JS-only projects (no `tsconfig.json`) are supported automatically.
+- **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use `--path packages/api` (or any file/dir) to scope queries.
 - **Prerequisites**: Node.js (for `npx` indexers). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
 
