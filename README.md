@@ -104,6 +104,7 @@ scip-cli <command> [arguments]
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `members <symbol>` - List members of a class/interface (`--path`)
+- `analyze [target]` - SQL health dashboards (`--limit`). No target: project-wide (bottlenecks, hotspots, cycles, stale types, dead exports, coupling). File path: change-surface, unused imports, consumers, dead exports, imports, coupling. Symbol: context, pressure, consumers, affected, dependencies.
 - `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
 - `skill [path]` - Install or dump the SKILL.md
 
@@ -130,6 +131,9 @@ scip-cli rdeps src/helper.ts
 
 # List members of a class
 scip-cli members Widget
+
+# Project health dashboard (or: scip-cli analyze src/foo.ts / scip-cli analyze greet)
+scip-cli analyze
 
 # Install skill file
 scip-cli skill ~/.claude/skills/scip-cli/SKILL.md

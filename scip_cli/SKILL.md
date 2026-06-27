@@ -1,6 +1,6 @@
 ---
 name: scip-cli
-description: Read when needing to find symbols, definitions, references, or members in TypeScript/JavaScript or Python code
+description: Read when needing symbols, definitions, refs, members, or SQL health dashboards in TS/JS or Python
 ---
 
 TypeScript/JavaScript (.ts, .tsx, .js, .jsx) and Python (.py) — not GraphQL, CSS, or other files.
@@ -17,6 +17,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes. Use `--kind variable` for consts                   |
 | "What files depend on this file?"         | `rdeps file`        | Importers — bare name works                                                               |
 | "What methods does this class have?"      | `members ClassName` | All methods/fields with line ranges                                                       |
+| "Health / risk / stale code?"             | `analyze`           | Multi-section SQL dashboard — omit target (project), pass file, or symbol                 |
 
 ## Gotchas
 
@@ -57,6 +58,7 @@ Commands emit one record per line on stdout; warnings and progress go to stderr.
 | Goal                         | Pipeline                                                                                                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Blast radius of a file       | `scip-cli rdeps file.ts \| xargs -I{} scip-cli symbols {}`                                                                                                   |
+| Pre-change / health briefing | `scip-cli analyze` or `scip-cli analyze path/to/file.ts` or `scip-cli analyze SymbolName`                                                                    |
 | Files that import a symbol   | `scip-cli refs Foo --paths-only`                                                                                                                             |
 | Symbols in referencing files | `scip-cli refs Foo --paths-only \| xargs -I{} scip-cli symbols {}` (barrel files may have no symbols; prefer `search Foo --paths-only` for definition files) |
 | Find classes, list members   | `scip-cli search Handler --kind class --names-only \| xargs -I{} scip-cli members {}`                                                                        |
@@ -106,3 +108,11 @@ members [--limit N] [--path PATH] [--names-only] <symbol>
 ```
 
 Returns `startLine:endLine kind name` for each member. Note: limited by database coverage — `enclosing_symbol` data is sparse for many indexers.
+
+### analyze
+
+```bash
+analyze [--limit N] [target]
+```
+
+Auto-detects scope: no target → project (bottlenecks, hotspots, cycles, stale types, dead exports, coupling); path with `.` → file (change-surface, unused imports, consumers, dead exports, imports, coupling); else symbol (context, pressure, consumers, affected, dependencies). SQL-only from the index — coarser than dedicated static-analysis tools. Human-readable sections on stdout; not pipe-friendly.

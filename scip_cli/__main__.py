@@ -8,7 +8,7 @@ import sys
 
 from . import __version__
 from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument
-from .commands import code, members, rdeps, refs, reindex, search, skill, symbols
+from .commands import analyze, code, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
@@ -103,6 +103,18 @@ def main():
     skill_parser = subparsers.add_parser("skill", help="Install or dump the scip-cli SKILL.md")
     skill_parser.add_argument("path", nargs="?", help="Optional file path to write to (creates dirs)")
 
+    # analyze
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Run SQL-based analysis (project, file, or symbol)",
+    )
+    analyze_parser.add_argument(
+        "target",
+        nargs="?",
+        help="Omit for project-wide; file path for file checks; symbol name for symbol checks",
+    )
+    analyze_parser.add_argument("--limit", type=int, default=20, help="Max rows per section (default: 20)")
+
     # reindex
     reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")
     reindex_parser.add_argument(
@@ -123,6 +135,7 @@ def main():
         "rdeps": rdeps.main,
         "members": members.main,
         "skill": skill.main,
+        "analyze": analyze.main,
         "reindex": reindex.main,
     }
 
