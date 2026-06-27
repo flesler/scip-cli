@@ -44,7 +44,9 @@ Thumbs.db
 .pytest_cache/
 
 # Project specific
-CONTEXT.md
+TODO.md
+todo.md
+dogfood.md
 
 # Local-only dev scripts (repo-specific smoke harnesses)
 scripts/deep-smoke.sh

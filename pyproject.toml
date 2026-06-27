@@ -2,6 +2,36 @@
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "scip-cli"
+dynamic = ["version"]
+description = "Fast code intelligence via SCIP indexes"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Ariel Flesler"}]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Code Generators",
+]
+
+[project.urls]
+Homepage = "https://github.com/flesler/scip-cli"
+
+[project.scripts]
+scip-cli = "scip_cli.__main__:main"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+scip_cli = ["SKILL.md"]
+
+[tool.setuptools.dynamic]
+version = {attr = "scip_cli.__version__"}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
