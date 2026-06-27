@@ -8,7 +8,7 @@ import sqlite3
 import sys
 
 from . import __version__
-from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument
+from .cli_args import add_limit_argument, add_names_only_argument, add_path_argument, add_paths_only_argument
 from .commands import analyze, code, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
@@ -31,14 +31,14 @@ def main():
     # refs
     refs_parser = subparsers.add_parser("refs", help="Find references to a symbol")
     refs_parser.add_argument("symbol", nargs="+", help="Symbol name(s)")
-    refs_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_limit_argument(refs_parser, default=10, help_suffix="reference lines")
     add_path_argument(refs_parser)
     add_paths_only_argument(refs_parser)
 
     # code
     code_parser = subparsers.add_parser("code", help="Find symbol definition")
     code_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
-    code_parser.add_argument("--limit", type=int, default=10, help="Max matching symbols (default: 10)")
+    add_limit_argument(code_parser, default=10, help_suffix="matching symbols")
     add_path_argument(code_parser)
     code_parser.add_argument(
         "--max-lines",
@@ -75,7 +75,7 @@ def main():
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")
     search_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
-    search_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_limit_argument(search_parser, default=10)
     add_path_argument(search_parser)
     add_names_only_argument(search_parser)
     add_paths_only_argument(search_parser)
@@ -83,19 +83,19 @@ def main():
 
     # symbols
     symbols_parser = subparsers.add_parser("symbols", help="List symbols in a file")
-    symbols_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_limit_argument(symbols_parser, default=10, help_suffix="symbols")
     add_path_argument(symbols_parser)
     symbols_parser.add_argument("file", help="File path or pattern")
 
     # rdeps
     rdeps_parser = subparsers.add_parser("rdeps", help="Find reverse dependencies of a file")
-    rdeps_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_limit_argument(rdeps_parser, default=10, help_suffix="importer files")
     add_path_argument(rdeps_parser)
     rdeps_parser.add_argument("file", help="File path or pattern")
 
     # members
     members_parser = subparsers.add_parser("members", help="List members of a class/interface")
-    members_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    add_limit_argument(members_parser, default=10, help_suffix="members")
     add_path_argument(members_parser)
     add_names_only_argument(members_parser)
     members_parser.add_argument("symbol", help="Symbol name")
@@ -114,7 +114,7 @@ def main():
         nargs="?",
         help="Omit for project-wide; file path for file checks; symbol name for symbol checks",
     )
-    analyze_parser.add_argument("--limit", type=int, default=20, help="Max rows per section (default: 20)")
+    add_limit_argument(analyze_parser, default=20, help_suffix="rows per section")
 
     # reindex
     reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")

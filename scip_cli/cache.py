@@ -1,5 +1,7 @@
 """Index cache path resolution."""
 
+import contextlib
+import fcntl
 import os
 import re
 from pathlib import Path
@@ -10,6 +12,21 @@ from .scope import project_root_hash
 INDEX_DB = "index.db"
 INDEX_DB_NEXT = "index.db.next"
 CACHE_SLUG_MAX_LEN = 48
+INDEX_LOCK = ".index.lock"
+
+
+@contextlib.contextmanager
+def index_build_lock(cache_dir: Path):
+    """Exclusive lock for index build + promote (POSIX flock)."""
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = cache_dir / INDEX_LOCK
+    with open(lock_path, "w", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def index_db_path(cache_dir: Path, *, replace: bool = False) -> Path:

@@ -216,6 +216,29 @@ def get_file_symbols(db, relative_path, limit=None):
     return debug_execute(db, sql, (relative_path,)).fetchall()
 
 
+def get_importer_paths(db, symbol_ids, exclude_path, limit=None):
+    """Distinct files that reference any of the given symbols (excluding exclude_path)."""
+    if not symbol_ids:
+        return []
+
+    placeholders = ",".join("?" * len(symbol_ids))
+    limit_clause = f"LIMIT {int(limit)}" if limit is not None else ""
+    rows = debug_execute(
+        db,
+        f"""
+        SELECT DISTINCT d.relative_path
+        FROM mentions m
+        JOIN chunks c ON m.chunk_id = c.id
+        JOIN documents d ON c.document_id = d.id
+        WHERE m.symbol_id IN ({placeholders}) AND m.role != 1 AND d.relative_path != ?
+        ORDER BY d.relative_path
+        {limit_clause}
+    """,
+        (*symbol_ids, exclude_path),
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
 def get_refs_for_symbols(db, symbol_ids):
     """Get all references for multiple symbol_ids in one query."""
     if not symbol_ids:

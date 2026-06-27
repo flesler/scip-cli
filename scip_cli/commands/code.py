@@ -51,10 +51,13 @@ def main(args):
 
         if snippet_mode:
             max_def_lines = 1
+            max_def_chars = None
         elif full_mode:
             max_def_lines = 0
+            max_def_chars = 0
         else:
             max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
+            max_def_chars = None
 
         printed = 0
         for query_name, symbols in groups:
@@ -96,7 +99,13 @@ def main(args):
                     continue
 
                 source_snippet, truncated, shown_start, shown_end = format_def_body(
-                    lines, start_line, end_line, max_lines=max_def_lines, offset=offset, line_numbers=line_numbers
+                    lines,
+                    start_line,
+                    end_line,
+                    max_lines=max_def_lines,
+                    max_chars=max_def_chars,
+                    offset=offset,
+                    line_numbers=line_numbers,
                 )
 
                 print(f"{rel_path}:{format_line_range(start_line, end_line)}")

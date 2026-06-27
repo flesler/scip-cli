@@ -1,5 +1,7 @@
 """Path scope helpers for --path filtering."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from .sql import debug_execute, escape_like

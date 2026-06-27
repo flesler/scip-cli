@@ -11,42 +11,9 @@ from ..source import read_source_lines
 from ..symbols import extract_leaf_name
 
 
-def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
-    """Get references with exact line numbers by reading source files."""
-    sym_row = db.execute("SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
-    if not sym_row:
-        return []
-
-    leaf = extract_leaf_name(sym_row[0])
-
-    path_clause, path_params = path_filter_sql(db, path_scope, doc_alias="d")
-    chunks = db.execute(
-        f"""
-        SELECT c.id, c.document_id, c.start_line, c.end_line, d.relative_path
-        FROM mentions m
-        JOIN chunks c ON m.chunk_id = c.id
-        JOIN documents d ON c.document_id = d.id
-        WHERE m.symbol_id = ? AND m.role != 1{path_clause}
-        LIMIT ?
-    """,
-        (symbol_id, *path_params, max_refs + 1),
-    ).fetchall()
-
-    if len(chunks) > max_refs:
-        chunks = chunks[:max_refs]
-        print(f"Warning: more than {max_refs} references, truncating", file=sys.stderr)
-
-    if not chunks:
-        return []
-
-    by_doc = {}
-    for chunk_id, doc_id, start_line, end_line, rel_path in chunks:
-        if doc_id not in by_doc:
-            by_doc[doc_id] = {"path": rel_path, "chunks": []}
-        by_doc[doc_id]["chunks"].append((chunk_id, start_line, end_line))
-
+def _refs_from_chunk_groups(by_doc, project_root, leaf):
+    """Resolve mention chunks to exact file:line reference tuples."""
     results = []
-
     for _doc_id, info in by_doc.items():
         rel_path = info["path"]
         chunks_list = info["chunks"]
@@ -84,6 +51,57 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
                 results.append((rel_path, start_line + 1))
 
     return results
+
+
+def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
+    """Get references with exact line numbers by reading source files."""
+    sym_row = db.execute("SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
+    if not sym_row:
+        return []
+
+    leaf = extract_leaf_name(sym_row[0])
+    path_clause, path_params = path_filter_sql(db, path_scope, doc_alias="d")
+
+    batch_size = max(max_refs * 3, 20)
+    sql_offset = 0
+    seen: set[tuple[str, int]] = set()
+    results: list[tuple[str, int]] = []
+
+    while len(results) <= max_refs:
+        chunks = db.execute(
+            f"""
+            SELECT c.id, c.document_id, c.start_line, c.end_line, d.relative_path
+            FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            JOIN documents d ON c.document_id = d.id
+            WHERE m.symbol_id = ? AND m.role != 1{path_clause}
+            ORDER BY d.relative_path, c.start_line
+            LIMIT ? OFFSET ?
+        """,
+            (symbol_id, *path_params, batch_size, sql_offset),
+        ).fetchall()
+        if not chunks:
+            break
+
+        sql_offset += len(chunks)
+        by_doc = {}
+        for chunk_id, doc_id, start_line, end_line, rel_path in chunks:
+            if doc_id not in by_doc:
+                by_doc[doc_id] = {"path": rel_path, "chunks": []}
+            by_doc[doc_id]["chunks"].append((chunk_id, start_line, end_line))
+
+        for ref in _refs_from_chunk_groups(by_doc, project_root, leaf):
+            if ref in seen:
+                continue
+            seen.add(ref)
+            results.append(ref)
+            if len(results) > max_refs:
+                break
+
+        if len(results) > max_refs or len(chunks) < batch_size:
+            break
+
+    return limit_and_warn(results, max_refs, "references")
 
 
 def _resolve_symbol_groups(db, names, limit, path_scope):

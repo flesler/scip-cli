@@ -12,8 +12,8 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | Question                                  | Use                 | What you get                                                                              |
 | ----------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
 | "Where is X defined and what does it do?" | `code X`             | Definition snippet (capped at 80 lines by default). Use `members Class` for large classes |
-| "Where is X used/called?"                 | `refs X`            | All file:line locations. Shows refs for all matching symbols. Use `--limit` to cap        |
-| "What's in this file?"                    | `symbols file`      | All symbols — bare filename works (`helper.ts`, `widget.ts`)                     |
+| "Where is X used/called?"                 | `refs X`            | Up to `--limit` file:line refs (default 10). Use `--limit` to raise cap        |
+| "What's in this file?"                    | `symbols file`      | Up to `--limit` symbols (default 10). Bare filename works (`helper.ts`)                     |
 | "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes |
 | "What files depend on this file?"         | `rdeps file`        | Importers — bare name works                                                               |
 | "What methods does this class have?"      | `members ClassName` | All methods/fields with line ranges                                                       |
@@ -22,9 +22,11 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 ## Gotchas
 
 - **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Type/object fields use the same form: `search Options.verbose`, `code Options.verbose`. Consts/let/var are not kept in the index (too many rows, single-line defs) — use `rg` or read the file. Class methods need `members ClassName`, not bare `code methodName`.
-- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code` returns all matches; `refs` returns refs for all matching symbols. Use `--limit N` to cap results, or use `search` with a more specific pattern to disambiguate.
+- **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code`/`refs` return all matches up to `--limit`; `members` and `analyze` pick the first match with a stderr warning. Use dotted qualifiers or `--path` to narrow.
+- **Stale index** — the cache is a snapshot; run `scip-cli reindex` after substantive code changes (no automatic invalidation).
+- **Query `--path` vs `reindex --path`** — query `--path` filters results only. `reindex --path` persists scope and **replaces** the cached index with only those tsconfig projects; run full `reindex` (no `--path`) to restore.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). Repos with more than 10 tsconfig projects log per-project progress to stderr. JS-only projects (no `tsconfig.json`) are supported automatically.
-- **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use `--path packages/api` (or any file/dir) to scope queries.
+- **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use query `--path packages/api` to scope lookups.
 - **Prerequisites**: Node.js (for `npx` indexers). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
 
 ## Details
@@ -37,7 +39,7 @@ code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path P
 
 Kinds: `function`, `method`, `class`, `property` — use `--kind` when the bare name isn't in the default set above.
 
-`--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (equivalent to `--max-lines 0`). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines **of the definition body** (not file-absolute); the truncation hint uses the same body-relative offset. `--line-numbers` prefixes each line with its line number. Override default via `SCIP_CLI_MAX_DEF_LINES`.
+`--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (no line or char cap). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines **of the definition body** (not file-absolute); the truncation hint uses the same body-relative offset. `--line-numbers` prefixes each line with its line number. Override line cap via `SCIP_CLI_MAX_DEF_LINES`.
 
 For large classes, prefer `members ClassName` first, then `code Class.method` for one member.
 
@@ -49,7 +51,7 @@ refs [--limit N] [--path PATH] [--paths-only] <symbol> [<symbol> ...]
 
 Returns `file:line` for each reference. Reads source files to find exact line numbers.
 
-Default `--limit` is 10 per symbol query. When more than one symbol is output, each group is prefixed on stdout with the query name (or `name (path)` when one query matches multiple symbols). Use `--paths-only` for unique file paths (pipe-friendly).
+Default `--limit` is 10 **reference lines** per symbol query (not mention chunks). When more than one symbol is output, each group is prefixed on stdout with the query name (or `name (path)` when one query matches multiple symbols). Use `--paths-only` for unique file paths (pipe-friendly).
 
 ### Pipelines
 

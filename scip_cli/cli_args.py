@@ -3,6 +3,30 @@
 import argparse
 
 
+def positive_int(min_value: int = 1):
+    """Argparse type: integer >= min_value."""
+
+    def _check(value: str) -> int:
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"expected an integer, got {value!r}") from exc
+        if parsed < min_value:
+            raise argparse.ArgumentTypeError(f"must be >= {min_value}")
+        return parsed
+
+    return _check
+
+
+def add_limit_argument(parser: argparse.ArgumentParser, *, default: int, help_suffix: str = "results") -> None:
+    parser.add_argument(
+        "--limit",
+        type=positive_int(),
+        default=default,
+        help=f"Max {help_suffix} (default: {default})",
+    )
+
+
 def add_path_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--path",

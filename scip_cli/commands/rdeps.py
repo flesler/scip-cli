@@ -5,7 +5,7 @@ import sys
 from ..cli_args import path_scope_from_args
 from ..output import limit_and_warn
 from ..paths import path_in_scope
-from ..queries import get_file_symbols, get_refs_for_symbols
+from ..queries import get_file_symbols, get_importer_paths
 from ..session import resolve_one_file, setup
 
 
@@ -23,20 +23,14 @@ def main(args):
             sys.exit(1)
 
         symbol_ids = [s[0] for s in symbols]
-        refs = get_refs_for_symbols(db, symbol_ids)
-
-        rdeps = set()
-        for _symbol_id, ref_list in refs.items():
-            for ref_path, _ref_line in ref_list:
-                if ref_path != file_path and path_in_scope(ref_path, path_scope):
-                    rdeps.add(ref_path)
+        importers = get_importer_paths(db, symbol_ids, file_path, limit=limit + 1)
+        rdeps = [path for path in importers if path_in_scope(path, path_scope)]
 
         if not rdeps:
             print(f"No reverse dependencies found for '{file_path}'", file=sys.stderr)
             sys.exit(1)
 
-        sorted_rdeps = sorted(rdeps)
-        sorted_rdeps = limit_and_warn(sorted_rdeps, limit, "reverse dependencies")
+        sorted_rdeps = limit_and_warn(sorted(rdeps), limit, "reverse dependencies")
 
         for dep_path in sorted_rdeps:
             print(dep_path)
