@@ -99,7 +99,7 @@ scip-cli <command> [arguments]
 ### Commands
 
 - `refs <symbol>` - Find all references to a symbol (`--path` to scope)
-- `def <symbol>` - Find symbol definition with source code (`--path`, `--max-lines`)
+- `code <symbol>` - Find symbol definition with source code (`--path`, `--max-lines`, `--snippet`)
 - `search <pattern>` - Search symbols by name pattern (`--path`)
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
@@ -114,13 +114,13 @@ scip-cli <command> [arguments]
 scip-cli refs greet
 
 # Get definition of greet
-scip-cli def greet
+scip-cli code greet
 
 # Search for symbols matching "Widget"
 scip-cli search Widget
 
 # Scope to a subdirectory
-scip-cli def greet --path packages/api
+scip-cli code greet --path packages/api
 
 # List symbols by bare filename
 scip-cli symbols helper.ts
@@ -150,7 +150,7 @@ scip-cli refs greet --paths-only
 scip-cli search Handler --kind class --names-only | xargs -I{} scip-cli members {}
 
 # Walk class members to their definitions
-scip-cli members Widget --names-only | xargs -I{} scip-cli def Widget.{}
+scip-cli members Widget --names-only | xargs -I{} scip-cli code Widget.{}
 ```
 
 ## How It Works

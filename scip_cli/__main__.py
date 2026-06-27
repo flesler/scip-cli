@@ -7,7 +7,7 @@ import sys
 
 from . import __version__
 from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument
-from .commands import def_cmd, members, rdeps, refs, reindex, search, skill, symbols
+from .commands import code, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
@@ -37,12 +37,12 @@ def main():
     add_path_argument(refs_parser)
     add_paths_only_argument(refs_parser)
 
-    # def
-    def_parser = subparsers.add_parser("def", help="Find symbol definition")
-    def_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
-    def_parser.add_argument("--limit", type=int, default=10, help="Max matching symbols (default: 10)")
-    add_path_argument(def_parser)
-    def_parser.add_argument(
+    # code
+    code_parser = subparsers.add_parser("code", help="Find symbol definition")
+    code_parser.add_argument("--kind", choices=SymbolKind.filterable_values(), help="Filter by kind")
+    code_parser.add_argument("--limit", type=int, default=10, help="Max matching symbols (default: 10)")
+    add_path_argument(code_parser)
+    code_parser.add_argument(
         "--max-lines",
         type=int,
         default=None,
@@ -52,7 +52,12 @@ def main():
             "Use 0 for unlimited."
         ),
     )
-    def_parser.add_argument("symbol", help="Symbol name")
+    code_parser.add_argument(
+        "--snippet",
+        action="store_true",
+        help="Show only file, line range, and first line (not full body)",
+    )
+    code_parser.add_argument("symbol", help="Symbol name")
 
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")
@@ -100,7 +105,7 @@ def main():
     # Dispatch to command handlers
     dispatch = {
         "refs": refs.main,
-        "def": def_cmd.main,
+        "code": code.main,
         "search": search.main,
         "symbols": symbols.main,
         "rdeps": rdeps.main,

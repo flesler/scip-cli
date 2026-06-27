@@ -1,4 +1,4 @@
-"""def command - find symbol definitions."""
+"""code command - find symbol definitions."""
 import sys
 
 from ..cli_args import path_scope_from_args
@@ -28,7 +28,11 @@ def main(args):
             sys.exit(1)
 
         symbols = limit_and_warn(symbols, limit, "symbols")
-        max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
+        
+        if getattr(args, "snippet", False):
+            max_def_lines = 1
+        else:
+            max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
 
         for symbol_id, symbol_str, _display_name in symbols:
             row = get_def_location(db, symbol_id)
@@ -38,6 +42,12 @@ def main(args):
                 continue
 
             rel_path, start_line, end_line = row
+
+            if getattr(args, "snippet", False):
+                lines = read_source_lines(project_root, rel_path, start_line, start_line)
+                first_line = lines[0].rstrip()
+                print(f"{rel_path}:{format_line_range(start_line, end_line)} {first_line}")
+                continue
 
             lines = read_source_lines(project_root, rel_path, start_line, end_line)
             source_snippet, truncated, shown_start, shown_end = format_def_body(

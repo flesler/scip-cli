@@ -108,11 +108,11 @@ class TestSmokeCLI:
         assert result.returncode == 0
         assert FN_GREET in result.stdout
 
-    def test_def_function(self, smoke_cli, indexed_sample_project):
+    def test_code_function(self, smoke_cli, indexed_sample_project):
         result = _run(
             smoke_cli,
             indexed_sample_project,
-            "def",
+            "code",
             FN_GREET,
             "--limit",
             "1",
@@ -138,7 +138,7 @@ class TestSmokeCLI:
         result = _run(
             smoke_cli,
             indexed_sample_project,
-            "def",
+            "code",
             "__scip_cli_missing_symbol_xyz__",
         )
         assert result.returncode != 0
