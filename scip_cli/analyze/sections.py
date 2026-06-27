@@ -55,9 +55,45 @@ class Check:
     priority: Priority
     title: str
     run: CheckFn
+    false_positive_preface: str | None = None
 
     def labeled_title(self) -> str:
         return f"[{self.priority.value}] {self.title}"
+
+
+# Shown only when the section has hits (not "(none)").
+FALSE_POSITIVE_PREFACES: dict[str, str] = {
+    "dead_exports": (
+        "SCIP may miss dynamic loading (loadFiles, GraphQL) and default-export object members "
+        "— verify with rdeps/rg before deleting."
+    ),
+    "unreferenced": (
+        "No mentions in the index — symbols may still run via dynamic import or side-effect registration."
+    ),
+    "same_file_only": ("Referenced only in the defining file — often handlers or private helpers, not dead exports."),
+    "stale_types": ("No cross-file refs in the index — may still be used in-file or as a type-only shape."),
+    "cycles": "Remaining cycles may be barrel re-exports; confirm before refactoring.",
+    "dead_in_file": (
+        "SCIP may miss dynamic loading and default-export indirection — verify with rdeps/rg before deleting."
+    ),
+    "unreferenced_in_file": (
+        "No mentions in the index — may still be used in-file via handlers or dynamic registration."
+    ),
+}
+
+
+def _preface_for(key: str) -> str | None:
+    return FALSE_POSITIVE_PREFACES.get(key)
+
+
+@dataclass
+class RowBudget:
+    """Shared cap on result rows across analyze sections."""
+
+    remaining: int
+
+    def exhausted(self) -> bool:
+        return self.remaining <= 0
 
 
 def run_checks(
@@ -66,12 +102,19 @@ def run_checks(
     limit: int,
     priorities: set[Priority] | None,
     **kwargs: Any,
-) -> list[tuple[str, list[str]]]:
+) -> list[tuple[str, list[str], str | None]]:
     """Run checks in priority order (high → low), optionally filtered."""
     selected = [check for check in checks if priorities is None or check.priority in priorities]
     selected.sort(key=lambda check: (_ORDER.index(check.priority), check.key))
-    sections: list[tuple[str, list[str]]] = []
+    budget: RowBudget = kwargs.pop("budget", None) or RowBudget(remaining=limit)
+    sections: list[tuple[str, list[str], str | None]] = []
     for check in selected:
-        lines = check.run(db, limit, **kwargs)
-        sections.append(section(check.labeled_title(), lines))
+        if budget.exhausted():
+            break
+        lines = check.run(db, budget.remaining, **kwargs)
+        if lines != ["(none)"]:
+            lines = lines[: budget.remaining]
+            budget.remaining -= len(lines)
+        preface = check.false_positive_preface if check.false_positive_preface else _preface_for(check.key)
+        sections.append(section(check.labeled_title(), lines, preface=preface))
     return sections

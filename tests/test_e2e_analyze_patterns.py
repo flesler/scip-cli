@@ -141,14 +141,6 @@ class TestAnalyzePatternsE2E:
         finally:
             db.close()
 
-    def test_possibly_unused_lists_live_exports(self, indexed_fixture):
-        db = _db(indexed_fixture)
-        try:
-            possibly = project_checks.possibly_unused_exports(db, limit=50)
-            assert _contains(possibly, FN_LAZY_PANEL) or _contains(possibly, FN_SEND)
-        finally:
-            db.close()
-
     def test_module_symbol_shows_module_label(self, indexed_fixture):
         db = _db(indexed_fixture)
         try:

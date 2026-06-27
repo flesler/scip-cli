@@ -127,7 +127,7 @@ def cycle_path_noise(cycle_line: str, *, include_tests: bool = False) -> bool:
     return any(is_test_path(part.strip()) for part in parts if part.strip())
 
 
-def section(title: str, lines: list[str]) -> tuple[str, list[str]]:
+def section(title: str, lines: list[str], *, preface: str | None = None) -> tuple[str, list[str], str | None]:
     if not lines:
-        return title, ["(none)"]
-    return title, lines
+        return title, ["(none)"], None
+    return title, lines, preface

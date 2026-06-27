@@ -107,26 +107,43 @@ class TestProjectAnalyze:
         assert any("testOnlyFn" in line for line in lines)
         assert not any("moduleUsed" in line for line in lines)
 
-    def test_run_all_returns_ten_sections(self):
+    def test_run_all_global_limit_stops_early(self):
         db = mini_codebase_db()
-        sections = project_checks.run_all(db, limit=5)
-        assert len(sections) == 10
-        titles = [title for title, _lines in sections]
+        sections = project_checks.run_all(db, limit=3)
+        total_rows = sum(len(lines) for _title, lines, _preface in sections if lines != ["(none)"])
+        assert total_rows <= 3
+        assert len(sections) < 9
+
+    def test_run_all_returns_nine_sections(self):
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=500)
+        assert len(sections) == 9
+        titles = [title for title, _lines, _preface in sections]
         assert sum(1 for t in titles if "[low]" in t) == 4
-        assert sum(1 for t in titles if "[medium]" in t) == 2
-        titles = [title for title, _lines in sections]
+        assert sum(1 for t in titles if "[medium]" in t) == 1
+        titles = [title for title, _lines, _preface in sections]
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
         assert titles[-1].startswith("[low]")
         assert "Top coupling" in titles[-1]
 
+    def test_dead_exports_preface_when_hits(self):
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=20)
+        dead = next((entry for entry in sections if "Dead exports" in entry[0]), None)
+        assert dead is not None
+        _title, lines, preface = dead
+        if lines != ["(none)"]:
+            assert preface is not None
+            assert "rdeps" in preface
+
     def test_run_all_high_priority_only(self):
         from scip_cli.analyze.sections import Priority
 
         db = mini_codebase_db()
-        sections = project_checks.run_all(db, limit=5, priorities={Priority.HIGH})
+        sections = project_checks.run_all(db, limit=500, priorities={Priority.HIGH})
         assert len(sections) == 4
-        titles = [title for title, _lines in sections]
+        titles = [title for title, _lines, _preface in sections]
         assert all("[high]" in title for title in titles)
 
 
@@ -146,20 +163,24 @@ class TestFileAnalyze:
         lines = file_checks.file_consumers(db, "src/lib.ts", limit=10)
         assert any("consumer.ts" in line for line in lines)
 
-    def test_dead_export_rdeps_warning_when_importers_and_dead(self):
+    def test_same_file_helper_not_in_dead_exports(self):
         db = mini_codebase_db()
-        msg = file_checks.dead_export_rdeps_warning(db, "src/lib.ts", limit=20)
-        assert msg is not None
-        assert "importer" in msg.lower()
+        dead = project_checks.dead_exports(db, limit=20)
+        assert not any("sameFileHelper" in line for line in dead)
+        same = project_checks.same_file_only(db, limit=20)
+        assert any("sameFileHelper" in line for line in same)
 
-    def test_no_rdeps_warning_when_no_dead_exports(self):
-        db = mini_codebase_db()
-        assert file_checks.dead_export_rdeps_warning(db, "src/consumer.ts", limit=20) is None
+    def test_same_file_only_skips_dynamic_load_modules(self):
+        b = AnalyzeDbBuilder()
+        handler = b.define("src/rules/handler.ts", "onEvent")
+        b.reference("src/rules/handler.ts", handler)
+        lines = project_checks.same_file_only(b.finish(), limit=20)
+        assert not any("onEvent" in line for line in lines)
 
     def test_run_all_includes_coupling(self):
         db = mini_codebase_db()
-        sections = file_checks.run_all(db, "src/lib.ts", limit=5)
-        titles = [title for title, _lines in sections]
+        sections = file_checks.run_all(db, "src/lib.ts", limit=500)
+        titles = [title for title, _lines, _preface in sections]
         assert any("Coupling partners" in title for title in titles)
 
 
@@ -221,7 +242,7 @@ class TestSymbolAnalyze:
         foo_id = db.execute(
             "SELECT id FROM global_symbols WHERE display_name = 'foo'",
         ).fetchone()[0]
-        sections = symbol_checks.run_all(db, foo_id, limit=5)
+        sections = symbol_checks.run_all(db, foo_id, limit=500)
         assert len(sections) == 5
 
 

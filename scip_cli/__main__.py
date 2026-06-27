@@ -115,7 +115,7 @@ def main():
         help="Omit for project-wide; directory for scoped project + per-file; file or symbol for focused checks",
     )
     add_path_argument(analyze_parser)
-    add_limit_argument(analyze_parser, default=20, help_suffix="rows per section")
+    add_limit_argument(analyze_parser, default=20, help_suffix="result rows total")
     analyze_parser.add_argument(
         "--include-tests",
         action="store_true",

@@ -235,7 +235,7 @@ Use `--priority high` for a quick gate; `--priority high,medium` adds context. F
 | **Cycles** | Import/mention cycles between production files — break the edge or extract shared code |
 | **Unreferenced** | No usage in the index at all — delete |
 | **Dead exports** | No external refs — delete or `_` prefix |
-| **Stale types** | Classes/types with ≤1 external consumer — merge, inline, or document why they stay |
+| **Stale types** | Classes/types with no external consumer in the index — verify in-file or type-only use before removing |
 | **Same-file only** | Used only inside defining file — rename to `_` |
 | **Test-only consumers** | Cross-file refs are all from tests — promote to e2e or accept as internal |
 

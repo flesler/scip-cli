@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from ..paths import path_filter_sql, path_filter_sql_any, path_in_scope
+from ..symbols import is_module_symbol
 from .common import (
     DEFAULT_LIMIT,
     SYM_DEF_JOIN,
@@ -17,7 +18,7 @@ from .common import (
     stale_type_noise,
 )
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
-from .live import LiveIndex, has_same_file_reference_usage
+from .live import LiveIndex, file_has_scip_importers, has_same_file_reference_usage
 from .sections import Check, Priority, run_checks
 
 
@@ -80,7 +81,7 @@ def bottlenecks(
     lines = [
         f"{short_name(symbol)}  score={score}  loc={loc}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
         for symbol, path, fan_in, fan_out, loc, score in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
+        if not analyze_noise(path, symbol, include_tests=include_tests) and not is_module_symbol(symbol)
     ]
     return lines[:limit]
 
@@ -114,7 +115,7 @@ def hotspots(
     lines = [
         f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
         for symbol, path, ref_count, file_count in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
+        if not analyze_noise(path, symbol, include_tests=include_tests) and not is_module_symbol(symbol)
     ]
     return lines[:limit]
 
@@ -159,8 +160,10 @@ def _format_dead_export_rows(
     limit: int,
 ) -> list[str]:
     lines = []
-    for symbol, path, loc, def_doc_id in rows:
+    for symbol_id, symbol, path, loc, def_doc_id in rows:
         if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        if has_same_file_reference_usage(db, symbol_id, def_doc_id):
             continue
         if live.dead_export_noise(symbol, def_doc_id):
             continue
@@ -192,7 +195,7 @@ def stale_types(
           AND gs.symbol NOT LIKE '%().'
           AND gs.symbol NOT LIKE '%#typeLiteral%'{scope_clause}
         GROUP BY gs.id
-        HAVING consumers <= 1
+        HAVING consumers = 0
         ORDER BY consumers ASC, def_d.relative_path
         LIMIT ?
         """,
@@ -226,7 +229,7 @@ def unreferenced_symbols(
     rows = fetch_all(
         db,
         f"""
-        SELECT gs.symbol, def_d.relative_path,
+        SELECT gs.id, gs.symbol, def_d.relative_path,
                sym_def.end_line - sym_def.start_line + 1 AS loc,
                def_d.id
         FROM global_symbols gs
@@ -261,7 +264,8 @@ def same_file_only(
         db,
         f"""
         SELECT gs.symbol, def_d.relative_path,
-               sym_def.end_line - sym_def.start_line + 1 AS loc
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
+               def_d.id
         FROM global_symbols gs
         {SYM_DEF_JOIN}
         WHERE EXISTS (
@@ -280,10 +284,12 @@ def same_file_only(
         (*scope_params, limit * 5),
     )
     lines = []
-    for symbol, path, loc in rows:
+    for symbol, path, loc, def_doc_id in rows:
         if analyze_noise(path, symbol, include_tests=include_tests):
             continue
-        if live.same_file_export_noise(symbol):
+        if live.same_file_export_noise(symbol, def_doc_id):
+            continue
+        if not file_has_scip_importers(db, path, live=live, def_doc_id=def_doc_id):
             continue
         lines.append(f"{short_name(symbol)}  loc={loc}  ({path})")
         if len(lines) >= limit:
@@ -345,7 +351,7 @@ def dead_exports(
     rows = fetch_all(
         db,
         f"""
-        SELECT gs.symbol, def_d.relative_path,
+        SELECT gs.id, gs.symbol, def_d.relative_path,
                sym_def.end_line - sym_def.start_line + 1 AS loc,
                def_d.id
         FROM global_symbols gs
@@ -364,49 +370,6 @@ def dead_exports(
         (*scope_params, limit * 5),
     )
     return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
-
-
-def possibly_unused_exports(
-    db,
-    limit: int = DEFAULT_LIMIT,
-    *,
-    include_tests: bool = False,
-    scope: str | None = None,
-) -> list[str]:
-    """Exports with no direct external refs but live via module import or export alias."""
-    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    live = LiveIndex(db)
-    rows = fetch_all(
-        db,
-        f"""
-        SELECT gs.symbol, def_d.relative_path,
-               sym_def.end_line - sym_def.start_line + 1 AS loc,
-               def_d.id
-        FROM global_symbols gs
-        {SYM_DEF_JOIN}
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM mentions m
-            JOIN chunks c ON m.chunk_id = c.id
-            WHERE m.symbol_id = gs.id
-              AND m.role != 1
-              AND c.document_id != def_d.id
-        ){scope_clause}
-        ORDER BY loc DESC, def_d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, limit * 5),
-    )
-    lines = []
-    for symbol, path, loc, def_doc_id in rows:
-        if analyze_noise(path, symbol, include_tests=include_tests):
-            continue
-        if not live.dead_export_noise(symbol, def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  loc={loc}  (live via module/alias)  ({path})")
-        if len(lines) >= limit:
-            break
-    return lines
 
 
 def top_coupling(
@@ -450,21 +413,21 @@ def run_all(
     include_tests: bool = False,
     scope: str | None = None,
     priorities=None,
-) -> list[tuple[str, list[str]]]:
+    budget=None,
+) -> list[tuple[str, list[str], str | None]]:
     suffix = _scope_suffix(scope)
-    opts = {"include_tests": include_tests, "scope": scope}
+    opts = {"include_tests": include_tests, "scope": scope, "budget": budget}
     checks = [
         Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
         Check("unreferenced", Priority.HIGH, f"Unreferenced symbols (no refs){suffix}", unreferenced_symbols),
-        Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
         Check(
-            "possibly_unused",
-            Priority.MEDIUM,
-            f"Possibly unused exports (live via module/alias){suffix}",
-            possibly_unused_exports,
+            "dead_exports",
+            Priority.HIGH,
+            f"Dead exports (no in-file or external use){suffix}",
+            dead_exports,
         ),
-        Check("stale_types", Priority.HIGH, f"Stale types (≤1 external consumer){suffix}", stale_types),
-        Check("same_file_only", Priority.MEDIUM, f"Same-file only (consider _prefix){suffix}", same_file_only),
+        Check("stale_types", Priority.HIGH, f"Stale types (no external consumers){suffix}", stale_types),
+        Check("same_file_only", Priority.MEDIUM, f"Same-file only (in-file use, not exported){suffix}", same_file_only),
         Check(
             "test_only",
             Priority.LOW,

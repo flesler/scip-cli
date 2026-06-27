@@ -64,24 +64,25 @@ class LiveIndex:
     def __init__(self, db) -> None:
         self.live_module_docs: set[int] = set()
         self.live_alias_bases: set[str] = set()
+        self.module_importers: dict[int, int] = {}
         self._build(db)
 
     def _build(self, db) -> None:
-        for (doc_id,) in _fetch_all(
+        for doc_id, importer_count in _fetch_all(
             db,
             """
-            SELECT DISTINCT der.document_id
+            SELECT der.document_id, COUNT(DISTINCT c.document_id)
             FROM global_symbols gs
             JOIN defn_enclosing_ranges der ON der.symbol_id = gs.id
+            JOIN mentions m ON m.symbol_id = gs.id AND m.role != 1
+            JOIN chunks c ON m.chunk_id = c.id
             WHERE gs.symbol LIKE '%/' AND gs.symbol NOT LIKE '%().'
-              AND EXISTS (
-                SELECT 1 FROM mentions m
-                JOIN chunks c ON m.chunk_id = c.id
-                WHERE m.symbol_id = gs.id AND m.role != 1 AND c.document_id != der.document_id
-              )
+              AND c.document_id != der.document_id
+            GROUP BY der.document_id
             """,
         ):
             self.live_module_docs.add(doc_id)
+            self.module_importers[doc_id] = importer_count
 
         for sym_id, symbol in _fetch_all(
             db,
@@ -99,20 +100,35 @@ class LiveIndex:
             if _fetch_one(db, _EXTERNAL_MENTION, (sym_id, def_doc)):
                 self.live_alias_bases.add(base)
 
-    def dead_export_noise(self, symbol: str, def_doc_id: int) -> bool:
+    def possibly_live_label(self, symbol: str, def_doc_id: int) -> str | None:
+        """Proof of liveness via module or export alias (used to suppress false dead-export hits)."""
         if is_module_symbol(symbol):
-            return True
+            if def_doc_id not in self.live_module_docs:
+                return None
+            count = self.module_importers.get(def_doc_id, 0)
+            return f"module_import:{count}"
         base = export_value_base(symbol)
-        if base and base in self.live_alias_bases:
-            return True
-        return bool(base and def_doc_id in self.live_module_docs)
+        if not base:
+            return None
+        if base in self.live_alias_bases:
+            return "export_alias"
+        if def_doc_id in self.live_module_docs:
+            count = self.module_importers.get(def_doc_id, 0)
+            return f"default_export:{count}"
+        return None
 
-    def same_file_export_noise(self, symbol: str) -> bool:
+    def dead_export_noise(self, symbol: str, def_doc_id: int) -> bool:
+        """Suppress from dead_exports when live via module or export alias."""
+        return self.possibly_live_label(symbol, def_doc_id) is not None or is_module_symbol(symbol)
+
+    def same_file_export_noise(self, symbol: str, def_doc_id: int | None = None) -> bool:
         """Export used only in-file but live via module or export alias elsewhere."""
         base = export_value_base(symbol)
         if not base:
             return False
-        return base in self.live_alias_bases
+        if base in self.live_alias_bases:
+            return True
+        return def_doc_id is not None and def_doc_id in self.live_module_docs
 
     def stale_type_live_noise(self, symbol: str, def_doc_id: int) -> bool:
         """Class/type looks unused but file is live via default export or module import."""
@@ -125,7 +141,7 @@ class LiveIndex:
 
 
 def has_same_file_reference_usage(db, symbol_id: int, def_doc_id: int) -> bool:
-    """Type or value referenced in the same file (extends, signatures, object literal)."""
+    """Type or value referenced in the same file (extends, signatures, handler registration)."""
     row = _fetch_one(
         db,
         """
@@ -137,3 +153,16 @@ def has_same_file_reference_usage(db, symbol_id: int, def_doc_id: int) -> bool:
         (symbol_id, def_doc_id),
     )
     return row is not None
+
+
+def file_has_scip_importers(db, relative_path: str, *, live: LiveIndex, def_doc_id: int) -> bool:
+    """True when the index shows another file importing this module or its symbols."""
+    if def_doc_id in live.live_module_docs:
+        return True
+    from ..queries import get_file_symbols, get_importer_paths
+
+    symbols = get_file_symbols(db, relative_path)
+    if not symbols:
+        return False
+    symbol_ids = [row[0] for row in symbols]
+    return bool(get_importer_paths(db, symbol_ids, relative_path))
