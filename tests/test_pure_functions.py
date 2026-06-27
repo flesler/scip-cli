@@ -112,6 +112,27 @@ class TestKindHelpers:
         assert "LIKE '%#'" in kind_sql_clause("class")
         assert "NOT LIKE '%().'" in kind_sql_clause(SymbolKind.CLASS)
 
+    def test_kind_sql_clause_function(self):
+        clause = kind_sql_clause(SymbolKind.FUNCTION)
+        assert "LIKE '%().'" in clause
+        assert "NOT LIKE '%#%().'" in clause
+
+    def test_kind_sql_clause_method(self):
+        clause = kind_sql_clause("method")
+        assert "LIKE '%#%'" in clause
+        assert "LIKE '%().'" in clause
+
+    def test_kind_sql_clause_property(self):
+        assert "#typeLiteral" in kind_sql_clause(SymbolKind.PROPERTY)
+
+    def test_kind_sql_clause_variable(self):
+        clause = kind_sql_clause("variable")
+        assert "LIKE '%.'" in clause
+        assert "NOT LIKE '%().'" in clause
+
+    def test_kind_sql_clause_unknown_kind(self):
+        assert kind_sql_clause(SymbolKind.UNKNOWN) == ""
+
 
 class TestParseSymbol:
     def test_function(self):
@@ -155,7 +176,7 @@ class TestIsNoisySymbol:
 
     def test_type_literal_property(self):
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/WidgetOptions#typeLiteral0:onVerbose."
-        assert is_noisy_symbol(s) is True
+        assert is_noisy_symbol(s) is False
 
     def test_function_parameter(self):
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet().(err)"

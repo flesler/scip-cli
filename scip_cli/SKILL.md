@@ -48,7 +48,7 @@ refs [--limit N] [--path PATH] [--paths-only] <symbol>
 
 Returns `file:line` for each reference. Reads source files to find exact line numbers.
 
-Default `--limit` is 10. When multiple symbols match, refs are grouped by symbol with `# <symbol>` headers. Use `--paths-only` for unique file paths (pipe-friendly).
+Default `--limit` is 10. When multiple symbols match, refs are grouped by symbol with `# <leaf-name>` headers on **stderr** (stdout stays pipe-clean). Use `--paths-only` for unique file paths (pipe-friendly).
 
 ### Pipelines
 
@@ -75,7 +75,7 @@ Each `xargs` invocation reopens the index (fast on cache hit). Use `--limit` on 
 search [--kind <kind>] [--limit N] [--path PATH] [--names-only] [--paths-only] <pattern>
 ```
 
-Returns `file:line Kind symbolName`. Filters noisy symbols (file-level, parameters, type literals).
+Returns `file:line kind symbolName` (kinds are lowercase: `function`, `class`, etc.). Filters noisy symbols (file-level, parameters, type literals).
 
 Default `--limit` is 10.
 

@@ -136,7 +136,7 @@ scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 
 ### Pipelines
 
-Stdout is one record per line; stderr carries warnings. Pipe-friendly flags: `refs --paths-only`, `search --names-only` / `--paths-only`, `members --names-only`. `rdeps` already prints bare file paths.
+Stdout is one record per line; stderr carries warnings and ambiguity notices. Kinds are lowercase (`function`, `class`, `method`, `property`, `variable`). Pipe-friendly flags: `refs --paths-only`, `search --names-only` / `--paths-only`, `members --names-only`. `rdeps` already prints bare file paths.
 
 ```bash
 # What do importers of this file export?

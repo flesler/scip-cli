@@ -6,7 +6,7 @@ import sqlite3
 import sys
 
 from . import __version__
-from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument, add_paths_only_argument
+from .cli_args import add_names_only_argument, add_path_argument, add_paths_only_argument
 from .symbols import SymbolKind
 from .commands import refs, def_cmd, search, symbols, rdeps, members, skill, reindex
 

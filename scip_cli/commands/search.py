@@ -43,7 +43,7 @@ def is_noisy_symbol(symbol_str):
         return True
     if symbol_str.endswith("/__init__:"):
         return True
-    if "typeLiteral" in symbol_str:
+    if "typeLiteral" in symbol_str and infer_kind(symbol_str) != SymbolKind.PROPERTY:
         return True
     if ").(" in symbol_str:
         return True
