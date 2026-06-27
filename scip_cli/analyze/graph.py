@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ..symbols import cycle_runtime_edge_sql
 from .common import fetch_all
 
-FILE_EDGES_SQL = """
+FILE_EDGES_SQL = f"""
     SELECT DISTINCT d1.relative_path AS from_file, d2.relative_path AS to_file
     FROM mentions m
     JOIN chunks c ON m.chunk_id = c.id
     JOIN documents d1 ON c.document_id = d1.id
     JOIN defn_enclosing_ranges der ON m.symbol_id = der.symbol_id
     JOIN documents d2 ON der.document_id = d2.id
+    JOIN global_symbols gs ON gs.id = der.symbol_id
     WHERE d1.id != d2.id AND m.role != 1
+      AND {cycle_runtime_edge_sql()}
 """
 
 

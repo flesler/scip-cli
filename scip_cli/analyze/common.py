@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from ..sql import debug_execute
-from ..symbols import extract_leaf_name
+from ..symbols import extract_leaf_name, is_module_symbol
 
 DEFAULT_LIMIT = 20
 
@@ -25,8 +25,14 @@ def fetch_one(db, sql: str, params=()):
 
 
 def short_name(symbol: str) -> str:
+    if is_module_symbol(symbol):
+        return "(module)"
     leaf = extract_leaf_name(symbol)
-    return leaf or symbol.split("/")[-1][:60]
+    if leaf:
+        return leaf
+    if symbol.endswith("/"):
+        return "(module)"
+    return symbol.split("/")[-1][:60]
 
 
 def is_test_path(relative_path: str) -> bool:
@@ -53,9 +59,18 @@ def is_cli_entrypoint(relative_path: str, symbol: str) -> bool:
     return path == "scip_cli/__main__.py" or "/commands/" in path
 
 
+def is_generated_analyze_path(relative_path: str) -> bool:
+    p = relative_path.replace("\\", "/")
+    if "/types/prisma/" in p:
+        return True
+    return p.endswith("types/resolvers.ts")
+
+
 def analyze_noise(relative_path: str, symbol: str, *, include_tests: bool = False) -> bool:
     """True for rows that clutter analyze dashboards (test paths, module-private helpers)."""
     if not include_tests and is_test_path(relative_path):
+        return True
+    if is_generated_analyze_path(relative_path):
         return True
     if short_name(symbol).startswith("_"):
         return True
@@ -80,12 +95,20 @@ def is_analyze_dashboard_export(relative_path: str, symbol: str) -> bool:
     return "()." in symbol or name.endswith(")")
 
 
+def is_component_props_type(symbol: str) -> bool:
+    """React-style Props interfaces — rarely referenced outside the component file."""
+    name = short_name(symbol)
+    return bool(name and name.endswith("Props") and "#" in symbol.split("/")[-1])
+
+
 def stale_type_noise(relative_path: str, symbol: str, consumers: int) -> bool:
     """Dataclass-style types with no SCIP consumers (typing-only)."""
+    if is_component_props_type(symbol):
+        return True
     if consumers > 0:
         return False
     name = short_name(symbol)
-    if not name or not name[0].isupper():
+    if not name or name == "(module)" or not name[0].isupper():
         return False
     path = relative_path.replace("\\", "/")
     return path.endswith(("config.py", "scope.py", "analyze/targets.py"))

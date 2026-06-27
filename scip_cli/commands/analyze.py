@@ -45,6 +45,9 @@ def _project_sections(
 
 
 def _file_sections(db, path: str, *, limit: int, priorities) -> list[tuple[str, list[str]]]:
+    warn = file_checks.dead_export_rdeps_warning(db, path, limit=limit)
+    if warn:
+        print(warn, file=sys.stderr)
     return file_checks.run_all(db, path, limit=limit, priorities=priorities)
 
 

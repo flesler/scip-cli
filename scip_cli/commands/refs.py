@@ -4,7 +4,7 @@ import re
 import sys
 
 from ..cli_args import path_scope_from_args
-from ..output import limit_and_warn, maybe_print_symbol_header, symbol_output_label
+from ..output import limit_and_warn, maybe_print_symbol_header, symbol_output_label, warn_ambiguous_refs
 from ..paths import path_filter_sql, path_in_scope
 from ..queries import resolve_symbol
 from ..session import setup
@@ -120,7 +120,9 @@ def _resolve_symbol_groups(db, names, limit, path_scope):
         if not symbols:
             print(f"Symbol '{query_name}' not found", file=sys.stderr)
             continue
-        groups.append((query_name, limit_and_warn(symbols, limit, "symbols")))
+        trimmed = limit_and_warn(symbols, limit, "symbols")
+        warn_ambiguous_refs(query_name, trimmed, db)
+        groups.append((query_name, trimmed))
     return groups
 
 

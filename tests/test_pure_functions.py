@@ -11,7 +11,7 @@ from scip_cli.project import detect_language
 from scip_cli.queries import resolve_file, resolve_symbol
 from scip_cli.source import read_source_lines
 from scip_cli.sql import escape_like
-from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind, kind_sql_clause
+from scip_cli.symbols import SymbolKind, extract_leaf_name, infer_kind, is_type_or_interface_symbol, kind_sql_clause
 
 
 class TestDetectLanguage:
@@ -72,6 +72,14 @@ class TestExtractLeafName:
 
 
 class TestInferKind:
+    def test_type_or_interface_symbol(self):
+        assert is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/Foo#")
+        assert is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/FooProps#")
+        assert is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/Opts#typeLiteral0:verbose.")
+        assert not is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/foo().")
+        assert not is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/")
+        assert not is_type_or_interface_symbol("scip-typescript npm app 1.0 src/`t.ts`/Foo#run().")
+
     def test_function(self):
         s = "scip-typescript npm sample-app 1.0 src/`helper.ts`/greet()."
         assert infer_kind(s) == SymbolKind.FUNCTION

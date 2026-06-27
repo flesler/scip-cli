@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, short_name
+from .live import LiveIndex
 from .sections import Check, Priority, run_checks
 from .symbol import symbol_pressure
 
@@ -82,10 +83,11 @@ def file_consumers(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[s
 
 
 def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    live = LiveIndex(db)
     rows = fetch_all(
         db,
         """
-        SELECT gs.symbol, der.start_line, der.end_line
+        SELECT gs.symbol, der.start_line, der.end_line, def_d.id
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
         JOIN documents def_d ON der.document_id = def_d.id
@@ -104,14 +106,18 @@ def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> 
         """,
         (relative_path, limit),
     )
-    return [
-        f"{short_name(symbol)}  {start + 1}:{end + 1}"
-        for symbol, start, end in rows
-        if not analyze_noise(relative_path, symbol, include_tests=True)
-    ]
+    lines = []
+    for symbol, start, end, def_doc_id in rows:
+        if analyze_noise(relative_path, symbol, include_tests=True):
+            continue
+        if live.dead_export_noise(symbol, def_doc_id):
+            continue
+        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
+    return lines
 
 
 def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    live = LiveIndex(db)
     rows = fetch_all(
         db,
         """
@@ -135,18 +141,22 @@ def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -
         """,
         (relative_path, limit),
     )
-    return [
-        f"{short_name(symbol)}  {start + 1}:{end + 1}"
-        for symbol, start, end in rows
-        if not analyze_noise(relative_path, symbol, include_tests=True)
-    ]
+    lines = []
+    for symbol, start, end in rows:
+        if analyze_noise(relative_path, symbol, include_tests=True):
+            continue
+        if live.same_file_export_noise(symbol):
+            continue
+        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
+    return lines
 
 
 def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    live = LiveIndex(db)
     rows = fetch_all(
         db,
         """
-        SELECT gs.symbol, der.start_line, der.end_line
+        SELECT gs.symbol, der.start_line, der.end_line, def_d.id
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
         JOIN documents def_d ON der.document_id = def_d.id
@@ -164,11 +174,14 @@ def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
         """,
         (relative_path, limit),
     )
-    return [
-        f"{short_name(symbol)}  {start + 1}:{end + 1}"
-        for symbol, start, end in rows
-        if not analyze_noise(relative_path, symbol, include_tests=True)
-    ]
+    lines = []
+    for symbol, start, end, def_doc_id in rows:
+        if analyze_noise(relative_path, symbol, include_tests=True):
+            continue
+        if live.dead_export_noise(symbol, def_doc_id):
+            continue
+        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
+    return lines
 
 
 def imports_summary(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -238,6 +251,29 @@ def coupling_for(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
         (relative_path, relative_path, relative_path, relative_path, limit),
     )
     return [f"{other}  shared={shared}" for other, shared in rows]
+
+
+def count_file_importers(db, relative_path: str) -> int:
+    from ..queries import get_file_symbols, get_importer_paths
+
+    symbols = get_file_symbols(db, relative_path)
+    if not symbols:
+        return 0
+    symbol_ids = [row[0] for row in symbols]
+    return len(get_importer_paths(db, symbol_ids, relative_path))
+
+
+def dead_export_rdeps_warning(db, relative_path: str, *, limit: int = DEFAULT_LIMIT) -> str | None:
+    """Warn when dead/unreferenced exports coexist with file importers (SCIP symbol split)."""
+    if not dead_in_file(db, relative_path, limit=limit) and not unreferenced_in_file(db, relative_path, limit=limit):
+        return None
+    importer_count = count_file_importers(db, relative_path)
+    if importer_count == 0:
+        return None
+    return (
+        f"Warning: {relative_path} has {importer_count} importer(s) but lists dead/unreferenced exports — "
+        "default-export, lazy(), or object-alias false positives are likely; verify with rg or rdeps"
+    )
 
 
 def top_symbol_pressure(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:

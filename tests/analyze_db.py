@@ -95,6 +95,69 @@ class AnalyzeDbBuilder:
         )
         return sym_id
 
+    def define_type(self, path: str, name: str, *, start: int = 0, end: int = 5) -> int:
+        """Define a type/interface symbol (SCIP # suffix). Returns symbol_id."""
+        doc_id, chunk_id = self._ensure_file(path)
+        sym_id = self._next_sym
+        self._next_sym += 1
+        file_label = path.split("/")[-1]
+        symbol = f"scip-typescript npm test 1.0 {path}/`{file_label}`/{name}#"
+        self.conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, name),
+        )
+        der_id = self._next_der
+        self._next_der += 1
+        self.conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, ?, 0, ?, 0)
+            """,
+            (der_id, doc_id, sym_id, start, end),
+        )
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 1)",
+            (chunk_id, sym_id),
+        )
+        return sym_id
+
+    def define_module(self, path: str) -> int:
+        """Define a file module symbol (SCIP trailing /). Returns symbol_id."""
+        doc_id, _chunk_id = self._ensure_file(path)
+        sym_id = self._next_sym
+        self._next_sym += 1
+        file_label = path.split("/")[-1]
+        symbol = f"scip-typescript npm test 1.0 {path}/`{file_label}`/"
+        self.conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, file_label),
+        )
+        der_id = self._next_der
+        self._next_der += 1
+        self.conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, 0, 0, 200, 0)
+            """,
+            (der_id, doc_id, sym_id),
+        )
+        return sym_id
+
+    def define_export_alias(self, path: str, base_name: str) -> int:
+        """SCIP export-object field alias (e.g. chat0:) — often has no defn_enclosing_ranges."""
+        _doc_id, _chunk_id = self._ensure_file(path)
+        sym_id = self._next_sym
+        self._next_sym += 1
+        file_label = path.split("/")[-1]
+        symbol = f"scip-typescript npm test 1.0 {path}/`{file_label}`/{base_name}0:"
+        self.conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, base_name),
+        )
+        return sym_id
+
     def reference(self, from_path: str, to_sym_id: int) -> None:
         """Record a cross-file or same-file reference (role=0)."""
         _doc_id, chunk_id = self._ensure_file(from_path)

@@ -3,9 +3,9 @@
 from scip_cli.analyze import file as file_checks
 from scip_cli.analyze import project as project_checks
 from scip_cli.analyze import symbol as symbol_checks
-from scip_cli.analyze.common import analyze_noise, is_test_path
+from scip_cli.analyze.common import analyze_noise, is_component_props_type, is_test_path
 
-from .analyze_db import mini_codebase_db
+from .analyze_db import AnalyzeDbBuilder, mini_codebase_db
 
 
 class TestAnalyzeNoise:
@@ -25,6 +25,11 @@ class TestAnalyzeNoise:
     def test_include_tests_keeps_test_paths(self):
         assert not analyze_noise("tests/test_foo.py", "scip-python x `t.py`/helper().", include_tests=True)
         assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/_helper().", include_tests=True)
+
+    def test_component_props_stale_noise(self):
+        sym = "scip-typescript npm x 1.0 src/ui/`Button.ts`/ButtonProps#"
+        assert is_component_props_type(sym)
+        assert not is_component_props_type("scip-typescript npm x 1.0 src/`t.ts`/Options#")
 
     def test_skips_analyze_dashboard_runners(self):
         sym = "scip-python x `project.py`/bottlenecks()."
@@ -61,6 +66,24 @@ class TestProjectAnalyze:
         lines = project_checks.cycles(db, limit=10)
         assert any("cycle/a.ts" in line and "cycle/b.ts" in line for line in lines)
 
+    def test_cycles_ignores_type_only_mutual_imports(self):
+        b = AnalyzeDbBuilder()
+        t_a = b.define_type("src/types/a.ts", "AType")
+        t_b = b.define_type("src/types/b.ts", "BType")
+        b.reference("src/types/a.ts", t_b)
+        b.reference("src/types/b.ts", t_a)
+        lines = project_checks.cycles(b.finish(), limit=10)
+        assert not any("types/a.ts" in line and "types/b.ts" in line for line in lines)
+
+    def test_cycles_keeps_runtime_mutual_imports(self):
+        b = AnalyzeDbBuilder()
+        sym_b = b.define("src/runtime/b.ts", "runB")
+        sym_a = b.define("src/runtime/a.ts", "runA")
+        b.reference("src/runtime/a.ts", sym_b)
+        b.reference("src/runtime/b.ts", sym_a)
+        lines = project_checks.cycles(b.finish(), limit=10)
+        assert any("runtime/a.ts" in line and "runtime/b.ts" in line for line in lines)
+
     def test_dead_exports_includes_orphan(self):
         db = mini_codebase_db()
         lines = project_checks.dead_exports(db, limit=20)
@@ -84,12 +107,13 @@ class TestProjectAnalyze:
         assert any("testOnlyFn" in line for line in lines)
         assert not any("moduleUsed" in line for line in lines)
 
-    def test_run_all_returns_nine_sections(self):
+    def test_run_all_returns_ten_sections(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=5)
-        assert len(sections) == 9
+        assert len(sections) == 10
         titles = [title for title, _lines in sections]
         assert sum(1 for t in titles if "[low]" in t) == 4
+        assert sum(1 for t in titles if "[medium]" in t) == 2
         titles = [title for title, _lines in sections]
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
@@ -121,6 +145,16 @@ class TestFileAnalyze:
         db = mini_codebase_db()
         lines = file_checks.file_consumers(db, "src/lib.ts", limit=10)
         assert any("consumer.ts" in line for line in lines)
+
+    def test_dead_export_rdeps_warning_when_importers_and_dead(self):
+        db = mini_codebase_db()
+        msg = file_checks.dead_export_rdeps_warning(db, "src/lib.ts", limit=20)
+        assert msg is not None
+        assert "importer" in msg.lower()
+
+    def test_no_rdeps_warning_when_no_dead_exports(self):
+        db = mini_codebase_db()
+        assert file_checks.dead_export_rdeps_warning(db, "src/consumer.ts", limit=20) is None
 
     def test_run_all_includes_coupling(self):
         db = mini_codebase_db()

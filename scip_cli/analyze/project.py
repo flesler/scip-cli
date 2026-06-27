@@ -17,6 +17,7 @@ from .common import (
     stale_type_noise,
 )
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
+from .live import LiveIndex, has_same_file_reference_usage
 from .sections import Check, Priority, run_checks
 
 
@@ -149,6 +150,26 @@ def cycles(
     return lines[:limit]
 
 
+def _format_dead_export_rows(
+    db,
+    rows,
+    live: LiveIndex,
+    *,
+    include_tests: bool,
+    limit: int,
+) -> list[str]:
+    lines = []
+    for symbol, path, loc, def_doc_id in rows:
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        if live.dead_export_noise(symbol, def_doc_id):
+            continue
+        lines.append(f"{short_name(symbol)}  loc={loc}  ({path})")
+        if len(lines) >= limit:
+            break
+    return lines
+
+
 def stale_types(
     db,
     limit: int = DEFAULT_LIMIT,
@@ -160,7 +181,7 @@ def stale_types(
     rows = fetch_all(
         db,
         f"""
-        SELECT gs.symbol, def_d.relative_path,
+        SELECT gs.id, gs.symbol, def_d.relative_path, def_d.id,
                COUNT(DISTINCT CASE WHEN ref_d.id != def_d.id THEN ref_d.id END) AS consumers
         FROM global_symbols gs
         {SYM_DEF_JOIN}
@@ -177,13 +198,21 @@ def stale_types(
         """,
         (*scope_params, limit * 5),
     )
-    lines = [
-        f"{short_name(symbol)}  consumers={consumers}  ({path})"
-        for symbol, path, consumers in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
-        and not stale_type_noise(path, symbol, consumers)
-    ]
-    return lines[:limit]
+    lines = []
+    live = LiveIndex(db)
+    for sym_id, symbol, path, def_doc_id, consumers in rows:
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        if stale_type_noise(path, symbol, consumers):
+            continue
+        if consumers == 0 and has_same_file_reference_usage(db, sym_id, def_doc_id):
+            continue
+        if live.stale_type_live_noise(symbol, def_doc_id):
+            continue
+        lines.append(f"{short_name(symbol)}  consumers={consumers}  ({path})")
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 def unreferenced_symbols(
@@ -198,7 +227,8 @@ def unreferenced_symbols(
         db,
         f"""
         SELECT gs.symbol, def_d.relative_path,
-               sym_def.end_line - sym_def.start_line + 1 AS loc
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
+               def_d.id
         FROM global_symbols gs
         {SYM_DEF_JOIN}
         WHERE NOT EXISTS (
@@ -215,12 +245,7 @@ def unreferenced_symbols(
         """,
         (*scope_params, limit * 5),
     )
-    lines = [
-        f"{short_name(symbol)}  loc={loc}  ({path})"
-        for symbol, path, loc in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
-    ]
-    return lines[:limit]
+    return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
 
 
 def same_file_only(
@@ -231,6 +256,7 @@ def same_file_only(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    live = LiveIndex(db)
     rows = fetch_all(
         db,
         f"""
@@ -253,12 +279,16 @@ def same_file_only(
         """,
         (*scope_params, limit * 5),
     )
-    lines = [
-        f"{short_name(symbol)}  loc={loc}  ({path})"
-        for symbol, path, loc in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
-    ]
-    return lines[:limit]
+    lines = []
+    for symbol, path, loc in rows:
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        if live.same_file_export_noise(symbol):
+            continue
+        lines.append(f"{short_name(symbol)}  loc={loc}  ({path})")
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 def symbols_test_only_consumers(
@@ -316,7 +346,8 @@ def dead_exports(
         db,
         f"""
         SELECT gs.symbol, def_d.relative_path,
-               sym_def.end_line - sym_def.start_line + 1 AS loc
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
+               def_d.id
         FROM global_symbols gs
         {SYM_DEF_JOIN}
         WHERE NOT EXISTS (
@@ -332,12 +363,50 @@ def dead_exports(
         """,
         (*scope_params, limit * 5),
     )
-    lines = [
-        f"{short_name(symbol)}  loc={loc}  ({path})"
-        for symbol, path, loc in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests)
-    ]
-    return lines[:limit]
+    return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
+
+
+def possibly_unused_exports(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    """Exports with no direct external refs but live via module import or export alias."""
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    live = LiveIndex(db)
+    rows = fetch_all(
+        db,
+        f"""
+        SELECT gs.symbol, def_d.relative_path,
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
+               def_d.id
+        FROM global_symbols gs
+        {SYM_DEF_JOIN}
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE m.symbol_id = gs.id
+              AND m.role != 1
+              AND c.document_id != def_d.id
+        ){scope_clause}
+        ORDER BY loc DESC, def_d.relative_path
+        LIMIT ?
+        """,
+        (*scope_params, limit * 5),
+    )
+    lines = []
+    for symbol, path, loc, def_doc_id in rows:
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        if not live.dead_export_noise(symbol, def_doc_id):
+            continue
+        lines.append(f"{short_name(symbol)}  loc={loc}  (live via module/alias)  ({path})")
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 def top_coupling(
@@ -388,6 +457,12 @@ def run_all(
         Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
         Check("unreferenced", Priority.HIGH, f"Unreferenced symbols (no refs){suffix}", unreferenced_symbols),
         Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
+        Check(
+            "possibly_unused",
+            Priority.MEDIUM,
+            f"Possibly unused exports (live via module/alias){suffix}",
+            possibly_unused_exports,
+        ),
         Check("stale_types", Priority.HIGH, f"Stale types (≤1 external consumer){suffix}", stale_types),
         Check("same_file_only", Priority.MEDIUM, f"Same-file only (consider _prefix){suffix}", same_file_only),
         Check(

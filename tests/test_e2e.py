@@ -170,5 +170,5 @@ class TestIndex:
         docs = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
         symbols = conn.execute("SELECT COUNT(*) FROM global_symbols").fetchone()[0]
         conn.close()
-        assert docs >= 8
-        assert symbols >= 10
+        assert docs >= 25
+        assert symbols >= 40

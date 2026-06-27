@@ -46,6 +46,23 @@ def warn_ambiguous(name, matches, context="symbol"):
     )
 
 
+def warn_ambiguous_refs(name, matches, db):
+    """Print external ref counts when a symbol name resolves to multiple definitions."""
+    if len(matches) <= 1:
+        return
+    from .queries import symbol_external_ref_count
+
+    parts = []
+    for sym_id, sym_str, _display in matches:
+        label = _ambiguous_label((None, sym_str))
+        count = symbol_external_ref_count(db, sym_id)
+        parts.append(f"{label} ext_refs={count}")
+    print(
+        f"Ambiguous symbol '{name}' ({len(matches)} matches). Use --path to narrow. {'; '.join(parts)}",
+        file=sys.stderr,
+    )
+
+
 def format_line_range(start_line, end_line, sep=":"):
     """Format a line range as a string, handling None values."""
     if start_line is not None and end_line is not None:

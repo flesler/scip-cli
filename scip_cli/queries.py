@@ -329,3 +329,24 @@ def resolve_document_path(db, symbol_str):
     if len(rows) == 1:
         return rows[0][0]
     return suffix_matches[0] if suffix_matches else rows[0][0]
+
+
+def symbol_external_ref_count(db, symbol_id: int) -> int:
+    """Distinct files with non-definition mentions of symbol_id (excludes def file)."""
+    def_row = debug_execute(
+        db,
+        "SELECT document_id FROM defn_enclosing_ranges WHERE symbol_id = ? LIMIT 1",
+        (symbol_id,),
+    ).fetchone()
+    exclude_doc = def_row[0] if def_row else -1
+    row = debug_execute(
+        db,
+        """
+        SELECT COUNT(DISTINCT c.document_id)
+        FROM mentions m
+        JOIN chunks c ON m.chunk_id = c.id
+        WHERE m.symbol_id = ? AND m.role != 1 AND c.document_id != ?
+        """,
+        (symbol_id, exclude_doc),
+    ).fetchone()
+    return row[0] if row else 0

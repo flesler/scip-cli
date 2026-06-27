@@ -31,7 +31,7 @@ Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `S
 | Task | Command |
 |------|---------|
 | Full suite | `pytest` |
-| E2e loop | `pytest tests/test_e2e.py` |
+| E2e loop | `pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py` |
 | Lint / format | `ruff check .` / `ruff format .` |
 
 Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command changes.
@@ -69,9 +69,10 @@ When you or a review subagent finds a repo issue — bug, dead code, cycle, risk
 
 If **yes** (the signal is in `documents`, `mentions`, `global_symbols`, `defn_enclosing_ranges`):
 
-1. **Extend `analyze` first** — new or tuned SQL check in `scip_cli/analyze/`, priority in `sections.py`, tests in `tests/test_analyze.py` + `analyze_db.py`.
-2. **Dogfood** — `reindex` → confirm the issue appears (or the false positive is filtered).
-3. **Then** fix the production code (or document a known blind spot).
+1. **Red on the fixture** — minimal generic repro + e2e test (see **TDD → External project feedback**). Do not name real customer repos in tests.
+2. **Extend `analyze`** — new or tuned SQL/heuristic in `scip_cli/analyze/`, priority in `sections.py`; unit tests only for graph/SQL plumbing (`analyze_db.py`, `test_analyze_graph.py`).
+3. **Dogfood** — `reindex` on this repo (or re-run fixture e2e) → confirm signal appears or false positive is filtered.
+4. **Then** fix production code in the other repo (or document a known blind spot).
 
 Only skip step 1 when the issue is **outside the index** (runtime, CLI UX, docs drift, git, env, concurrency, test harness).
 
@@ -137,14 +138,36 @@ The e2e fixture and this repo's own index are **small** — every query looks fa
 
 ## TDD
 
-1. **Red** — `tests/test_e2e.py` + `fixture_catalog` constants.
-2. **Green** — `scip_cli/commands/*.py`.
-3. **Refactor** — unit tests for pure helpers only.
+### Default: extend the shared fixture
 
-- **E2e** (`cli` fixture): in-process `main()`, TS project indexed once per session — default for behavior.
-- **Unit**: `:memory:` SQLite, `tests/analyze_db.py`, merge/index prune tests.
+**One indexed TS project** — `tests/fixtures/sample-project/` — indexed once per session via `indexed_fixture` (`conftest.py`). Stable names live in `tests/fixture_catalog.py`.
+
+1. **Red** — add a **minimal** `.ts` file (or tweak an existing one) that reproduces the SCIP shape; assert in `tests/test_e2e.py` or `tests/test_e2e_analyze_patterns.py` using `cli` / `open_index_db` + analyze helpers.
+2. **Green** — fix `scip_cli/` (commands, `analyze/*`, `queries.py`, …).
+3. **Refactor** — only if a pure helper deserves isolation.
+
+- **E2e** (`cli` / `indexed_fixture`): in-process `main()` or direct Python API on the **real** index — default for behavior.
 - **No subprocess** for CLI tests; no `reindex` in e2e (mutates `~/.cache/scip-cli`).
-- New symbols: extend `tests/fixtures/sample-project/` + `fixture_catalog.py`.
+- New symbols/paths: fixture file + `fixture_catalog.py` constant — never hardcode paths in test bodies.
+
+### External project feedback → fixture (mandatory workflow)
+
+When dogfooding **another repo** surfaces a bug or false positive (analyze noise, dead-export mistake, cycle, stale type, refs mismatch):
+
+1. **Capture the pattern, not the project** — note the SCIP shape (module `/`, export alias `foo0:`, lazy import, `Props#`, barrel cycle, …). Do **not** copy real repo names, paths, or filenames into tests or docs.
+2. **Red on the fixture** — smallest TS repro under `tests/fixtures/sample-project/` with generic names (`LazyPanel`, `evictItem`, `OrphanWidget`, …). E2e test proves the bug against **real `scip-typescript`** output.
+3. **Green** — fix analyze heuristics / SQL / CLI; dogfood on this repo if applicable.
+4. **Verify** — `pytest tests/test_e2e_analyze_patterns.py` (or full `pytest`); only then trim redundant tests.
+
+**Prefer fixture e2e over fake SQLite graphs.** `tests/analyze_db.py` (`AnalyzeDbBuilder`, `:memory:`) is for SQL/dashboard **plumbing** and graph primitives (`test_analyze_graph.py`, `mini_codebase_db`) — not for reproducing production SCIP symbol shapes. Hand-built symbols often diverge from scip-typescript (path format, `0:` aliases, module rows) and can pass while production still breaks.
+
+| Use fixture e2e | Use `analyze_db` unit |
+|-----------------|----------------------|
+| False positives / analyze checks from real projects | Tarjan, edge-type SQL, `run_all` section wiring |
+| Any behavior that depends on indexer symbol strings | Noise filters with one or two synthetic rows |
+| CLI commands (`refs`, `search`, `analyze` output) | Merge/index prune tests |
+
+If both layers help during development, **keep both until e2e passes**, then delete duplicate in-memory repros — fixture is the source of truth.
 
 ## Codebase map (contributors)
 

@@ -51,6 +51,32 @@ def sql_exclude_variable_symbols(column: str = "symbol") -> str:
     )
 
 
+def is_module_symbol(symbol_str: str) -> bool:
+    return symbol_str.endswith("/")
+
+
+def is_type_or_interface_symbol(symbol_str: str) -> bool:
+    """True for SCIP type/interface symbols (erased at runtime — ignore for import cycles)."""
+    if symbol_str.endswith("/") or symbol_str.endswith("()."):
+        return False
+    if "#typeLiteral" in symbol_str:
+        return True
+    tail = symbol_str.split("/")[-1]
+    return "#" in tail
+
+
+def cycle_edge_type_sql(column: str = "gs.symbol") -> str:
+    """SQL: true when symbol is a runtime dependency (not type/interface-only)."""
+    c = column
+    return f"({c} LIKE '%().' OR {c} LIKE '%/' OR ({c} NOT LIKE '%#%' AND {c} NOT LIKE '%#typeLiteral%'))"
+
+
+def cycle_runtime_edge_sql(column: str = "gs.symbol") -> str:
+    """SQL: cycle edges excluding types and module-only re-exports (barrel false positives)."""
+    c = column
+    return f"({c} LIKE '%().' OR ({c} NOT LIKE '%#%' AND {c} NOT LIKE '%#typeLiteral%' AND {c} NOT LIKE '%/'))"
+
+
 def infer_kind(symbol):
     """Infer symbol kind from symbol string pattern."""
     if "#" in symbol and symbol.endswith("()."):
