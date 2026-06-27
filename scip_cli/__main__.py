@@ -66,7 +66,7 @@ def main():
     add_path_argument(search_parser)
     add_names_only_argument(search_parser)
     add_paths_only_argument(search_parser)
-    search_parser.add_argument("pattern", help="Search pattern")
+    search_parser.add_argument("pattern", nargs="+", help="Search pattern(s), matched with OR logic")
 
     # symbols
     symbols_parser = subparsers.add_parser("symbols", help="List symbols in a file")

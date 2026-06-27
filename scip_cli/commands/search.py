@@ -109,14 +109,17 @@ def main(args):
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
+        patterns = args.pattern
 
+        # Single dotted pattern (e.g. "Widget.run") - try exact resolve first
         if (
-            "." in args.pattern
-            and "/" not in args.pattern
-            and "*" not in args.pattern
+            len(patterns) == 1
+            and "." in patterns[0]
+            and "/" not in patterns[0]
+            and "*" not in patterns[0]
         ):
             symbols = resolve_symbol(
-                db, args.pattern, args.kind, limit=limit + 1, path_scope=path_scope
+                db, patterns[0], args.kind, limit=limit + 1, path_scope=path_scope
             )
             if symbols:
                 symbols = limit_and_warn(symbols, limit, "results")
@@ -132,13 +135,22 @@ def main(args):
                 _print_search_results(results, args)
                 return
 
-        escaped_pattern = escape_like(args.pattern)
         path_clause, path_params = path_filter_sql(db, path_scope)
         kind_clause = kind_sql_clause(args.kind) if args.kind else ""
         join_docs = (
             " LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id"
             " LEFT JOIN documents d ON der.document_id = d.id"
         )
+
+        # Build OR clause for multiple patterns
+        pattern_clauses = []
+        pattern_params = []
+        for pattern in patterns:
+            escaped = escape_like(pattern)
+            pattern_clauses.append("gs.symbol LIKE ? ESCAPE '\\'")
+            pattern_params.append(f"%{escaped}%")
+
+        where_clause = " OR ".join(pattern_clauses)
 
         if args.kind:
             rows = _search_rows_with_kind(
@@ -147,9 +159,9 @@ def main(args):
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
                 FROM global_symbols gs
                 {join_docs}
-                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}{kind_clause}
+                WHERE ({where_clause}){path_clause}{kind_clause}
             """,
-                (f"%{escaped_pattern}%", *path_params),
+                (*pattern_params, *path_params),
                 args.kind,
                 limit,
             )
@@ -159,21 +171,22 @@ def main(args):
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
                 FROM global_symbols gs
                 {join_docs}
-                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}
+                WHERE ({where_clause}){path_clause}
                 LIMIT ?
             """,
-                (f"%{escaped_pattern}%", *path_params, limit + 1),
+                (*pattern_params, *path_params, limit + 1),
             ).fetchall()
             rows = limit_and_warn(rows, limit, "results")
 
         if not rows:
+            pattern_str = " or ".join(f"'{p}'" for p in patterns)
             if args.kind:
                 print(
-                    f"No {args.kind} symbols found matching '{args.pattern}'",
+                    f"No {args.kind} symbols found matching {pattern_str}",
                     file=sys.stderr,
                 )
             else:
-                print(f"No symbols found matching '{args.pattern}'", file=sys.stderr)
+                print(f"No symbols found matching {pattern_str}", file=sys.stderr)
             sys.exit(1)
 
         results = []
@@ -188,7 +201,8 @@ def main(args):
             results.append((file_path, line, kind_to_display(kind), symbol_name))
 
         if not results:
-            print(f"No symbols found matching '{args.pattern}'", file=sys.stderr)
+            pattern_str = " or ".join(f"'{p}'" for p in patterns)
+            print(f"No symbols found matching {pattern_str}", file=sys.stderr)
             sys.exit(1)
 
         _print_search_results(results, args)

@@ -16,6 +16,9 @@ def main(args):
     if args.path:
         # Write to file, creating parent directories
         target = Path(args.path).expanduser()
+        # If path has no extension, treat it as a directory
+        if not target.suffix:
+            target = target / "SKILL.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
         print(f"Installed skill to {target}", file=sys.stderr)
