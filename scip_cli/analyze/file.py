@@ -81,6 +81,67 @@ def file_consumers(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[s
     return [f"{path}  symbols={hits}" for path, hits in rows]
 
 
+def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    rows = fetch_all(
+        db,
+        """
+        SELECT gs.symbol, der.start_line, der.end_line
+        FROM global_symbols gs
+        JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
+        JOIN documents def_d ON der.document_id = def_d.id
+        WHERE def_d.relative_path = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM mentions m
+              WHERE m.symbol_id = gs.id AND m.role = 0
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM mentions m
+              JOIN chunks c ON m.chunk_id = c.id
+              WHERE m.symbol_id = gs.id AND m.role != 1 AND c.document_id != def_d.id
+          )
+        ORDER BY der.start_line
+        LIMIT ?
+        """,
+        (relative_path, limit),
+    )
+    return [
+        f"{short_name(symbol)}  {start + 1}:{end + 1}"
+        for symbol, start, end in rows
+        if not analyze_noise(relative_path, symbol, include_tests=True)
+    ]
+
+
+def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    rows = fetch_all(
+        db,
+        """
+        SELECT gs.symbol, der.start_line, der.end_line
+        FROM global_symbols gs
+        JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
+        JOIN documents def_d ON der.document_id = def_d.id
+        WHERE def_d.relative_path = ?
+          AND EXISTS (
+              SELECT 1 FROM mentions m
+              JOIN chunks c ON m.chunk_id = c.id
+              WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id = def_d.id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM mentions m
+              JOIN chunks c ON m.chunk_id = c.id
+              WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id != def_d.id
+          )
+        ORDER BY der.start_line
+        LIMIT ?
+        """,
+        (relative_path, limit),
+    )
+    return [
+        f"{short_name(symbol)}  {start + 1}:{end + 1}"
+        for symbol, start, end in rows
+        if not analyze_noise(relative_path, symbol, include_tests=True)
+    ]
+
+
 def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     rows = fetch_all(
         db,
@@ -219,8 +280,25 @@ def _bind_path(fn, relative_path: str):
 def _file_checks(relative_path: str, *, include_top_symbols: bool) -> list[Check]:
     title = f"({relative_path})"
     checks = [
-        Check("dead_in_file", Priority.HIGH, f"Dead exports in file {title}", _bind_path(dead_in_file, relative_path)),
+        Check(
+            "unreferenced",
+            Priority.HIGH,
+            f"Unreferenced in file {title}",
+            _bind_path(unreferenced_in_file, relative_path),
+        ),
+        Check(
+            "dead_in_file",
+            Priority.HIGH,
+            f"Dead exports in file {title}",
+            _bind_path(dead_in_file, relative_path),
+        ),
         Check("unused_imports", Priority.HIGH, f"Unused imports {title}", _bind_path(unused_imports, relative_path)),
+        Check(
+            "same_file_only",
+            Priority.MEDIUM,
+            f"Same-file only {title}",
+            _bind_path(same_file_only_in_file, relative_path),
+        ),
         Check("change_surface", Priority.MEDIUM, f"Change surface {title}", _bind_path(change_surface, relative_path)),
         Check("file_consumers", Priority.MEDIUM, f"File consumers {title}", _bind_path(file_consumers, relative_path)),
         Check("coupling", Priority.LOW, f"Coupling partners {title}", _bind_path(coupling_for, relative_path)),

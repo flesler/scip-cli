@@ -45,11 +45,21 @@ def is_test_path(relative_path: str) -> bool:
     return name == "conftest.py"
 
 
+def is_cli_entrypoint(relative_path: str, symbol: str) -> bool:
+    """True for command main() entrypoints the index does not link to __main__.py."""
+    if short_name(symbol) != "main":
+        return False
+    path = relative_path.replace("\\", "/")
+    return path == "scip_cli/__main__.py" or "/commands/" in path
+
+
 def analyze_noise(relative_path: str, symbol: str, *, include_tests: bool = False) -> bool:
     """True for rows that clutter analyze dashboards (test paths, module-private helpers)."""
     if not include_tests and is_test_path(relative_path):
         return True
     if short_name(symbol).startswith("_"):
+        return True
+    if is_cli_entrypoint(relative_path, symbol):
         return True
     return is_analyze_dashboard_export(relative_path, symbol)
 

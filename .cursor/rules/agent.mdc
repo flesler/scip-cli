@@ -47,13 +47,44 @@ Interpretation: README § *Finding easy wins with analyze*. Target = omit (proje
 | Priority | Section | Action |
 |----------|---------|--------|
 | 1 | **Cycles** | Break production file dependency cycles (`cache`↔`scope` was one) |
-| 2 | **Dead exports** | Cross-file unused symbols — verify with `rg`, then delete; ignore `scip_cli/analyze/*` section helpers |
-| 3 | **Stale types** | Low-consumer classes — merge or justify |
-| 4 | **Top coupling** | Split or clarify module boundaries |
+| 2 | **Unreferenced / dead exports** | No ref usage / no external refs — verify with `rg`, delete or `_` prefix |
+| 3 | **Same-file only** | Module-private by usage — rename to `_` |
+| 4 | **Stale types** | Low-consumer classes — merge or justify |
 
-`analyze` skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include. **Cannot** find same-file-only dead code — use `rg` after analyze hints. Reindex after large edits.
+`analyze` skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include. Reindex after large edits.
 
 Do **not** spawn broad code-review agents until this pass is done (or explain why skipped).
+
+## Analyze feedback loop (mandatory)
+
+When you or a review subagent finds a repo issue — bug, dead code, cycle, risky hub, stale type, unused import — **stop and ask first:**
+
+> *Could our SQLite index have predicted this, and `analyze` just doesn't surface it yet?*
+
+If **yes** (the signal is in `documents`, `mentions`, `global_symbols`, `defn_enclosing_ranges`):
+
+1. **Extend `analyze` first** — new or tuned SQL check in `scip_cli/analyze/`, priority in `sections.py`, tests in `tests/test_analyze.py` + `analyze_db.py`.
+2. **Dogfood** — `reindex` → confirm the issue appears (or the false positive is filtered).
+3. **Then** fix the production code (or document a known blind spot).
+
+Only skip step 1 when the issue is **outside the index** (runtime, CLI UX, docs drift, git, env, concurrency, test harness).
+
+### Retrospective: caught manually, SQLite already had it
+
+| Issue we hit | Index signal | Analyze today | Gap / next check |
+|--------------|--------------|---------------|------------------|
+| `cache` ↔ `scope` import cycle | cross-file `mentions` edges | `[high] Cycles` | **Caught** — keep dogfooding cycles |
+| Cross-file dead export (`get_refs_for_symbols`) | def with no external `mentions` | `[high] Dead exports` | **Caught** |
+| Same-file-only dead code | def, `role=0` only in def file | `[high] Unreferenced` or `[medium] Same-file only` | **Caught** (since extended) |
+| Same-file helper without `_` (`run_with_fallback`) | same-file `role=0` or none | `[medium] Same-file only` / unreferenced | **Caught** — rename to `_` |
+| Typing-only dataclasses (`ProjectSettings`, `IndexScope`) | type `#` symbol, 0 consumer files | `[high] Stale types` + `stale_type_noise` | **Filtered** — index can't see annotations; document or optional `--types` |
+| `analyze/*` section runners “dead” | no external refs | noise filter in `common.py` | **Filtered** — framework pattern |
+| Unused import | `role=2` mention, no in-file use | `[high] Unused imports` (per file) | **Caught** on file target |
+| Hub before editing (`resolve_symbol`, `queries.py`) | fan-in / consumer count | `[medium] Change surface` / `[low] Hotspots` | **Caught** on file target; project hubs are low tier |
+| Symbol only used from tests | consumers all under `tests/` | `[medium] Test-only consumers` | **Caught** |
+| Duplicate / parallel helpers | — | — | **Not in index** — `rg`, not analyze |
+
+Add new rows to `dogfood.md` when you find another gap; implement the SQL check before the next manual review pass.
 
 ## TDD
 

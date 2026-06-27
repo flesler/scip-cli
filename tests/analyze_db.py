@@ -177,13 +177,18 @@ def mini_codebase_db() -> sqlite3.Connection:
     b = AnalyzeDbBuilder()
     foo = b.define("src/lib.ts", "foo")
     b.define("src/lib.ts", "Orphan")
+    same_file = b.define("src/lib.ts", "sameFileHelper")
+    b.reference("src/lib.ts", same_file)
     bar = b.define("src/lib.ts", "Bar")
     unused = b.define("src/dead.ts", "deadFn")
+    test_only = b.define("src/lib.ts", "testOnlyFn")
     b.define("src/consumer.ts", "message")
     b.reference("src/consumer.ts", foo)
     b.reference("src/consumer.ts", bar)
     b.import_symbol("src/consumer.ts", foo)
     b.import_symbol("src/importer.ts", unused)  # import only, never referenced
+    b.add_file("tests/harness.ts")
+    b.reference("tests/harness.ts", test_only)
 
     sym_x = b.define("src/cycle/a.ts", "alpha")
     sym_y = b.define("src/cycle/b.ts", "beta")

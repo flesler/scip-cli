@@ -12,6 +12,7 @@ from .common import (
     cycle_path_noise,
     fetch_all,
     file_pair_noise,
+    is_test_path,
     short_name,
     stale_type_noise,
 )
@@ -216,6 +217,119 @@ def stale_types(
     return lines[:limit]
 
 
+def unreferenced_symbols(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    rows = fetch_all(
+        db,
+        f"""
+        SELECT gs.symbol, def_d.relative_path,
+               sym_def.end_line - sym_def.start_line + 1 AS loc
+        FROM global_symbols gs
+        {SYM_DEF_JOIN}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM mentions m
+            WHERE m.symbol_id = gs.id AND m.role = 0
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE m.symbol_id = gs.id AND m.role != 1 AND c.document_id != def_d.id
+        ){scope_clause}
+        ORDER BY loc DESC, def_d.relative_path
+        LIMIT ?
+        """,
+        (*scope_params, limit * 5),
+    )
+    lines = [
+        f"{short_name(symbol)}  loc={loc}  ({path})"
+        for symbol, path, loc in rows
+        if not analyze_noise(path, symbol, include_tests=include_tests)
+    ]
+    return lines[:limit]
+
+
+def same_file_only(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    rows = fetch_all(
+        db,
+        f"""
+        SELECT gs.symbol, def_d.relative_path,
+               sym_def.end_line - sym_def.start_line + 1 AS loc
+        FROM global_symbols gs
+        {SYM_DEF_JOIN}
+        WHERE EXISTS (
+            SELECT 1 FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id = def_d.id
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id != def_d.id
+        ){scope_clause}
+        ORDER BY loc DESC, def_d.relative_path
+        LIMIT ?
+        """,
+        (*scope_params, limit * 5),
+    )
+    lines = [
+        f"{short_name(symbol)}  loc={loc}  ({path})"
+        for symbol, path, loc in rows
+        if not analyze_noise(path, symbol, include_tests=include_tests)
+    ]
+    return lines[:limit]
+
+
+def symbols_test_only_consumers(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    if include_tests:
+        return []
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    rows = fetch_all(
+        db,
+        f"""
+        SELECT gs.symbol, def_d.relative_path,
+               GROUP_CONCAT(DISTINCT ref_d.relative_path) AS consumer_paths
+        FROM global_symbols gs
+        {SYM_DEF_JOIN}
+        JOIN mentions m ON m.symbol_id = gs.id AND m.role != 1
+        JOIN chunks c ON m.chunk_id = c.id
+        JOIN documents ref_d ON c.document_id = ref_d.id
+        WHERE ref_d.id != def_d.id{scope_clause}
+        GROUP BY gs.id
+        HAVING COUNT(DISTINCT ref_d.id) > 0
+        ORDER BY def_d.relative_path, gs.symbol
+        LIMIT ?
+        """,
+        (*scope_params, limit * 10),
+    )
+    lines = []
+    for symbol, path, consumer_paths in rows:
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            continue
+        paths = [part.strip() for part in (consumer_paths or "").split(",") if part.strip()]
+        if paths and all(is_test_path(p) for p in paths):
+            lines.append(f"{short_name(symbol)}  test_consumers={len(paths)}  ({path})")
+    return lines[:limit]
+
+
 def dead_exports(
     db,
     limit: int = DEFAULT_LIMIT,
@@ -298,8 +412,11 @@ def run_all(
     opts = {"include_tests": include_tests, "scope": scope}
     checks = [
         Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
+        Check("unreferenced", Priority.HIGH, f"Unreferenced symbols (no refs){suffix}", unreferenced_symbols),
         Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
         Check("stale_types", Priority.HIGH, f"Stale types (≤1 external consumer){suffix}", stale_types),
+        Check("same_file_only", Priority.MEDIUM, f"Same-file only (consider _prefix){suffix}", same_file_only),
+        Check("test_only", Priority.MEDIUM, f"Test-only consumers{suffix}", symbols_test_only_consumers),
         Check("top_coupling", Priority.LOW, f"Top coupling (file pairs){suffix}", top_coupling),
         Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
         Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),

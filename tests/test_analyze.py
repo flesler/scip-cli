@@ -66,10 +66,27 @@ class TestProjectAnalyze:
         lines = project_checks.dead_exports(db, limit=20)
         assert any("Orphan" in line or "deadFn" in line for line in lines)
 
-    def test_run_all_returns_six_sections(self):
+    def test_unreferenced_finds_orphan(self):
+        db = mini_codebase_db()
+        lines = project_checks.unreferenced_symbols(db, limit=20)
+        assert any("Orphan" in line for line in lines)
+        assert not any("foo" in line for line in lines)
+
+    def test_same_file_only_finds_helper(self):
+        db = mini_codebase_db()
+        lines = project_checks.same_file_only(db, limit=20)
+        assert any("sameFileHelper" in line for line in lines)
+        assert not any("Orphan" in line for line in lines)
+
+    def test_test_only_symbols(self):
+        db = mini_codebase_db()
+        lines = project_checks.symbols_test_only_consumers(db, limit=20)
+        assert any("testOnlyFn" in line for line in lines)
+
+    def test_run_all_returns_nine_sections(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=5)
-        assert len(sections) == 6
+        assert len(sections) == 9
         titles = [title for title, _lines in sections]
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
@@ -81,7 +98,7 @@ class TestProjectAnalyze:
 
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=5, priorities={Priority.HIGH})
-        assert len(sections) == 3
+        assert len(sections) == 4
         titles = [title for title, _lines in sections]
         assert all("[high]" in title for title in titles)
 
