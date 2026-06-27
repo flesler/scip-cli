@@ -37,6 +37,7 @@ Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command chang
 ```bash
 .venv/bin/scip-cli reindex
 .venv/bin/scip-cli analyze --limit 25
+.venv/bin/scip-cli analyze --priority high --limit 25   # dead code & cycles only
 .venv/bin/scip-cli analyze scip_cli --limit 15              # directory
 .venv/bin/scip-cli analyze scip_cli/queries.py --limit 20   # file (+ scoped project)
 ```

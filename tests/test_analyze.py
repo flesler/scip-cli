@@ -26,6 +26,16 @@ class TestAnalyzeNoise:
         assert not analyze_noise("tests/test_foo.py", "scip-python x `t.py`/helper().", include_tests=True)
         assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/_helper().", include_tests=True)
 
+    def test_skips_analyze_dashboard_runners(self):
+        sym = "scip-python x `project.py`/bottlenecks()."
+        assert analyze_noise("scip_cli/analyze/project.py", sym)
+
+    def test_stale_type_noise_for_dataclasses(self):
+        from scip_cli.analyze.common import stale_type_noise
+
+        assert stale_type_noise("scip_cli/config.py", "scip-python x `config.py`/ProjectSettings#", 0)
+        assert not stale_type_noise("scip_cli/config.py", "scip-python x `config.py`/ProjectSettings#", 1)
+
 
 class TestProjectAnalyze:
     def test_hotspots_finds_greet_like_hub(self):
@@ -61,7 +71,19 @@ class TestProjectAnalyze:
         sections = project_checks.run_all(db, limit=5)
         assert len(sections) == 6
         titles = [title for title, _lines in sections]
-        assert "Hotspots (most referenced)" in titles
+        assert titles[0].startswith("[high]")
+        assert "Cycles" in titles[0]
+        assert titles[-1].startswith("[low]")
+        assert "Hotspots" in titles[-1]
+
+    def test_run_all_high_priority_only(self):
+        from scip_cli.analyze.sections import Priority
+
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=5, priorities={Priority.HIGH})
+        assert len(sections) == 2
+        titles = [title for title, _lines in sections]
+        assert all("[high]" in title for title in titles)
 
 
 class TestFileAnalyze:
@@ -84,7 +106,7 @@ class TestFileAnalyze:
         db = mini_codebase_db()
         sections = file_checks.run_all(db, "src/lib.ts", limit=5)
         titles = [title for title, _lines in sections]
-        assert "Coupling partners" in titles
+        assert any("Coupling partners" in title for title in titles)
 
 
 class TestAnalyzeTargets:
@@ -147,6 +169,15 @@ class TestSymbolAnalyze:
         ).fetchone()[0]
         sections = symbol_checks.run_all(db, foo_id, limit=5)
         assert len(sections) == 5
+
+
+class TestAnalyzeSections:
+    def test_parse_priorities(self):
+        from scip_cli.analyze.sections import Priority, parse_priorities
+
+        assert parse_priorities(None) is None
+        assert parse_priorities("high") == {Priority.HIGH}
+        assert parse_priorities("1,medium") == {Priority.HIGH, Priority.MEDIUM}
 
 
 class TestAnalyzeCommand:

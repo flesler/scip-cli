@@ -202,7 +202,10 @@ Use `analyze` on the repo itself before broad refactors or agent review — it s
 
 ```bash
 scip-cli analyze --limit 25
+scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 ```
+
+Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order (dead code and cycles first; bottlenecks/hotspots last).
 
 **What to look at first**
 

@@ -121,6 +121,11 @@ def main():
         action="store_true",
         help="Include tests/, *.test.*, *.spec.* paths in project-wide analyze (default: skip)",
     )
+    analyze_parser.add_argument(
+        "--priority",
+        metavar="LEVEL",
+        help="Comma-separated check tiers: high, medium, low (or 1/2/3). Default: all. E.g. high or high,medium",
+    )
 
     # reindex
     reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")

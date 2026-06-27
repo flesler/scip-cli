@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, section, short_name
+from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, short_name
+from .sections import Check, Priority, run_checks
 from .symbol import symbol_pressure
 
 
@@ -208,28 +209,68 @@ def top_symbol_pressure(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> l
     return lines
 
 
-def run_all(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
-    sections = [
-        section(f"Change surface ({relative_path})", change_surface(db, relative_path, limit)),
-        section("Unused imports", unused_imports(db, relative_path, limit)),
-        section("File consumers", file_consumers(db, relative_path, limit)),
-        section("Dead exports in file", dead_in_file(db, relative_path, limit)),
-        section("Imports summary", imports_summary(db, relative_path, limit)),
-        section("Coupling partners", coupling_for(db, relative_path, limit)),
+def _bind_path(fn, relative_path: str):
+    def run(db, limit: int, **kwargs):
+        return fn(db, relative_path, limit)
+
+    return run
+
+
+def _file_checks(relative_path: str, *, include_top_symbols: bool) -> list[Check]:
+    title = f"({relative_path})"
+    checks = [
+        Check("dead_in_file", Priority.HIGH, f"Dead exports in file {title}", _bind_path(dead_in_file, relative_path)),
+        Check("unused_imports", Priority.HIGH, f"Unused imports {title}", _bind_path(unused_imports, relative_path)),
+        Check("change_surface", Priority.MEDIUM, f"Change surface {title}", _bind_path(change_surface, relative_path)),
+        Check("coupling", Priority.MEDIUM, f"Coupling partners {title}", _bind_path(coupling_for, relative_path)),
+        Check("file_consumers", Priority.MEDIUM, f"File consumers {title}", _bind_path(file_consumers, relative_path)),
+        Check("imports_summary", Priority.LOW, f"Imports summary {title}", _bind_path(imports_summary, relative_path)),
     ]
-    top = top_symbol_pressure(db, relative_path, limit)
-    if top:
-        sections.append(section("Top symbols (by external consumers)", top))
-    return sections
+    if include_top_symbols:
+        checks.append(
+            Check(
+                "top_symbols",
+                Priority.LOW,
+                f"Top symbols (by external consumers) {title}",
+                _bind_path(top_symbol_pressure, relative_path),
+            )
+        )
+    return checks
 
 
-def run_all_sections_only(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
+def _run_file_checks(
+    checks: list[Check],
+    db,
+    limit: int,
+    priorities,
+) -> list[tuple[str, list[str]]]:
+    return run_checks(checks, db, limit, priorities)
+
+
+def run_all(
+    db,
+    relative_path: str,
+    limit: int = DEFAULT_LIMIT,
+    priorities=None,
+) -> list[tuple[str, list[str]]]:
+    return _run_file_checks(
+        _file_checks(relative_path, include_top_symbols=True),
+        db,
+        limit,
+        priorities,
+    )
+
+
+def run_all_sections_only(
+    db,
+    relative_path: str,
+    limit: int = DEFAULT_LIMIT,
+    priorities=None,
+) -> list[tuple[str, list[str]]]:
     """Per-file sections without top-symbols (directory batch)."""
-    return [
-        section(f"Change surface ({relative_path})", change_surface(db, relative_path, limit)),
-        section("Unused imports", unused_imports(db, relative_path, limit)),
-        section("File consumers", file_consumers(db, relative_path, limit)),
-        section("Dead exports in file", dead_in_file(db, relative_path, limit)),
-        section("Imports summary", imports_summary(db, relative_path, limit)),
-        section("Coupling partners", coupling_for(db, relative_path, limit)),
-    ]
+    return _run_file_checks(
+        _file_checks(relative_path, include_top_symbols=False),
+        db,
+        limit,
+        priorities,
+    )

@@ -43,7 +43,7 @@ def read_source_lines(project_root, relative_path, start_line=None, end_line=Non
         return None
 
 
-def fallback_def_location(db, project_root, symbol_str):
+def _fallback_def_location(db, project_root, symbol_str):
     """Best-effort definition location when defn_enclosing_ranges is missing."""
     rel_path = resolve_document_path(db, symbol_str)
     if not rel_path:
@@ -71,4 +71,4 @@ def resolve_def_location(db, project_root, symbol_id, symbol_str):
     row = get_def_location(db, symbol_id)
     if row:
         return row
-    return fallback_def_location(db, project_root, symbol_str)
+    return _fallback_def_location(db, project_root, symbol_str)

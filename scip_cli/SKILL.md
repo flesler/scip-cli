@@ -124,6 +124,10 @@ analyze [--limit N] [--path PATH] [--include-tests] [target]
 | **file** | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
 | **symbol** | Symbol pressure, consumers, dependencies, affected |
 
+Sections are ordered **high → medium → low** priority so `--limit` surfaces actionable rows first. Labels: `[high]` dead code & cycles, `[medium]` coupling & change surface, `[low]` bottlenecks & hotspots.
+
+`--priority high` or `--priority high,medium` (also `1`/`2`/`3`) skips lower tiers.
+
 Directory detection uses the filesystem when present, otherwise an indexed path prefix. `--path` narrows ambiguous file/symbol resolution only (not directory scope — pass the dir as `target`).
 
 **Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.

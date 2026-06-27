@@ -16,7 +16,7 @@ INDEX_LOCK = ".index.lock"
 ROOT_HASH_LEN = 12
 
 
-def project_root_hash(project_root: Path) -> str:
+def _project_root_hash(project_root: Path) -> str:
     return hashlib.sha256(str(Path(project_root).resolve()).encode()).hexdigest()[:ROOT_HASH_LEN]
 
 
@@ -74,7 +74,7 @@ def project_cache_slug(project_root: Path) -> str:
     slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", slug_base).strip("-") or "project"
     if len(slug) > CACHE_SLUG_MAX_LEN:
         slug = slug[:CACHE_SLUG_MAX_LEN].rstrip("-")
-    digest = project_root_hash(root)[:6]
+    digest = _project_root_hash(root)[:6]
     return f"{slug}-{digest}"
 
 

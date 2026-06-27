@@ -3,7 +3,22 @@
 from __future__ import annotations
 
 from ..symbols import infer_kind
-from .common import DEFAULT_LIMIT, fetch_all, fetch_one, section, short_name
+from .common import DEFAULT_LIMIT, fetch_all, fetch_one, short_name
+from .sections import Check, Priority, run_checks
+
+
+def _bind_symbol(fn, symbol_id: int):
+    def run(db, limit: int, **kwargs):
+        return fn(db, symbol_id, limit)
+
+    return run
+
+
+def _bind_symbol0(fn, symbol_id: int):
+    def run(db, limit: int, **kwargs):
+        return fn(db, symbol_id)
+
+    return run
 
 
 def affected(db, symbol_id: int, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -148,11 +163,22 @@ def def_context(db, symbol_id: int) -> list[str]:
     ]
 
 
-def run_all(db, symbol_id: int, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
-    return [
-        section("Definition context", def_context(db, symbol_id)),
-        section("Symbol pressure (loc x fan metrics)", symbol_pressure(db, symbol_id)),
-        section("Consumer files (direct)", consumer_files(db, symbol_id, limit)),
-        section("Affected (transitive, coarse)", affected(db, symbol_id, limit)),
-        section("Dependencies (cross-file)", dependencies(db, symbol_id, limit)),
+def run_all(
+    db,
+    symbol_id: int,
+    limit: int = DEFAULT_LIMIT,
+    priorities=None,
+) -> list[tuple[str, list[str]]]:
+    checks = [
+        Check("consumer_files", Priority.HIGH, "Consumer files (direct)", _bind_symbol(consumer_files, symbol_id)),
+        Check("dependencies", Priority.HIGH, "Dependencies (cross-file)", _bind_symbol(dependencies, symbol_id)),
+        Check("affected", Priority.MEDIUM, "Affected (transitive, coarse)", _bind_symbol(affected, symbol_id)),
+        Check(
+            "symbol_pressure",
+            Priority.MEDIUM,
+            "Symbol pressure (loc x fan metrics)",
+            _bind_symbol0(symbol_pressure, symbol_id),
+        ),
+        Check("def_context", Priority.LOW, "Definition context", _bind_symbol0(def_context, symbol_id)),
     ]
+    return run_checks(checks, db, limit, priorities)

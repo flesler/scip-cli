@@ -49,7 +49,36 @@ def analyze_noise(relative_path: str, symbol: str, *, include_tests: bool = Fals
     """True for rows that clutter analyze dashboards (test paths, module-private helpers)."""
     if not include_tests and is_test_path(relative_path):
         return True
-    return short_name(symbol).startswith("_")
+    if short_name(symbol).startswith("_"):
+        return True
+    return is_analyze_dashboard_export(relative_path, symbol)
+
+
+_ANALYZE_DASHBOARD_SUFFIXES = (
+    "analyze/project.py",
+    "analyze/file.py",
+    "analyze/symbol.py",
+)
+
+
+def is_analyze_dashboard_export(relative_path: str, symbol: str) -> bool:
+    """Section runner functions in analyze/* (same-file only, look like dead exports)."""
+    path = relative_path.replace("\\", "/")
+    if not any(path.endswith(suffix) for suffix in _ANALYZE_DASHBOARD_SUFFIXES):
+        return False
+    name = short_name(symbol)
+    return "()." in symbol or name.endswith(")")
+
+
+def stale_type_noise(relative_path: str, symbol: str, consumers: int) -> bool:
+    """Dataclass-style types with no SCIP consumers (typing-only)."""
+    if consumers > 0:
+        return False
+    name = short_name(symbol)
+    if not name or not name[0].isupper():
+        return False
+    path = relative_path.replace("\\", "/")
+    return path.endswith(("config.py", "scope.py", "analyze/targets.py"))
 
 
 def file_pair_noise(file1: str, file2: str, *, include_tests: bool = False) -> bool:

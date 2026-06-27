@@ -12,9 +12,10 @@ from .common import (
     cycle_path_noise,
     fetch_all,
     file_pair_noise,
-    section,
     short_name,
+    stale_type_noise,
 )
+from .sections import Check, Priority, run_checks
 
 _FILE_EDGES_SQL = """
     SELECT DISTINCT d1.relative_path AS from_file, d2.relative_path AS to_file
@@ -210,6 +211,7 @@ def stale_types(
         f"{short_name(symbol)}  consumers={consumers}  ({path})"
         for symbol, path, consumers in rows
         if not analyze_noise(path, symbol, include_tests=include_tests)
+        and not stale_type_noise(path, symbol, consumers)
     ]
     return lines[:limit]
 
@@ -290,14 +292,16 @@ def run_all(
     *,
     include_tests: bool = False,
     scope: str | None = None,
+    priorities=None,
 ) -> list[tuple[str, list[str]]]:
     suffix = _scope_suffix(scope)
     opts = {"include_tests": include_tests, "scope": scope}
-    return [
-        section(f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks(db, limit, **opts)),
-        section(f"Hotspots (most referenced){suffix}", hotspots(db, limit, **opts)),
-        section(f"Cycles (file dependencies){suffix}", cycles(db, limit, **opts)),
-        section(f"Stale types (≤1 external consumer){suffix}", stale_types(db, limit, **opts)),
-        section(f"Dead exports (no external refs){suffix}", dead_exports(db, limit, **opts)),
-        section(f"Top coupling (file pairs){suffix}", top_coupling(db, limit, **opts)),
+    checks = [
+        Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
+        Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
+        Check("stale_types", Priority.MEDIUM, f"Stale types (≤1 external consumer){suffix}", stale_types),
+        Check("top_coupling", Priority.MEDIUM, f"Top coupling (file pairs){suffix}", top_coupling),
+        Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
+        Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),
     ]
+    return run_checks(checks, db, limit, priorities, **opts)
