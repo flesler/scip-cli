@@ -32,6 +32,22 @@ scip_cli = ["SKILL.md"]
 [tool.setuptools.dynamic]
 version = {attr = "scip_cli.__version__"}
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11",
+    "pytest>=7",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
