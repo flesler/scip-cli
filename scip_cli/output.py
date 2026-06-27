@@ -129,13 +129,14 @@ def _add_line_numbers(body, start_line):
     return "\n".join(numbered)
 
 
-def print_def_truncation_notice(query_name, shown_end, def_end_line):
+def print_def_truncation_notice(query_name, body_offset, lines_shown, def_body_lines):
     """Print stderr hint when a definition body was truncated."""
-    if shown_end >= def_end_line:
+    next_offset = body_offset + lines_shown
+    if next_offset >= def_body_lines:
         return
-    next_offset = shown_end + 1
+    at_line = body_offset + lines_shown
     print(
-        f"Warning: truncated at line {shown_end + 1}/{def_end_line + 1}. "
+        f"Warning: truncated at line {at_line}/{def_body_lines} of definition. "
         f"Continue: code --offset {next_offset} {query_name}",
         file=sys.stderr,
     )

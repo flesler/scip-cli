@@ -6,7 +6,7 @@ from pathlib import Path
 
 from scip_cli.commands.refs import get_exact_refs
 from scip_cli.commands.search import is_noisy_symbol, kind_to_display, parse_symbol
-from scip_cli.output import format_def_body, format_line_range
+from scip_cli.output import format_def_body, format_line_range, print_def_truncation_notice
 from scip_cli.project import detect_language
 from scip_cli.queries import resolve_file, resolve_symbol
 from scip_cli.source import read_source_lines
@@ -422,6 +422,18 @@ class TestFormatDefBody:
         assert body.endswith("...")
 
 
+class TestPrintDefTruncationNotice:
+    def test_body_relative_offset_hint(self, capsys):
+        print_def_truncation_notice("bigFn", body_offset=0, lines_shown=80, def_body_lines=200)
+        err = capsys.readouterr().err
+        assert "80/200 of definition" in err
+        assert "code --offset 80 bigFn" in err
+
+    def test_no_hint_when_fully_shown(self, capsys):
+        print_def_truncation_notice("fn", body_offset=0, lines_shown=50, def_body_lines=50)
+        assert capsys.readouterr().err == ""
+
+
 class TestResolveFile:
     def test_exact_match(self):
         conn = sqlite3.connect(":memory:")
@@ -652,3 +664,23 @@ class TestGetExactRefs:
             refs = get_exact_refs(conn, 1, tmpdir, 2)
             assert len(refs) == 2
             conn.close()
+
+    def test_path_scope_applied_in_sql(self):
+        conn = self._create_test_db()
+        conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (1, "scip-python test/test `a.py`/foo().", "foo"),
+        )
+        conn.execute("INSERT INTO documents (id, relative_path) VALUES (1, 'pkg/a.py'), (2, 'pkg/b.py')")
+        for doc_id, line in ((1, 1), (2, 5), (2, 6), (2, 7)):
+            chunk_id = doc_id * 10 + line
+            conn.execute(
+                "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)",
+                (chunk_id, doc_id, line, line),
+            )
+            conn.execute("INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (?, 1, 0)", (chunk_id,))
+        conn.commit()
+
+        refs = get_exact_refs(conn, 1, "/tmp", 10, path_scope="pkg/a.py")
+        assert refs == [("pkg/a.py", 2)]
+        conn.close()

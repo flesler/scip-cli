@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import re
 import shutil
@@ -88,6 +89,15 @@ def _path_scip_binary() -> Path | None:
     return Path(found)
 
 
+def _safe_tar_member_path(dest_dir: Path, member_name: str) -> Path:
+    """Reject archive paths that escape dest_dir."""
+    dest_root = dest_dir.resolve()
+    target = (dest_root / member_name).resolve()
+    if target != dest_root and not str(target).startswith(f"{dest_root}{os.sep}"):
+        raise RuntimeError(f"unsafe path in scip archive: {member_name}")
+    return target
+
+
 def _download_scip_binary(dest: Path) -> None:
     release_tag = _latest_release_tag()
     archive_name = _platform_archive()
@@ -106,8 +116,10 @@ def _download_scip_binary(dest: Path) -> None:
             members = [m for m in tar.getmembers() if m.name == "scip" or m.name.endswith("/scip")]
             if not members:
                 raise RuntimeError("scip archive did not contain a scip binary")
-            tar.extract(members[0], path=tmpdir)
-            extracted = Path(tmpdir) / members[0].name
+            member = members[0]
+            _safe_tar_member_path(Path(tmpdir), member.name)
+            tar.extract(member, path=tmpdir)
+            extracted = Path(tmpdir) / member.name
             shutil.move(str(extracted), dest)
 
     dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

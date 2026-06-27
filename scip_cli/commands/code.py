@@ -44,6 +44,9 @@ def main(args):
         snippet_mode = getattr(args, "snippet", False)
         full_mode = getattr(args, "full", False)
         offset = getattr(args, "offset", 0)
+        if offset < 0:
+            print(f"Error: --offset must be >= 0, got {offset}", file=sys.stderr)
+            sys.exit(1)
         line_numbers = getattr(args, "line_numbers", False)
 
         if snippet_mode:
@@ -65,6 +68,7 @@ def main(args):
                     continue
 
                 rel_path, start_line, end_line = row
+                def_body_lines = end_line - start_line + 1
                 label = symbol_output_label(query_name, symbol_str, len(symbols))
                 maybe_print_symbol_header(label, show_headers)
 
@@ -98,7 +102,8 @@ def main(args):
                 print(f"{rel_path}:{format_line_range(start_line, end_line)}")
                 print(source_snippet)
                 if truncated:
-                    print_def_truncation_notice(query_name, shown_end, end_line)
+                    lines_shown = shown_end - shown_start + 1 if shown_start is not None else 0
+                    print_def_truncation_notice(query_name, offset, lines_shown, def_body_lines)
                 printed += 1
 
         if printed == 0:

@@ -192,6 +192,7 @@ def main(args):
                 limit,
             )
         else:
+            fetch_limit = max(limit + 1, limit * 5 + 1)
             rows = db.execute(
                 f"""
                 SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
@@ -200,9 +201,8 @@ def main(args):
                 WHERE ({where_clause}){path_clause}
                 LIMIT ?
             """,
-                (*pattern_params, *path_params, limit + 1),
+                (*pattern_params, *path_params, fetch_limit),
             ).fetchall()
-            rows = limit_and_warn(rows, limit, "results")
 
         if not rows:
             pattern_str = " or ".join(f"'{p}'" for p in patterns)
@@ -235,6 +235,8 @@ def main(args):
             pattern_str = " or ".join(f"'{p}'" for p in patterns)
             print(f"No symbols found matching {pattern_str}", file=sys.stderr)
             sys.exit(1)
+
+        results = limit_and_warn(results, limit, "results")
 
         if prefill:
             seen = {(r[0], r[1]) for r in prefill}

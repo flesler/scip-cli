@@ -43,10 +43,13 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     like_patterns = symbol_like_patterns(search_name)
     like_clause = " OR ".join("gs.symbol LIKE ? ESCAPE '\\'" for _ in like_patterns)
 
-    # Skip SQL LIMIT when qualifier_parts present (filtered in Python)
+    # Qualified names need post-filtering; use a generous SQL cap before Python qualifier match.
     if limit and not qualifier_parts:
         limit_clause = "LIMIT ?"
         limit_param = (limit,)
+    elif limit and qualifier_parts:
+        limit_clause = "LIMIT ?"
+        limit_param = (min(limit * 50, 5000),)
     else:
         limit_clause = ""
         limit_param = ()

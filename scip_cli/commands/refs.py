@@ -4,7 +4,7 @@ import sys
 
 from ..cli_args import path_scope_from_args
 from ..output import limit_and_warn, maybe_print_symbol_header, symbol_output_label
-from ..paths import path_in_scope
+from ..paths import path_filter_sql, path_in_scope
 from ..queries import resolve_symbol
 from ..session import setup
 from ..source import read_source_lines
@@ -19,16 +19,17 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
     leaf = extract_leaf_name(sym_row[0])
 
+    path_clause, path_params = path_filter_sql(db, path_scope, doc_alias="d")
     chunks = db.execute(
-        """
+        f"""
         SELECT c.id, c.document_id, c.start_line, c.end_line, d.relative_path
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
         JOIN documents d ON c.document_id = d.id
-        WHERE m.symbol_id = ? AND m.role != 1
+        WHERE m.symbol_id = ? AND m.role != 1{path_clause}
         LIMIT ?
     """,
-        (symbol_id, max_refs + 1),
+        (symbol_id, *path_params, max_refs + 1),
     ).fetchall()
 
     if len(chunks) > max_refs:

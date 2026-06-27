@@ -41,6 +41,10 @@ scip-cli skill                     # familiarize with subcommands and gotchas
 
 **Pre-commit** (`.pre-commit-config.yaml`): `ruff --fix`, `ruff-format`, then full `pytest`. Run `pre-commit run --all-files` before pushing if you skipped hooks.
 
+## Iterate / code review
+
+Reviewers and explore agents: run `scip-cli skill` (or `python -m scip_cli skill`) first for quickstart context before auditing commands vs docs.
+
 ## Test layout (not in SKILL)
 
 - `tests/fixtures/sample-project/` — minimal TS project, indexed once per session

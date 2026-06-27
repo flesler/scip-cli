@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from .cache import find_db, get_cache_dir, index_db_path
+from .cache import cleanup_in_progress_index, find_db, get_cache_dir, index_db_path, promote_next_index
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from .debug import debug_log
 from .discover import discover_typescript_projects
@@ -483,7 +483,20 @@ def get_db(project_root=None):
             raise RuntimeError(f"No supported project markers found in {root}")
 
         cache_dir = get_cache_dir(root)
-        _index_project(root, lang, cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cleanup_in_progress_index(cache_dir)
+        try:
+            _output_db, skipped, total = _index_project(root, lang, cache_dir, replace=True, log=False)
+            promote_next_index(cache_dir)
+            log_index_complete(
+                index_db_path(cache_dir),
+                lang.value,
+                projects=total if total > 1 else None,
+                skipped=skipped,
+            )
+        except RuntimeError:
+            cleanup_in_progress_index(cache_dir)
+            raise
 
         db_path = find_db(project_root)
         if not db_path:
