@@ -106,7 +106,7 @@ scip-cli <command> [arguments]
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `members <symbol>` - List members of a class/interface (`--path`)
-- `reindex` - Force re-indexing of the current project
+- `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
 - `skill [path]` - Install or dump the SKILL.md
 
 ### Examples
@@ -161,7 +161,7 @@ scip-cli members Widget --names-only | xargs -I{} scip-cli def Widget.{}
 2. For TypeScript monorepos, walks the repository for `tsconfig*.json` project roots (nested ancestors deduped; root included only when its `include` is broad)
 3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), or `scip-python` for Python
 4. Converts each SCIP output to SQLite with `scip expt-convert`, then merges partial databases when needed
-5. Caches the result in `~/.cache/scip-cli/projects/<project-hash>-<config-hash>/index.db`
+5. Caches the result in `~/.cache/scip-cli/projects/<dirname>-<hash>/index.db` (e.g. `my-monorepo-1a3f7a`)
 6. Subsequent queries are SQLite lookups against that cache (not re-indexing)
 
 ## Configuration
@@ -182,7 +182,16 @@ Optional `.scip-cli.json` in the project root:
 
 `SCIP_CLI_INDEX_WORKERS` controls parallel `scip-typescript` runs during first index (default: up to 8). Merge into one database is always serial.
 
-Changing `.scip-cli.json` indexing options (`indexRoots`, `onlyIndexRoots`) uses a separate cache entry automatically. Run `scip-cli reindex` after code changes — the cache does not auto-invalidate when sources change.
+Scoped indexing without editing `.scip-cli.json`:
+
+```bash
+scip-cli reindex --path entrypoints/server
+scip-cli reindex --path packages/api --path packages/worker
+```
+
+`--path` limits which discovered tsconfig projects are indexed (prefix match, same idea as query `--path`). The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`.
+
+Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or when you want a fresh index.
 
 This is separate from `.scipquery.json`, which belongs to [scip-query](https://github.com/PlunderStruck/scip-query) and configures its analyzers, watch mode, and diff-gate — not read by scip-cli.
 

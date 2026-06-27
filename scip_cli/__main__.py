@@ -87,7 +87,13 @@ def main():
     skill_parser.add_argument("path", nargs="?", help="Optional file path to write to (creates dirs)")
 
     # reindex
-    subparsers.add_parser("reindex", help="Force re-indexing of the current project")
+    reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")
+    reindex_parser.add_argument(
+        "--path",
+        action="append",
+        metavar="PATH",
+        help="Index only tsconfig projects under PATH (repeatable; persisted until full reindex)",
+    )
 
     args = parser.parse_args()
 

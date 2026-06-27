@@ -11,10 +11,11 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from .cache import find_db, get_cache_dir, warn_if_stale_index, write_index_meta
+from .cache import find_db, get_cache_dir, index_db_path
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from .constants import DEFAULT_MAX_HEAP_MB, INDEX_TIMEOUT, SCIP_INSTALL_URL, default_index_workers
 from .discover import discover_typescript_projects
+from .scope import load_index_scope, projects_matching_scope
 from .merge import merge_sqlite_indexes
 from .project import detect_language, find_project_root
 from .scip_tool import ensure_scip_binary
@@ -74,6 +75,16 @@ def indexer_env(project_root=None):
 def typescript_projects(root: Path) -> list[Path]:
     """Resolve the TypeScript project list for a repository."""
     settings = load_project_config(root)
+    scope = load_index_scope(root)
+
+    if scope is not None:
+        discovered = list(discover_typescript_projects(root))
+        filtered = projects_matching_scope(discovered, scope.paths)
+        if not filtered:
+            joined = ", ".join(scope.paths)
+            raise RuntimeError(f"No TypeScript projects found under index scope: {joined}")
+        return sorted(filtered, key=str)
+
     configured = resolve_index_roots(root, settings) if settings.index_roots else []
 
     if settings.only_index_roots:
@@ -136,11 +147,10 @@ def _warn_old_scip(binary):
         )
 
 
-def _convert_scip_to_db(scip_path, cache_dir):
-    """Convert a SCIP protobuf file to SQLite in cache_dir/index.db."""
-    cache_dir = Path(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    db_path = cache_dir / "index.db"
+def _convert_scip_to_db(scip_path, db_path):
+    """Convert a SCIP protobuf file to a SQLite index at db_path."""
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()
 
@@ -148,8 +158,8 @@ def _convert_scip_to_db(scip_path, cache_dir):
     _warn_old_scip(scip_binary)
 
     result = _run_subprocess(
-        [scip_binary, "expt-convert", str(scip_path), "--output", "index.db"],
-        cwd=str(cache_dir),
+        [scip_binary, "expt-convert", str(scip_path), "--output", db_path.name],
+        cwd=str(db_path.parent),
     )
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
@@ -197,14 +207,15 @@ def _index_one_ts_project(root, project, work_dir, env):
     )
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
-    _convert_scip_to_db(part_scip, work_dir)
+    _convert_scip_to_db(part_scip, work_dir / "index.db")
     return label, work_dir / "index.db", None
 
 
-def _index_typescript(root, cache_dir, projects, env):
-    """Index one or more TypeScript projects and write cache_dir/index.db."""
+def _index_typescript(root, cache_dir, projects, env, *, replace=False):
+    """Index one or more TypeScript projects and write the merged index.db."""
     root = Path(root)
     cache_dir = Path(cache_dir)
+    output_db = index_db_path(cache_dir, replace=replace)
     workers = _index_workers()
     use_parallel = len(projects) > 1 and workers > 1
 
@@ -286,20 +297,12 @@ def _index_typescript(root, cache_dir, projects, env):
             )
 
         if len(part_dbs) == 1:
-            shutil.copy2(part_dbs[0], cache_dir / "index.db")
+            shutil.copy2(part_dbs[0], output_db)
         else:
-            merge_sqlite_indexes(part_dbs, cache_dir / "index.db")
-
-        write_index_meta(
-            cache_dir,
-            language="typescript",
-            project_count=indexed,
-            skipped=skipped,
-            parallel_workers=workers if use_parallel else 1,
-        )
+            merge_sqlite_indexes(part_dbs, output_db)
 
 
-def _index_project(root, lang, cache_dir):
+def _index_project(root, lang, cache_dir, *, replace=False):
     """Run the language-specific indexer and convert to DB."""
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -313,7 +316,7 @@ def _index_project(root, lang, cache_dir):
                 f"Indexing {len(projects)} TypeScript projects",
                 file=sys.stderr,
             )
-        _index_typescript(root, cache_dir, projects, env)
+        _index_typescript(root, cache_dir, projects, env, replace=replace)
         return
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -333,8 +336,7 @@ def _index_project(root, lang, cache_dir):
             print(result.stderr, file=sys.stderr)
             raise RuntimeError("Failed to index project")
 
-        _convert_scip_to_db(index_scip, cache_dir)
-        write_index_meta(cache_dir, language=lang, project_count=1, skipped=0, parallel_workers=1)
+        _convert_scip_to_db(index_scip, index_db_path(cache_dir, replace=replace))
 
 
 def get_db(project_root=None):
@@ -360,8 +362,6 @@ def get_db(project_root=None):
         db_path = find_db(project_root)
         if not db_path:
             raise RuntimeError("No index.db found after indexing")
-    else:
-        warn_if_stale_index(db_path.parent)
 
     from .sql import configure_read_connection
 
