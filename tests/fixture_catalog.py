@@ -1,0 +1,17 @@
+"""Stable names and paths in tests/fixtures/sample-project."""
+
+HELPER_FILE = "src/helper.ts"
+WIDGET_FILE = "src/widget.ts"
+USER_FILE = "src/user.ts"
+CONSUMER_FILE = "src/consumer.ts"
+LIB_HANDLER_FILE = "src/lib/handler.ts"
+APP_HANDLER_FILE = "src/app/handler.ts"
+
+FN_GREET = "greet"
+CLASS_WIDGET = "Widget"
+TYPE_OPTIONS = "Options"
+FIELD_VERBOSE = "verbose"
+CLASS_HANDLER = "Handler"
+CONST_VERSION = "VERSION"
+FN_ORPHAN = "orphanExport"
+METHOD_RUN = "Widget.run"

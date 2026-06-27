@@ -1,9 +1,6 @@
 """Tests for qualified symbols, type-literal fields, and members."""
 
 import sqlite3
-import subprocess
-
-import pytest
 
 from scip_cli.queries import get_members, resolve_symbol
 from scip_cli.symbols import extract_leaf_name, symbol_matches_qualifier
@@ -101,40 +98,3 @@ class TestGetMembers:
         assert "enclosing_symbol" not in cols
         assert len(get_members(db, parent_id)) == 1
         db.close()
-
-
-@pytest.mark.integration
-class TestQualifiedSmoke:
-    def test_search_options_verbose(self, smoke_cli, indexed_sample_project):
-        result = subprocess.run(
-            [smoke_cli, "search", "Options.verbose", "--limit", "3"],
-            cwd=indexed_sample_project,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0
-        assert "verbose" in result.stdout
-
-    def test_members_options_includes_verbose(self, smoke_cli, indexed_sample_project):
-        result = subprocess.run(
-            [smoke_cli, "members", "Options", "--names-only"],
-            cwd=indexed_sample_project,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0
-        assert "verbose" in result.stdout
-
-    def test_search_multi_pattern_qualified_and_bare(self, smoke_cli, indexed_sample_project):
-        result = subprocess.run(
-            [smoke_cli, "search", "Widget.run", "greet", "--limit", "5"],
-            cwd=indexed_sample_project,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0
-        assert "run" in result.stdout
-        assert "greet" in result.stdout

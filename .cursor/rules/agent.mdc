@@ -1,0 +1,71 @@
+---
+description: scip-cli dev workflow and TDD with the shared fixture
+alwaysApply: true
+---
+
+# scip-cli agent
+
+**Work from repo root.** Command usage, flags, and gotchas live in `scip_cli/SKILL.md` — run once after setup:
+
+```bash
+scip-cli skill
+```
+
+Do not duplicate SKILL content here; read it (or the command output) when implementing or testing CLI behavior.
+
+## Bootstrap (from scratch)
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+pre-commit install                 # ruff + ruff-format + pytest on commit
+scip-cli --version
+scip-cli skill                     # familiarize with subcommands and gotchas
+```
+
+- Use **`.venv/bin/scip-cli`** / **`.venv/bin/pytest`** — global `pip install scip-cli` may be stale.
+- **Node.js + `npx`** required for integration tests (real `scip-typescript` indexing).
+- Optional: `SCIP_CLI_DEBUG=1` for SQL logging to stderr.
+
+## Test / lint / format
+
+| Task | Command |
+|------|---------|
+| Full suite | `.venv/bin/pytest` |
+| E2e only (fast loop) | `.venv/bin/pytest tests/test_e2e.py` |
+| Integration marker | `.venv/bin/pytest -m integration` |
+| Lint | `.venv/bin/ruff check .` |
+| Format | `.venv/bin/ruff format .` |
+| Fix lint | `.venv/bin/ruff check --fix .` |
+
+**Pre-commit** (`.pre-commit-config.yaml`): `ruff --fix`, `ruff-format`, then full `pytest`. Run `pre-commit run --all-files` before pushing if you skipped hooks.
+
+## Test layout (not in SKILL)
+
+- `tests/fixtures/sample-project/` — minimal TS project, indexed once per session
+- `tests/e2e_harness.py` — in-process CLI (`cli.run("code", "greet")`)
+- `tests/fixture_catalog.py` — stable symbol/path constants
+- `tests/analyze_db.py` — synthetic DB for analyze SQL unit tests
+- `dogfood.md` — future improvements from real usage (not a changelog)
+
+## TDD (preferred for commands)
+
+1. **Red** — add a case to `tests/test_e2e.py` using `cli` + `fixture_catalog`.
+2. **Green** — implement in `scip_cli/commands/*.py`.
+3. **Refactor** — unit tests for pure helpers only; don't mock what the fixture covers.
+
+```python
+def test_my_behavior(self, cli):
+    r = cli.run("code", FN_GREET, "--snippet")
+    assert r.returncode == 0
+    assert "function greet" in r.stdout
+```
+
+- **E2e** (`cli`): real index — default for behavior changes.
+- **Unit** (`:memory:` / `AnalyzeDbBuilder`): merge, formatters, SQL edge cases.
+- Skip subprocess; use `run_cli` / `CliRunner`.
+- Extend `sample-project` + `fixture_catalog` for new symbols.
+- `reindex` not in e2e (mutates cache).
+
+Iterate with `pytest tests/test_e2e.py`; full `pytest` before committing.

@@ -55,5 +55,5 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-q --tb=line --no-header"
 markers = [
-    "integration: indexes the bundled sample project (requires scip-typescript)",
+    "integration: uses the shared indexed TS fixture (requires npx / scip-typescript)",
 ]
