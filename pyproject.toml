@@ -55,7 +55,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v"
+addopts = "-q --tb=line"
 markers = [
     "integration: indexes the bundled sample project (requires scip-typescript)",
 ]

@@ -58,6 +58,12 @@ def main(args):
                 continue
 
             lines = read_source_lines(project_root, rel_path, start_line, end_line)
+            if lines is not None and offset >= len(lines):
+                print(
+                    f"# Warning: offset {offset} is beyond definition (lines {start_line + 1}-{end_line + 1})",
+                    file=sys.stderr,
+                )
+
             source_snippet, truncated, shown_start, shown_end = format_def_body(
                 lines, start_line, end_line, max_lines=max_def_lines, offset=offset
             )
