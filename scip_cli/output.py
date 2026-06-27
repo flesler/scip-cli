@@ -68,7 +68,7 @@ def resolve_max_def_lines(cli_value=None):
     return DEFAULT_MAX_DEF_LINES
 
 
-def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None):
+def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None, offset=0):
     """Format definition source with optional truncation for agent-safe output."""
     if lines is None:
         return "(could not read source)", False, start_line, end_line
@@ -82,6 +82,11 @@ def format_def_body(lines, start_line, end_line, max_lines=None, max_chars=None)
 
     selected = list(lines)
     truncated = False
+
+    # Apply offset first
+    if offset > 0:
+        selected = selected[offset:]
+        start_line = start_line + offset
 
     if max_lines > 0 and len(selected) > max_lines:
         selected = selected[:max_lines]
@@ -114,6 +119,6 @@ def print_def_truncation_notice(
         f"# Warning: definition truncated for '{rel_path}' "
         f"(showing lines {shown_start + 1}-{shown_end + 1} of "
         f"{start_line + 1}-{end_line + 1}; {omitted} lines omitted). "
-        f"Use `scip-cli code --max-lines 0 <symbol>` or Read the file with offset/limit.",
+        f"Use `scip-cli code --full --offset {shown_end + 1} <symbol>` to see the rest.",
         file=sys.stderr,
     )

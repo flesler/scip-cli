@@ -29,7 +29,15 @@ def main(args):
         symbols = limit_and_warn(symbols, limit, "symbols")
 
         snippet_mode = getattr(args, "snippet", False)
-        max_def_lines = 1 if snippet_mode else resolve_max_def_lines(getattr(args, "max_lines", None))
+        full_mode = getattr(args, "full", False)
+        offset = getattr(args, "offset", 0)
+
+        if snippet_mode:
+            max_def_lines = 1
+        elif full_mode:
+            max_def_lines = 0
+        else:
+            max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
 
         for symbol_id, symbol_str, _display_name in symbols:
             row = get_def_location(db, symbol_id)
@@ -51,7 +59,7 @@ def main(args):
 
             lines = read_source_lines(project_root, rel_path, start_line, end_line)
             source_snippet, truncated, shown_start, shown_end = format_def_body(
-                lines, start_line, end_line, max_lines=max_def_lines
+                lines, start_line, end_line, max_lines=max_def_lines, offset=offset
             )
 
             print(f"{rel_path}:{format_line_range(start_line, end_line)}")

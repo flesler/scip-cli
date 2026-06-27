@@ -47,6 +47,18 @@ def main():
         help=("Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). Use 0 for unlimited."),
     )
     code_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Show full definition (equivalent to --max-lines 0)",
+    )
+    code_parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Skip first N lines of definition (use with --max-lines for pagination)",
+    )
+    code_parser.add_argument(
         "--snippet",
         action="store_true",
         help="Show only file, line range, and first line (not full body)",
