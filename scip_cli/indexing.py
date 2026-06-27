@@ -13,12 +13,20 @@ from pathlib import Path
 
 from .cache import find_db, get_cache_dir, index_db_path
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
-from .constants import DEFAULT_MAX_HEAP_MB, INDEX_TIMEOUT, SCIP_INSTALL_URL, default_index_workers
 from .discover import discover_typescript_projects
 from .scope import load_index_scope, projects_matching_scope
 from .merge import merge_sqlite_indexes
 from .project import detect_language, find_project_root
 from .scip_tool import ensure_scip_binary
+
+INDEX_TIMEOUT = 300
+DEFAULT_MAX_HEAP_MB = 8192
+SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
+
+
+def default_index_workers() -> int:
+    """Default parallel TypeScript project indexers (merge stays single-threaded)."""
+    return min(8, os.cpu_count() or 4)
 
 _scip_version_warned = False
 

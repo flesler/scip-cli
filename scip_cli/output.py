@@ -2,7 +2,8 @@
 import os
 import sys
 
-from .constants import DEFAULT_MAX_DEF_CHARS, DEFAULT_MAX_DEF_LINES
+DEFAULT_MAX_DEF_LINES = 80
+DEFAULT_MAX_DEF_CHARS = 32_000
 from .symbols import extract_file_path_from_symbol, extract_leaf_name
 
 

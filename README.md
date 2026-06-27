@@ -215,7 +215,6 @@ scip_cli/
 ├── discover.py      # TypeScript project discovery
 ├── merge.py         # SQLite index merging
 ├── scip_tool.py     # scip binary download
-├── constants.py     # Shared constants
 ├── sql.py           # SQLite helpers
 ├── paths.py         # --path scope filtering
 ├── project.py       # Project root + language detection
