@@ -107,7 +107,7 @@ scip-cli <command> [arguments]
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `members <symbol>` - List members of a class/interface (`--path`)
-- `analyze [target]` - SQL health dashboards (`--limit`, `--include-tests`). No target: project-wide. File or symbol target for scoped checks. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
+- `analyze [target]` - SQL health dashboards (`--limit`, `--priority`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
 - `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
 - `skill [path]` - Install or dump the SKILL.md
 
@@ -281,7 +281,7 @@ scip_cli/
 ├── source.py        # Filesystem source reads
 ├── output.py        # CLI formatting helpers
 ├── session.py       # setup() and single-match resolution
-├── targets.py       # file vs symbol target heuristics
+├── targets.py       # file-path heuristics (tests; analyze uses analyze/targets.py)
 ├── analyze/         # SQL dashboard queries (project/file/symbol)
 └── commands/        # Subcommand implementations
 ```

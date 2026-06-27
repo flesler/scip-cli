@@ -5,11 +5,18 @@ import sys
 from ..analyze import file as file_checks
 from ..analyze import project as project_checks
 from ..analyze import symbol as symbol_checks
-from ..analyze.common import section
+from ..analyze.common import is_test_path, section
 from ..analyze.sections import parse_priorities
 from ..analyze.targets import MAX_DIR_FILES, list_dir_files, resolve_analyze_target
 from ..cli_args import path_scope_from_args
 from ..session import resolve_one_symbol, setup
+
+
+def _project_include_tests(include_tests: bool, scope: str | None) -> bool:
+    """File-target analyze always includes that file, even when it is a test path."""
+    if scope and is_test_path(scope):
+        return True
+    return include_tests
 
 
 def _print_sections(sections: list[tuple[str, list[str]]]) -> None:
@@ -58,7 +65,12 @@ def _dir_sections(
     )
     files = list_dir_files(db, scope, include_tests=include_tests)
     total = len(files)
-    if total > MAX_DIR_FILES:
+    if total == 0:
+        print(
+            f"Note: no indexed files under {scope} (check path or run scip-cli reindex)",
+            file=sys.stderr,
+        )
+    elif total > MAX_DIR_FILES:
         print(
             f"Note: {total} indexed files under {scope}; showing first {MAX_DIR_FILES} "
             f"(analyze one file for full detail)",
@@ -107,10 +119,11 @@ def main(args):
                     priorities=priorities,
                 )
             elif resolved.kind == "file":
+                file_include = _project_include_tests(include_tests, resolved.scope)
                 sections = _project_sections(
                     db,
                     limit=limit,
-                    include_tests=include_tests,
+                    include_tests=file_include,
                     scope=resolved.scope,
                     priorities=priorities,
                 )

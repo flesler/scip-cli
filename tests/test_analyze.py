@@ -201,6 +201,13 @@ class TestAnalyzeSections:
 
 
 class TestAnalyzeCommand:
+    def test_project_include_tests_for_test_file_path(self):
+        from scip_cli.commands.analyze import _project_include_tests
+
+        assert _project_include_tests(False, "tests/test_foo.py") is True
+        assert _project_include_tests(False, "scip_cli/queries.py") is False
+        assert _project_include_tests(True, "scip_cli/queries.py") is True
+
     def test_project_analyze_rejects_path(self, tmp_path, monkeypatch):
         from argparse import Namespace
 

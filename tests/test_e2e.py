@@ -154,7 +154,14 @@ class TestAnalyze:
     def test_project_dashboard(self, cli):
         result = cli.run("analyze", "--limit", "5")
         assert result.returncode == 0
-        assert result.stdout.strip()
+        assert "[high]" in result.stdout
+        assert "===" in result.stdout
+
+    def test_priority_high_skips_low(self, cli):
+        result = cli.run("analyze", "--priority", "high", "--limit", "5")
+        assert result.returncode == 0
+        assert "[high]" in result.stdout
+        assert "[low]" not in result.stdout
 
 
 class TestIndex:

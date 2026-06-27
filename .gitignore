@@ -50,3 +50,4 @@ dogfood.md
 
 # Local-only dev scripts (repo-specific smoke harnesses)
 scripts/deep-smoke.sh
+tmp/
