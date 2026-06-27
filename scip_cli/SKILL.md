@@ -124,7 +124,7 @@ analyze [--limit N] [--path PATH] [--include-tests] [target]
 | **file** | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
 | **symbol** | Symbol pressure, consumers, dependencies, affected |
 
-Sections are ordered **high → medium → low** priority so `--limit` surfaces actionable rows first. Labels: `[high]` dead code & cycles, `[medium]` coupling & change surface, `[low]` bottlenecks & hotspots.
+Sections are ordered **high → medium → low** so `--limit` surfaces actionable rows first. Labels: `[high]` cycles, dead exports, stale types; `[medium]` change surface & consumers; `[low]` coupling, bottlenecks, hotspots.
 
 `--priority high` or `--priority high,medium` (also `1`/`2`/`3`) skips lower tiers.
 

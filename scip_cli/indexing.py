@@ -144,7 +144,7 @@ def typescript_projects(root: Path) -> list[Path]:
     return sorted(merged.values(), key=str)
 
 
-def run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None):
+def _run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None):
     """Try binary first, fallback to npx if not found."""
     run_env = env if env is not None else os.environ.copy()
     npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
@@ -340,7 +340,7 @@ def _index_one_ts_project(root, project, work_dir, env):
     label = "." if project == Path(".") else str(project)
     part_scip = work_dir / "index.scip"
     index_args = _typescript_index_args(root, part_scip, [project])
-    result = run_with_fallback(
+    result = _run_with_fallback(
         "scip-typescript",
         "@sourcegraph/scip-typescript",
         str(root),
@@ -451,7 +451,7 @@ def _index_project(root, lang, cache_dir, *, replace=False, log=True):
     with tempfile.TemporaryDirectory() as tmpdir:
         index_scip = os.path.join(tmpdir, "index.scip")
         if lang == Language.PYTHON:
-            result = run_with_fallback(
+            result = _run_with_fallback(
                 "scip-python",
                 "@sourcegraph/scip-python",
                 str(root),

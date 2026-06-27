@@ -74,14 +74,14 @@ class TestProjectAnalyze:
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
         assert titles[-1].startswith("[low]")
-        assert "Hotspots" in titles[-1]
+        assert "Top coupling" in titles[-1]
 
     def test_run_all_high_priority_only(self):
         from scip_cli.analyze.sections import Priority
 
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=5, priorities={Priority.HIGH})
-        assert len(sections) == 2
+        assert len(sections) == 3
         titles = [title for title, _lines in sections]
         assert all("[high]" in title for title in titles)
 

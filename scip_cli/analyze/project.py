@@ -299,8 +299,8 @@ def run_all(
     checks = [
         Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
         Check("dead_exports", Priority.HIGH, f"Dead exports (no external refs){suffix}", dead_exports),
-        Check("stale_types", Priority.MEDIUM, f"Stale types (≤1 external consumer){suffix}", stale_types),
-        Check("top_coupling", Priority.MEDIUM, f"Top coupling (file pairs){suffix}", top_coupling),
+        Check("stale_types", Priority.HIGH, f"Stale types (≤1 external consumer){suffix}", stale_types),
+        Check("top_coupling", Priority.LOW, f"Top coupling (file pairs){suffix}", top_coupling),
         Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
         Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),
     ]

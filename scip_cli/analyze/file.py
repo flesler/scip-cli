@@ -222,8 +222,8 @@ def _file_checks(relative_path: str, *, include_top_symbols: bool) -> list[Check
         Check("dead_in_file", Priority.HIGH, f"Dead exports in file {title}", _bind_path(dead_in_file, relative_path)),
         Check("unused_imports", Priority.HIGH, f"Unused imports {title}", _bind_path(unused_imports, relative_path)),
         Check("change_surface", Priority.MEDIUM, f"Change surface {title}", _bind_path(change_surface, relative_path)),
-        Check("coupling", Priority.MEDIUM, f"Coupling partners {title}", _bind_path(coupling_for, relative_path)),
         Check("file_consumers", Priority.MEDIUM, f"File consumers {title}", _bind_path(file_consumers, relative_path)),
+        Check("coupling", Priority.LOW, f"Coupling partners {title}", _bind_path(coupling_for, relative_path)),
         Check("imports_summary", Priority.LOW, f"Imports summary {title}", _bind_path(imports_summary, relative_path)),
     ]
     if include_top_symbols:

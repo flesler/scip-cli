@@ -3,27 +3,33 @@
 [![PyPI version](https://badge.fury.io/py/scip-cli.svg)](https://badge.fury.io/py/scip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Fast code intelligence CLI for TypeScript/JavaScript and Python projects. Query SCIP indexes directly via SQLite for instant results.
+Token-efficient code intelligence for AI agents. Precise refs, definitions, and repo health analysis via SCIP indexes — TypeScript/JavaScript and Python.
+
+## Why
+
+AI agents waste tokens on grep and file scanning. scip-cli gives them precise, type-aware code navigation in milliseconds — and `analyze` surfaces dead code, cycles, and coupling so agents (and humans) can fix real problems fast.
 
 ## Features
 
-- **Fast**: Direct SQLite queries, eliminating skippable overhead
-- **Simple**: Single binary with subcommands
-- **Auto-indexing**: Automatically indexes projects on first query
-- **Token-efficient**: Clean, minimal output optimized for AI consumption
+- **Agent-first**: Install as a skill for Claude Code, Cursor, or any AI agent — precise code navigation without burning context
+- **Token-efficient**: One record per line, stderr for warnings, pipe-friendly output
+- **Fast**: Direct SQLite queries — 10x to 213x faster than alternatives
+- **`analyze`**: Find dead exports, import cycles, stale types, coupling hotspots — actionable health dashboards at project, file, or symbol scope
+- **Auto-indexing**: Indexes on first query, caches in SQLite, zero config
 
 ## For AI Agents
 
-If you're an AI agent, run this to see the quick reference:
+Install as a reusable skill so your agent always knows how to navigate the codebase:
+
+```bash
+scip-cli skill ~/.claude/skills/scip-cli/   # Claude Code
+scip-cli skill ~/.cursor/skills/scip-cli/   # Cursor
+```
+
+Or dump the quick reference for one-off use:
 
 ```bash
 scip-cli skill
-```
-
-Or install it to your skills folder:
-
-```bash
-scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 ```
 
 ## Installation
@@ -205,7 +211,7 @@ scip-cli analyze --limit 25
 scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 ```
 
-Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order (dead code and cycles first; bottlenecks/hotspots last).
+Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order. **High** = cycles, dead exports, stale types (nuke candidates). **Medium** = change-surface context. **Low** = coupling, bottlenecks, hotspots (informational).
 
 **What to look at first**
 

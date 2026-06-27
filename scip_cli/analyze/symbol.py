@@ -172,10 +172,10 @@ def run_all(
     checks = [
         Check("consumer_files", Priority.HIGH, "Consumer files (direct)", _bind_symbol(consumer_files, symbol_id)),
         Check("dependencies", Priority.HIGH, "Dependencies (cross-file)", _bind_symbol(dependencies, symbol_id)),
-        Check("affected", Priority.MEDIUM, "Affected (transitive, coarse)", _bind_symbol(affected, symbol_id)),
+        Check("affected", Priority.LOW, "Affected (transitive, coarse)", _bind_symbol(affected, symbol_id)),
         Check(
             "symbol_pressure",
-            Priority.MEDIUM,
+            Priority.LOW,
             "Symbol pressure (loc x fan metrics)",
             _bind_symbol0(symbol_pressure, symbol_id),
         ),
