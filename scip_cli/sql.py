@@ -1,4 +1,5 @@
 """SQLite helpers shared across query modules."""
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,9 @@ def escape_like(s):
 
 def configure_read_connection(db):
     """Tune SQLite for read-heavy CLI queries."""
-    db.execute("PRAGMA query_only = ON")
-    db.execute("PRAGMA temp_store = MEMORY")
-    db.execute("PRAGMA cache_size = -64000")
-    db.execute("PRAGMA mmap_size = 268435456")
+    db.executescript("""
+        PRAGMA query_only = ON;
+        PRAGMA temp_store = MEMORY;
+        PRAGMA cache_size = -64000;
+        PRAGMA mmap_size = 268435456;
+    """)

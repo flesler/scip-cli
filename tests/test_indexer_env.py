@@ -1,4 +1,5 @@
 """Tests for indexer environment defaults."""
+
 from scip_cli.indexing import DEFAULT_MAX_HEAP_MB
 from scip_cli.indexing import indexer_env as _indexer_env
 

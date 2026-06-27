@@ -1,4 +1,5 @@
 """code command - find symbol definitions."""
+
 import sys
 
 from ..cli_args import path_scope_from_args
@@ -20,15 +21,13 @@ def main(args):
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
-        symbols = resolve_symbol(
-            db, args.symbol, args.kind, limit=limit + 1, path_scope=path_scope
-        )
+        symbols = resolve_symbol(db, args.symbol, args.kind, limit=limit + 1, path_scope=path_scope)
         if not symbols:
             print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
             sys.exit(1)
 
         symbols = limit_and_warn(symbols, limit, "symbols")
-        
+
         if getattr(args, "snippet", False):
             max_def_lines = 1
         else:
@@ -57,8 +56,6 @@ def main(args):
             print(f"{rel_path}:{format_line_range(start_line, end_line)}")
             print(source_snippet)
             if truncated:
-                print_def_truncation_notice(
-                    rel_path, start_line, end_line, shown_start, shown_end
-                )
+                print_def_truncation_notice(rel_path, start_line, end_line, shown_start, shown_end)
     finally:
         db.close()

@@ -1,4 +1,5 @@
 """Persisted index scope for scoped reindex without editing .scip-cli.json."""
+
 from __future__ import annotations
 
 import hashlib

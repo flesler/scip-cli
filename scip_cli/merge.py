@@ -1,4 +1,5 @@
 """Merge SCIP SQLite indexes produced from separate TypeScript projects."""
+
 from __future__ import annotations
 
 import shutil
@@ -68,8 +69,8 @@ def _merge_one_database(dest: sqlite3.Connection, part_path: Path) -> None:
             FROM src.chunks src
             JOIN doc_map dm ON dm.old_id = src.document_id
             WHERE NOT EXISTS (
-                SELECT 1 FROM chunks 
-                WHERE document_id = dm.new_id 
+                SELECT 1 FROM chunks
+                WHERE document_id = dm.new_id
                 AND chunk_index = src.chunk_index
             )
         """)

@@ -1,4 +1,5 @@
 """refs command - find all references to a symbol."""
+
 import sys
 
 from ..cli_args import path_scope_from_args
@@ -18,14 +19,17 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
     leaf = extract_leaf_name(sym_row[0])
 
-    chunks = db.execute("""
+    chunks = db.execute(
+        """
         SELECT c.id, c.document_id, c.start_line, c.end_line, d.relative_path
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
         JOIN documents d ON c.document_id = d.id
         WHERE m.symbol_id = ? AND m.role != 1
         LIMIT ?
-    """, (symbol_id, max_refs + 1)).fetchall()
+    """,
+        (symbol_id, max_refs + 1),
+    ).fetchall()
 
     if len(chunks) > max_refs:
         chunks = chunks[:max_refs]
@@ -37,14 +41,14 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
     by_doc = {}
     for chunk_id, doc_id, start_line, end_line, rel_path in chunks:
         if doc_id not in by_doc:
-            by_doc[doc_id] = {'path': rel_path, 'chunks': []}
-        by_doc[doc_id]['chunks'].append((chunk_id, start_line, end_line))
+            by_doc[doc_id] = {"path": rel_path, "chunks": []}
+        by_doc[doc_id]["chunks"].append((chunk_id, start_line, end_line))
 
     results = []
 
     for _doc_id, info in by_doc.items():
-        rel_path = info['path']
-        chunks_list = info['chunks']
+        rel_path = info["path"]
+        chunks_list = info["chunks"]
         if not chunks_list:
             continue
 

@@ -1,10 +1,12 @@
 """CLI output formatting helpers."""
+
 import os
 import sys
 
+from .symbols import extract_file_path_from_symbol, extract_leaf_name
+
 DEFAULT_MAX_DEF_LINES = 80
 DEFAULT_MAX_DEF_CHARS = 32_000
-from .symbols import extract_file_path_from_symbol, extract_leaf_name
 
 
 def _ambiguous_label(match):
@@ -57,9 +59,7 @@ def resolve_max_def_lines(cli_value=None):
         try:
             return int(env)
         except ValueError:
-            raise RuntimeError(
-                f"Invalid SCIP_CLI_MAX_DEF_LINES: expected an integer, got {env!r}"
-            ) from None
+            raise RuntimeError(f"Invalid SCIP_CLI_MAX_DEF_LINES: expected an integer, got {env!r}") from None
     return DEFAULT_MAX_DEF_LINES
 
 
@@ -109,6 +109,6 @@ def print_def_truncation_notice(
         f"# Warning: definition truncated for '{rel_path}' "
         f"(showing lines {shown_start + 1}-{shown_end + 1} of "
         f"{start_line + 1}-{end_line + 1}; {omitted} lines omitted). "
-        f"Use `scip-cli def --max-lines 0 <symbol>` or Read the file with offset/limit.",
+        f"Use `scip-cli code --max-lines 0 <symbol>` or Read the file with offset/limit.",
         file=sys.stderr,
     )

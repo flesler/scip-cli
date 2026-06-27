@@ -1,4 +1,5 @@
 """Path scope helpers for --path filtering."""
+
 from pathlib import Path
 
 from .sql import debug_execute, escape_like
@@ -37,9 +38,7 @@ def path_filter_sql(db, scope: str | None, doc_alias: str = "d") -> tuple[str, l
 
     col = f"{doc_alias}.relative_path"
     is_file = (
-        debug_execute(db, "SELECT 1 FROM documents WHERE relative_path = ? LIMIT 1", (scope,))
-        .fetchone()
-        is not None
+        debug_execute(db, "SELECT 1 FROM documents WHERE relative_path = ? LIMIT 1", (scope,)).fetchone() is not None
     )
     if is_file:
         return f" AND {col} = ?", [scope]

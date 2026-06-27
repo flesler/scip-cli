@@ -1,4 +1,5 @@
 """Force re-indexing of the current project."""
+
 import sys
 
 from ..cache import (
@@ -9,12 +10,12 @@ from ..cache import (
 )
 from ..indexing import _index_project
 from ..paths import normalize_path_scope
-from ..project import detect_language, find_project_root
+from ..project import find_project_root_and_language
 from ..scope import save_index_scope
 
 
 def main(args):
-    root = find_project_root()
+    root, lang = find_project_root_and_language()
     if not root:
         print("Error: Could not find project root", file=sys.stderr)
         sys.exit(1)
@@ -31,7 +32,6 @@ def main(args):
     cache_dir.mkdir(parents=True, exist_ok=True)
     cleanup_in_progress_index(cache_dir)
 
-    lang = detect_language(root)
     if lang is None:
         print(f"Error: No supported project markers found in {root}", file=sys.stderr)
         sys.exit(1)

@@ -1,4 +1,5 @@
 """Shared CLI argument helpers."""
+
 import argparse
 
 

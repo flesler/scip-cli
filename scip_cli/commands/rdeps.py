@@ -1,4 +1,5 @@
 """rdeps command - find reverse dependencies of a file."""
+
 import sys
 
 from ..cli_args import path_scope_from_args

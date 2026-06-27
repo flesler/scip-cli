@@ -1,4 +1,5 @@
 """Tests for TypeScript project discovery."""
+
 import json
 from pathlib import Path
 

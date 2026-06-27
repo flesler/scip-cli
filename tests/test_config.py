@@ -1,4 +1,5 @@
 """Tests for project configuration."""
+
 import json
 from pathlib import Path
 

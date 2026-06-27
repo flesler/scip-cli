@@ -1,4 +1,5 @@
 """Tests for TypeScript project list resolution."""
+
 import json
 from pathlib import Path
 

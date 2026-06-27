@@ -1,4 +1,5 @@
 """Tests for pure functions in scip_cli."""
+
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -154,7 +155,7 @@ class TestParseSymbol:
         assert name == "Btn#"
 
     def test_no_backtick(self):
-        assert parse_symbol("no-backticks-here") == ('?', '?')
+        assert parse_symbol("no-backticks-here") == ("?", "?")
 
     def test_python_method(self):
         s = "scip-python pip mypackage 1.0 src/module.py/MyClass#method()."
@@ -227,7 +228,7 @@ class TestResolveSymbol:
             """)
             conn.execute(
                 "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc")
+                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
             )
             conn.commit()
 
@@ -249,7 +250,7 @@ class TestResolveSymbol:
             """)
             conn.execute(
                 "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass")
+                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
             )
             conn.commit()
 
@@ -288,11 +289,11 @@ class TestResolveSymbol:
             """)
             conn.execute(
                 "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc")
+                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
             )
             conn.execute(
                 "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass")
+                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
             )
             conn.commit()
 
@@ -314,7 +315,7 @@ class TestResolveSymbol:
             """)
             conn.execute(
                 "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc")
+                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
             )
             conn.commit()
 
@@ -390,9 +391,7 @@ class TestResolveSymbol:
 class TestFormatDefBody:
     def test_truncates_long_definitions(self):
         lines = [f"line {i}\n" for i in range(200)]
-        body, truncated, shown_start, shown_end = format_def_body(
-            lines, start_line=10, end_line=209, max_lines=80
-        )
+        body, truncated, shown_start, shown_end = format_def_body(lines, start_line=10, end_line=209, max_lines=80)
         assert truncated is True
         assert body.count("\n") == 79
         assert shown_start == 10
@@ -400,18 +399,14 @@ class TestFormatDefBody:
 
     def test_unlimited_when_max_lines_zero(self):
         lines = ["a\n", "b\n", "c\n"]
-        body, truncated, _, shown_end = format_def_body(
-            lines, start_line=0, end_line=2, max_lines=0, max_chars=0
-        )
+        body, truncated, _, shown_end = format_def_body(lines, start_line=0, end_line=2, max_lines=0, max_chars=0)
         assert truncated is False
         assert body == "a\nb\nc"
         assert shown_end == 2
 
     def test_char_cap_truncates(self):
         lines = ["x" * 100 + "\n" for _ in range(10)]
-        body, truncated, _, _ = format_def_body(
-            lines, start_line=0, end_line=9, max_lines=0, max_chars=250
-        )
+        body, truncated, _, _ = format_def_body(lines, start_line=0, end_line=9, max_lines=0, max_chars=250)
         assert truncated is True
         assert body.endswith("...")
 
@@ -427,10 +422,7 @@ class TestResolveFile:
                     relative_path TEXT
                 )
             """)
-            conn.execute(
-                "INSERT INTO documents (relative_path) VALUES (?)",
-                ("src/test.ts",)
-            )
+            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
             conn.commit()
 
             results = resolve_file(conn, "src/test.ts")
@@ -448,14 +440,8 @@ class TestResolveFile:
                     relative_path TEXT
                 )
             """)
-            conn.execute(
-                "INSERT INTO documents (relative_path) VALUES (?)",
-                ("src/test.ts",)
-            )
-            conn.execute(
-                "INSERT INTO documents (relative_path) VALUES (?)",
-                ("src/other.ts",)
-            )
+            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
+            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/other.ts",))
             conn.commit()
 
             results = resolve_file(conn, "test")
@@ -607,7 +593,7 @@ class TestGetExactRefs:
         conn = self._create_test_db()
         conn.execute(
             "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
-            (1, "scip-python test/test `test.py`/foo().", "foo")
+            (1, "scip-python test/test `test.py`/foo().", "foo"),
         )
         conn.commit()
         refs = get_exact_refs(conn, 1, "/tmp", 10)
@@ -625,20 +611,11 @@ class TestGetExactRefs:
             # Insert data
             conn.execute(
                 "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
-                (1, "scip-python test/test `test.py`/foo().", "foo")
+                (1, "scip-python test/test `test.py`/foo().", "foo"),
             )
-            conn.execute(
-                "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
-                (1, "test.py")
-            )
-            conn.execute(
-                "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)",
-                (1, 1, 3, 3)
-            )
-            conn.execute(
-                "INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)",
-                (1, 1, 0)
-            )
+            conn.execute("INSERT INTO documents (id, relative_path) VALUES (?, ?)", (1, "test.py"))
+            conn.execute("INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)", (1, 1, 3, 3))
+            conn.execute("INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)", (1, 1, 0))
             conn.commit()
 
             refs = get_exact_refs(conn, 1, tmpdir, 10)
@@ -657,22 +634,15 @@ class TestGetExactRefs:
             # Insert symbol
             conn.execute(
                 "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
-                (1, "scip-python test/test `test.py`/foo().", "foo")
+                (1, "scip-python test/test `test.py`/foo().", "foo"),
             )
-            conn.execute(
-                "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
-                (1, "test.py")
-            )
+            conn.execute("INSERT INTO documents (id, relative_path) VALUES (?, ?)", (1, "test.py"))
             # Insert 3 mentions
             for i in range(3):
                 conn.execute(
-                    "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)",
-                    (i + 1, 1, i, i)
+                    "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, ?, ?)", (i + 1, 1, i, i)
                 )
-                conn.execute(
-                    "INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)",
-                    (1, i + 1, 0)
-                )
+                conn.execute("INSERT INTO mentions (symbol_id, chunk_id, role) VALUES (?, ?, ?)", (1, i + 1, 0))
             conn.commit()
 
             # Limit to 2 refs

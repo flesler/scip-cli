@@ -1,4 +1,5 @@
 """search command - search symbols by pattern."""
+
 import re
 import sys
 
@@ -112,15 +113,8 @@ def main(args):
         patterns = args.pattern
 
         # Single dotted pattern (e.g. "Widget.run") - try exact resolve first
-        if (
-            len(patterns) == 1
-            and "." in patterns[0]
-            and "/" not in patterns[0]
-            and "*" not in patterns[0]
-        ):
-            symbols = resolve_symbol(
-                db, patterns[0], args.kind, limit=limit + 1, path_scope=path_scope
-            )
+        if len(patterns) == 1 and "." in patterns[0] and "/" not in patterns[0] and "*" not in patterns[0]:
+            symbols = resolve_symbol(db, patterns[0], args.kind, limit=limit + 1, path_scope=path_scope)
             if symbols:
                 symbols = limit_and_warn(symbols, limit, "results")
                 results = []

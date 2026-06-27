@@ -1,4 +1,5 @@
 """Tests for persisted index scope."""
+
 import json
 import shutil
 from pathlib import Path

@@ -1,4 +1,5 @@
 """symbols command - list symbols in a file."""
+
 import sys
 
 from ..cli_args import path_scope_from_args
@@ -24,7 +25,7 @@ def main(args):
         symbols = limit_and_warn(symbols, limit, "symbols")
 
         for _symbol_id, symbol_str, _display_name, start_line, end_line in symbols:
-            if symbol_str.endswith('/'):
+            if symbol_str.endswith("/"):
                 continue
             kind = infer_kind(symbol_str)
             short = extract_leaf_name(symbol_str)

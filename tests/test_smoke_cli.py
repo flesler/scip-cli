@@ -1,4 +1,5 @@
 """CLI integration smoke tests against the bundled sample TypeScript project."""
+
 import sqlite3
 import subprocess
 

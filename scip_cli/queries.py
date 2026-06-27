@@ -1,4 +1,5 @@
 """SQLite queries for symbol and document resolution."""
+
 from pathlib import Path
 
 from .paths import path_filter_sql, path_in_scope
@@ -79,10 +80,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             """
             params = (f"%{escaped}%", *path_params) + limit_param
             rows = debug_execute(db, sql, params).fetchall()
-            results = [
-                r for r in rows
-                if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])
-            ]
+            results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
     else:
         sql = f"""
             SELECT id, symbol, display_name FROM global_symbols
@@ -105,16 +103,13 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             sql = f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}"
             params = (f"%{escaped}%",) + limit_param
             rows = debug_execute(db, sql, params).fetchall()
-            results = [
-                r for r in rows
-                if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])
-            ]
+            results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
 
     if qualifier_parts:
         results = [
-            r for r in results
-            if symbol_matches_qualifier(r[1], qualifier_parts, leaf)
-            and not is_parameter_symbol(r[1])
+            r
+            for r in results
+            if symbol_matches_qualifier(r[1], qualifier_parts, leaf) and not is_parameter_symbol(r[1])
         ]
 
     if kind_filter and results:
@@ -234,13 +229,17 @@ def get_refs_for_symbols(db, symbol_ids):
         return {}
 
     placeholders = ",".join("?" * len(symbol_ids))
-    rows = debug_execute(db, f"""
+    rows = debug_execute(
+        db,
+        f"""
         SELECT m.symbol_id, d.relative_path, c.start_line
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
         JOIN documents d ON c.document_id = d.id
         WHERE m.symbol_id IN ({placeholders}) AND m.role != 1
-    """, symbol_ids).fetchall()
+    """,
+        symbol_ids,
+    ).fetchall()
 
     result = {}
     for symbol_id, path, line in rows:
@@ -258,35 +257,47 @@ def get_members(db, symbol_id):
         return []
     parent_symbol = row[0]
 
-    rows = debug_execute(db, """
+    rows = debug_execute(
+        db,
+        """
         SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
         FROM global_symbols gs
         LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
         WHERE gs.enclosing_symbol = ?
         ORDER BY der.start_line
-    """, (parent_symbol,)).fetchall()
+    """,
+        (parent_symbol,),
+    ).fetchall()
 
     if not rows:
         escaped_parent = escape_like(parent_symbol)
-        rows = debug_execute(db, """
+        rows = debug_execute(
+            db,
+            """
             SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
             FROM global_symbols gs
             LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
             WHERE gs.symbol LIKE ? ESCAPE '\\' AND gs.symbol != ?
             ORDER BY der.start_line
-        """, (escaped_parent + "%", parent_symbol)).fetchall()
+        """,
+            (escaped_parent + "%", parent_symbol),
+        ).fetchall()
 
     return [r for r in rows if ").(" not in r[1]]
 
 
 def get_def_location(db, symbol_id):
     """Get definition location for a symbol."""
-    return debug_execute(db, """
+    return debug_execute(
+        db,
+        """
         SELECT d.relative_path, der.start_line, der.end_line
         FROM defn_enclosing_ranges der
         JOIN documents d ON der.document_id = d.id
         WHERE der.symbol_id = ?
-    """, (symbol_id,)).fetchone()
+    """,
+        (symbol_id,),
+    ).fetchone()
 
 
 def resolve_document_path(db, symbol_str):

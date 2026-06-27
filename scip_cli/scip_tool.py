@@ -1,4 +1,5 @@
 """Download and locate the scip CLI binary."""
+
 from __future__ import annotations
 
 import json

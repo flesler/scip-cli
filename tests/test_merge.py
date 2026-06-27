@@ -1,4 +1,5 @@
 """Tests for SQLite index merging."""
+
 import sqlite3
 from pathlib import Path
 
@@ -67,9 +68,7 @@ def _make_db(path: Path, relative_path: str, symbol: str) -> None:
         VALUES (1, 0, 0, 0, X'00')
         """
     )
-    conn.execute(
-        "INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (1, 1, 0)"
-    )
+    conn.execute("INSERT INTO mentions (chunk_id, symbol_id, role) VALUES (1, 1, 0)")
     conn.execute(
         """
         INSERT INTO defn_enclosing_ranges (

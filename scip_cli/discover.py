@@ -1,4 +1,5 @@
 """Discover TypeScript project roots in a repository."""
+
 from __future__ import annotations
 
 import json
@@ -35,15 +36,15 @@ def _tsconfig_project_root(path: Path) -> bool:
     if not data:
         return False
     name = path.name
-    if name.startswith("tsconfig.") and name not in {"tsconfig.json"}:
-        if "include" not in data and "files" not in data and "references" not in data:
-            return False
-    return (
-        "include" in data
-        or "files" in data
-        or "references" in data
-        or name == "tsconfig.json"
-    )
+    if (
+        name.startswith("tsconfig.")
+        and name not in {"tsconfig.json"}
+        and "include" not in data
+        and "files" not in data
+        and "references" not in data
+    ):
+        return False
+    return "include" in data or "files" in data or "references" in data or name == "tsconfig.json"
 
 
 def _tsconfig_covers_subdirectories(tsconfig_path: Path) -> bool:
@@ -62,11 +63,7 @@ def _walk_tsconfig_projects(root: Path) -> list[Path]:
     projects: list[Path] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [
-            name
-            for name in dirnames
-            if name not in _SKIP_DIR_NAMES and not name.startswith(".")
-        ]
+        dirnames[:] = [name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith(".")]
         for name in sorted(filenames):
             if not name.startswith("tsconfig") or not name.endswith(".json"):
                 continue

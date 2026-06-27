@@ -1,4 +1,5 @@
 """Index cache path resolution."""
+
 import re
 from pathlib import Path
 

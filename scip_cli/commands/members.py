@@ -1,4 +1,5 @@
 """members command - list members of a class/interface."""
+
 import re
 import sys
 
@@ -13,22 +14,22 @@ from ..symbols import SymbolKind, extract_leaf_name, infer_kind
 def _member_source_patterns(member_symbol, short, kind):
     """Build TS/JS and Python regex patterns for finding a member's source line."""
     if "<constructor>" in member_symbol:
-        ts_pattern = r'^\s*constructor\s*\('
+        ts_pattern = r"^\s*constructor\s*\("
     elif "<get>" in member_symbol:
-        ts_pattern = rf'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*get\s+{re.escape(short)}\s*\('
+        ts_pattern = rf"^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*get\s+{re.escape(short)}\s*\("
     elif "<set>" in member_symbol:
-        ts_pattern = rf'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*set\s+{re.escape(short)}\s*\('
+        ts_pattern = rf"^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*set\s+{re.escape(short)}\s*\("
     else:
-        prefix = r'^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*'
-        ts_pattern = rf'{prefix}{re.escape(short)}\s*\??\s*[:=(]'
+        prefix = r"^\s*(?:public\s+|private\s+|protected\s+|static\s+|readonly\s+)*"
+        ts_pattern = rf"{prefix}{re.escape(short)}\s*\??\s*[:=(]"
 
     py_pattern = None
     if kind == SymbolKind.METHOD:
-        py_pattern = rf'^\s*(?:async\s+)?def\s+{re.escape(short)}\s*\('
+        py_pattern = rf"^\s*(?:async\s+)?def\s+{re.escape(short)}\s*\("
     elif kind == SymbolKind.PROPERTY:
-        py_pattern = rf'^\s*{re.escape(short)}\s*[=:]'
+        py_pattern = rf"^\s*{re.escape(short)}\s*[=:]"
     elif kind == SymbolKind.CLASS:
-        py_pattern = rf'^\s*class\s+{re.escape(short)}\s*[:\(]'
+        py_pattern = rf"^\s*class\s+{re.escape(short)}\s*[:\(]"
 
     return ts_pattern, py_pattern
 
@@ -67,7 +68,7 @@ def main(args):
             if start_line is None and source_lines:
                 ts_pattern, py_pattern = _member_source_patterns(member_symbol, short, kind)
                 patterns = []
-                if parent_file and parent_file.endswith('.py'):
+                if parent_file and parent_file.endswith(".py"):
                     if py_pattern:
                         patterns.append(py_pattern)
                     patterns.append(ts_pattern)

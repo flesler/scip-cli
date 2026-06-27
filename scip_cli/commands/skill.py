@@ -1,4 +1,5 @@
 """skill command - install the scip-cli skill file."""
+
 import sys
 from pathlib import Path
 

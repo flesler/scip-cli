@@ -1,4 +1,5 @@
 """Tests for cache directory naming."""
+
 import json
 
 from scip_cli.cache import (

@@ -1,4 +1,5 @@
 """Tests for scip binary resolution."""
+
 from scip_cli.scip_tool import _platform_archive, parse_scip_version
 
 

@@ -1,4 +1,5 @@
 """CLI entry point for scip-cli."""
+
 import argparse
 import logging
 import os
@@ -12,11 +13,7 @@ from .symbols import SymbolKind
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
 if os.environ.get("SCIP_CLI_DEBUG"):
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(name)s: %(message)s",
-        stream=sys.stderr
-    )
+    logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s", stream=sys.stderr)
 else:
     logging.disable(logging.DEBUG)
 
@@ -25,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="scip-cli",
         description="Fast code intelligence via SCIP indexes",
-        epilog="AI agents: run 'scip-cli skill' for quick reference"
+        epilog="AI agents: run 'scip-cli skill' for quick reference",
     )
     parser.add_argument("--version", action="version", version=f"scip-cli {__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -47,10 +44,7 @@ def main():
         type=int,
         default=None,
         metavar="N",
-        help=(
-            "Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). "
-            "Use 0 for unlimited."
-        ),
+        help=("Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). Use 0 for unlimited."),
     )
     code_parser.add_argument(
         "--snippet",

@@ -1,4 +1,5 @@
 """SCIP symbol parsing and kind inference."""
+
 import re
 from enum import Enum
 

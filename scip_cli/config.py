@@ -1,4 +1,5 @@
 """Project configuration for scip-cli."""
+
 from __future__ import annotations
 
 import json

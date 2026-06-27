@@ -1,4 +1,5 @@
 """Command session setup and single-match resolution helpers."""
+
 import sys
 from pathlib import Path
 

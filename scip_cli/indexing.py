@@ -1,4 +1,5 @@
 """SCIP index building and SQLite database access."""
+
 import os
 import re
 import shutil
@@ -13,7 +14,6 @@ from .cache import find_db, get_cache_dir, index_db_path
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from .discover import discover_typescript_projects
 from .merge import merge_sqlite_indexes
-from .project import detect_language, find_project_root
 from .scip_tool import ensure_scip_binary
 from .scope import load_index_scope, projects_matching_scope
 
@@ -25,6 +25,7 @@ SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 def default_index_workers() -> int:
     """Default parallel TypeScript project indexers (merge stays single-threaded)."""
     return min(8, os.cpu_count() or 4)
+
 
 _scip_version_warned = False
 
@@ -40,9 +41,9 @@ def _run_subprocess(cmd, cwd, env=None):
             text=True,
             timeout=INDEX_TIMEOUT,
         )
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as err:
         print(f"Error: Command timed out after {INDEX_TIMEOUT} seconds", file=sys.stderr)
-        raise RuntimeError("Indexing command timed out")
+        raise RuntimeError("Indexing command timed out") from err
 
 
 def _parse_heap_mb(value, source: str) -> str:
@@ -50,9 +51,7 @@ def _parse_heap_mb(value, source: str) -> str:
     try:
         parsed = int(value)
     except (TypeError, ValueError):
-        raise RuntimeError(
-            f"Invalid {source}: expected a positive integer, got {value!r}"
-        ) from None
+        raise RuntimeError(f"Invalid {source}: expected a positive integer, got {value!r}") from None
     if type(value) is bool or parsed <= 0:
         raise RuntimeError(f"Invalid {source}: expected a positive integer")
     return str(parsed)
@@ -66,9 +65,7 @@ def indexer_env(project_root=None):
         heap_mb = _parse_heap_mb(heap_mb, "SCIP_CLI_MAX_HEAP_MB")
     elif project_root is not None:
         config_heap = load_project_config(Path(project_root)).max_heap_mb
-        heap_mb = (
-            str(config_heap) if config_heap is not None else str(DEFAULT_MAX_HEAP_MB)
-        )
+        heap_mb = str(config_heap) if config_heap is not None else str(DEFAULT_MAX_HEAP_MB)
     else:
         heap_mb = str(DEFAULT_MAX_HEAP_MB)
     flag = f"--max-old-space-size={heap_mb}"
@@ -95,9 +92,7 @@ def typescript_projects(root: Path) -> list[Path]:
 
     if settings.only_index_roots:
         if not configured:
-            raise RuntimeError(
-                f"onlyIndexRoots is true but no indexRoots are configured in {CONFIG_FILENAME}"
-            )
+            raise RuntimeError(f"onlyIndexRoots is true but no indexRoots are configured in {CONFIG_FILENAME}")
         return configured
 
     discovered = list(discover_typescript_projects(root))
@@ -190,9 +185,7 @@ def _index_workers():
         try:
             return max(1, int(env_val))
         except ValueError:
-            raise RuntimeError(
-                f"Invalid SCIP_CLI_INDEX_WORKERS: expected an integer, got {env_val!r}"
-            ) from None
+            raise RuntimeError(f"Invalid SCIP_CLI_INDEX_WORKERS: expected an integer, got {env_val!r}") from None
     return default_index_workers()
 
 
@@ -291,8 +284,7 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
         indexed = len(part_dbs)
         if total > 1 and not use_parallel:
             print(
-                f"Indexed {indexed}/{total} TypeScript projects"
-                + (f" ({skipped} skipped)" if skipped else ""),
+                f"Indexed {indexed}/{total} TypeScript projects" + (f" ({skipped} skipped)" if skipped else ""),
                 file=sys.stderr,
             )
         elif total > 1 and use_parallel:
@@ -353,11 +345,11 @@ def get_db(project_root=None):
     """
     db_path = find_db(project_root)
     if not db_path:
-        root = project_root or find_project_root()
+        from .project import find_project_root_and_language
+
+        root, lang = find_project_root_and_language(project_root)
         if not root:
             raise RuntimeError("Could not find project root")
-
-        lang = detect_language(root)
         if lang is None:
             raise RuntimeError(f"No supported project markers found in {root}")
 
