@@ -201,5 +201,5 @@ class TestMergeSqliteIndexes:
         assert "scheme b/symC()." in symbols
 
     def test_merge_requires_inputs(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="at least one input"):
             merge_sqlite_indexes([], Path("out.db"))

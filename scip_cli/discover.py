@@ -105,7 +105,7 @@ def discover_typescript_projects(root: Path) -> list[Path]:
     if discovered:
         relative = sorted({p.relative_to(root) for p in discovered}, key=str)
         if should_index_root_alongside_projects(root, relative) and Path(".") not in relative:
-            relative = [Path(".")] + relative
+            relative = [Path("."), *relative]
         return relative
 
     return [Path(".")]

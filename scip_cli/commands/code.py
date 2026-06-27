@@ -28,10 +28,8 @@ def main(args):
 
         symbols = limit_and_warn(symbols, limit, "symbols")
 
-        if getattr(args, "snippet", False):
-            max_def_lines = 1
-        else:
-            max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
+        snippet_mode = getattr(args, "snippet", False)
+        max_def_lines = 1 if snippet_mode else resolve_max_def_lines(getattr(args, "max_lines", None))
 
         for symbol_id, symbol_str, _display_name in symbols:
             row = get_def_location(db, symbol_id)
@@ -42,8 +40,11 @@ def main(args):
 
             rel_path, start_line, end_line = row
 
-            if getattr(args, "snippet", False):
+            if snippet_mode:
                 lines = read_source_lines(project_root, rel_path, start_line, start_line)
+                if lines is None:
+                    print(f"{rel_path}:{format_line_range(start_line, end_line)} [file not found]")
+                    continue
                 first_line = lines[0].rstrip()
                 print(f"{rel_path}:{format_line_range(start_line, end_line)} {first_line}")
                 continue

@@ -65,7 +65,8 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             f"%#{escaped}().",
             f"%#{escaped}.",
             *path_params,
-        ) + limit_param
+            *limit_param,
+        )
         rows = debug_execute(db, sql, params).fetchall()
         results = list(rows)
 
@@ -78,7 +79,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
                 WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}
                 {limit_clause}
             """
-            params = (f"%{escaped}%", *path_params) + limit_param
+            params = (f"%{escaped}%", *path_params, *limit_param)
             rows = debug_execute(db, sql, params).fetchall()
             results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
     else:
@@ -89,19 +90,13 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
                OR symbol LIKE ? ESCAPE '\\'
             {limit_clause}
         """
-        params = (
-            f"%/{escaped}().",
-            f"%/{escaped}#",
-            f"%/{escaped}.",
-            f"%#{escaped}().",
-            f"%#{escaped}.",
-        ) + limit_param
+        params = (f"%/{escaped}().", f"%/{escaped}#", f"%/{escaped}.", f"%#{escaped}().", f"%#{escaped}.", *limit_param)
         rows = debug_execute(db, sql, params).fetchall()
         results = list(rows)
 
         if not results:
             sql = f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}"
-            params = (f"%{escaped}%",) + limit_param
+            params = (f"%{escaped}%", *limit_param)
             rows = debug_execute(db, sql, params).fetchall()
             results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
 

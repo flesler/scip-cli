@@ -22,7 +22,7 @@ MIN_SCIP_VERSION = (0, 8, 0)
 def _latest_release_tag() -> str:
     """Return the latest scip release tag from GitHub."""
     try:
-        request = urlopen(SCIP_RELEASES_API, timeout=30)  # noqa: S310
+        request = urlopen(SCIP_RELEASES_API, timeout=30)
         data = json.loads(request.read().decode("utf-8"))
         tag = data.get("tag_name")
         if isinstance(tag, str) and tag:
@@ -94,7 +94,7 @@ def _download_scip_binary(dest: Path) -> None:
 
     print(f"Downloading scip {release_tag} from GitHub releases...", file=sys.stderr)
 
-    with urlopen(url, timeout=120) as response:  # noqa: S310 — fixed release URL
+    with urlopen(url, timeout=120) as response:
         data = response.read()
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -104,7 +104,7 @@ def _download_scip_binary(dest: Path) -> None:
             members = [m for m in tar.getmembers() if m.name == "scip" or m.name.endswith("/scip")]
             if not members:
                 raise RuntimeError("scip archive did not contain a scip binary")
-            tar.extract(members[0], path=tmpdir, filter="data")
+            tar.extract(members[0], path=tmpdir)
             extracted = Path(tmpdir) / members[0].name
             shutil.move(str(extracted), dest)
 

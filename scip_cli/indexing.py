@@ -106,16 +106,16 @@ def run_with_fallback(binary, npx_package, cwd, args, env=None):
     """Try binary first, fallback to npx if not found."""
     run_env = env if env is not None else os.environ.copy()
     try:
-        result = _run_subprocess([binary] + args, cwd, env=run_env)
+        result = _run_subprocess([binary, *args], cwd, env=run_env)
         if result.returncode == 0:
             return result
         if "not found" in result.stderr.lower():
             print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-            return _run_subprocess(["npx", "-y", npx_package] + args, cwd, env=run_env)
+            return _run_subprocess(["npx", "-y", npx_package, *args], cwd, env=run_env)
         return result
     except FileNotFoundError:
         print("Tool not found, trying npx (will download automatically)...", file=sys.stderr)
-        return _run_subprocess(["npx", "-y", npx_package] + args, cwd, env=run_env)
+        return _run_subprocess(["npx", "-y", npx_package, *args], cwd, env=run_env)
 
 
 def _scip_version(binary):
