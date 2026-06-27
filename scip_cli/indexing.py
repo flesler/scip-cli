@@ -302,12 +302,14 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
 
 def _index_project(root, lang, cache_dir, *, replace=False):
     """Run the language-specific indexer and convert to DB."""
+    from .project import Language
+
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
     root = Path(root).resolve()
     env = indexer_env(root)
 
-    if lang == "typescript":
+    if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
         if len(projects) > 1:
             print(
@@ -319,7 +321,7 @@ def _index_project(root, lang, cache_dir, *, replace=False):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         index_scip = os.path.join(tmpdir, "index.scip")
-        if lang == "python":
+        if lang == Language.PYTHON:
             result = run_with_fallback(
                 "scip-python",
                 "@sourcegraph/scip-python",

@@ -6,8 +6,8 @@ from .paths import path_filter_sql, path_in_scope
 from .sql import debug_execute, escape_like
 from .symbols import (
     extract_leaf_name,
-    infer_kind,
     is_parameter_symbol,
+    kind_sql_clause,
     parse_qualified_name,
     symbol_matches_qualifier,
 )
@@ -37,8 +37,10 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     search_name = leaf if qualifier_parts else name
     escaped = escape_like(search_name)
     path_clause, path_params = path_filter_sql(db, path_scope)
+    kind_clause = kind_sql_clause(kind_filter) if kind_filter else ""
 
-    if limit:
+    # Skip SQL LIMIT when qualifier_parts present (filtered in Python)
+    if limit and not qualifier_parts:
         limit_clause = "LIMIT ?"
         limit_param = (limit,)
     else:
@@ -55,7 +57,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
                 gs.symbol LIKE ? ESCAPE '\\' OR gs.symbol LIKE ? ESCAPE '\\'
                 OR gs.symbol LIKE ? ESCAPE '\\' OR gs.symbol LIKE ? ESCAPE '\\'
                 OR gs.symbol LIKE ? ESCAPE '\\'
-            ){path_clause}
+            ){path_clause}{kind_clause}
             {limit_clause}
         """
         params = (
@@ -76,7 +78,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
                 FROM global_symbols gs
                 LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
                 LEFT JOIN documents d ON der.document_id = d.id
-                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}
+                WHERE gs.symbol LIKE ? ESCAPE '\\'{path_clause}{kind_clause}
                 {limit_clause}
             """
             params = (f"%{escaped}%", *path_params, *limit_param)
@@ -85,9 +87,9 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     else:
         sql = f"""
             SELECT id, symbol, display_name FROM global_symbols
-            WHERE symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
+            WHERE (symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
                OR symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
-               OR symbol LIKE ? ESCAPE '\\'
+               OR symbol LIKE ? ESCAPE '\\'){kind_clause.replace("gs.", "")}
             {limit_clause}
         """
         params = (f"%/{escaped}().", f"%/{escaped}#", f"%/{escaped}.", f"%#{escaped}().", f"%#{escaped}.", *limit_param)
@@ -95,7 +97,10 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
         results = list(rows)
 
         if not results:
-            sql = f"SELECT id, symbol, display_name FROM global_symbols WHERE symbol LIKE ? ESCAPE '\\' {limit_clause}"
+            sql = (
+                f"SELECT id, symbol, display_name FROM global_symbols "
+                f"WHERE symbol LIKE ? ESCAPE '\\'{kind_clause.replace('gs.', '')} {limit_clause}"
+            )
             params = (f"%{escaped}%", *limit_param)
             rows = debug_execute(db, sql, params).fetchall()
             results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
@@ -106,9 +111,8 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             for r in results
             if symbol_matches_qualifier(r[1], qualifier_parts, leaf) and not is_parameter_symbol(r[1])
         ]
-
-    if kind_filter and results:
-        results = [r for r in results if infer_kind(r[1]) == kind_filter]
+        if limit:
+            results = results[:limit]
 
     return results
 

@@ -19,16 +19,14 @@ class Language(str, Enum):
 def find_project_root_and_language(start_dir=None):
     """Walk up from start_dir (or cwd) to find project root and detect language.
 
-    Returns: (project_root, language) tuple, or (None, None) if not found.
+    Returns: (project_root, Language) tuple, or (None, None) if not found.
     """
     d = Path(start_dir or os.getcwd()).resolve()
     while d != d.parent:
-        # Check for TypeScript markers
         if (d / "package.json").exists() or (d / "tsconfig.json").exists():
-            return d, Language.TYPESCRIPT.value
-        # Check for Python markers
+            return d, Language.TYPESCRIPT
         if (d / "pyproject.toml").exists() or (d / "setup.py").exists():
-            return d, Language.PYTHON.value
+            return d, Language.PYTHON
         d = d.parent
     return None, None
 
