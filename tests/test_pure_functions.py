@@ -216,176 +216,162 @@ class TestEscapeLike:
 
 class TestResolveSymbol:
     def test_exact_match_function(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "myFunc")
-            assert len(results) == 1
-            assert results[0][2] == "myFunc"
-            conn.close()
+        results = resolve_symbol(conn, "myFunc")
+        assert len(results) == 1
+        assert results[0][2] == "myFunc"
+        conn.close()
 
     def test_exact_match_class(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "MyClass")
-            assert len(results) == 1
-            assert results[0][2] == "MyClass"
-            conn.close()
+        results = resolve_symbol(conn, "MyClass")
+        assert len(results) == 1
+        assert results[0][2] == "MyClass"
+        conn.close()
 
     def test_no_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.commit()
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
+            )
+        """)
+        conn.commit()
 
-            results = resolve_symbol(conn, "nonexistent")
-            assert len(results) == 0
-            conn.close()
+        results = resolve_symbol(conn, "nonexistent")
+        assert len(results) == 0
+        conn.close()
 
     def test_kind_filter(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
-            )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scip-typescript npm test 1.0 src/`test.ts`/MyClass#", "MyClass"),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "my", kind_filter="function")
-            assert len(results) == 1
-            assert results[0][2] == "myFunc"
-            conn.close()
+        results = resolve_symbol(conn, "my", kind_filter="function")
+        assert len(results) == 1
+        assert results[0][2] == "myFunc"
+        conn.close()
 
     def test_kind_filter_no_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            ("scip-typescript npm test 1.0 src/`test.ts`/myFunc().", "myFunc"),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "myFunc", kind_filter="class")
-            assert len(results) == 0
-            conn.close()
+        results = resolve_symbol(conn, "myFunc", kind_filter="class")
+        assert len(results) == 0
+        conn.close()
 
     def test_qualified_class_method(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                (
-                    "scip-typescript npm test 1.0 src/`widget.ts`/Widget#run().",
-                    "onModuleInit",
-                ),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                (
-                    "scip-typescript npm test 1.0 src/`other.module.ts`/OtherModule#onModuleInit().",
-                    "onModuleInit",
-                ),
-            )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`widget.ts`/Widget#run().",
+                "onModuleInit",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`other.module.ts`/OtherModule#onModuleInit().",
+                "onModuleInit",
+            ),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "Widget.run")
-            assert len(results) == 1
-            assert "Widget#run" in results[0][1]
-            conn.close()
+        results = resolve_symbol(conn, "Widget.run")
+        assert len(results) == 1
+        assert "Widget#run" in results[0][1]
+        conn.close()
 
     def test_qualified_excludes_parameters(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE global_symbols (
-                    id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    display_name TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                (
-                    "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().",
-                    "setBar",
-                ),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
             )
-            conn.execute(
-                "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
-                (
-                    "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().(eventIds)",
-                    "eventIds",
-                ),
-            )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().",
+                "setBar",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`x.tsx`/Foo#setBar().(eventIds)",
+                "eventIds",
+            ),
+        )
+        conn.commit()
 
-            results = resolve_symbol(conn, "Foo.setBar")
-            assert len(results) == 1
-            assert ").(" not in results[0][1]
-            conn.close()
+        results = resolve_symbol(conn, "Foo.setBar")
+        assert len(results) == 1
+        assert ").(" not in results[0][1]
+        conn.close()
 
 
 class TestFormatDefBody:
@@ -413,82 +399,74 @@ class TestFormatDefBody:
 
 class TestResolveFile:
     def test_exact_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE documents (
-                    id INTEGER PRIMARY KEY,
-                    relative_path TEXT
-                )
-            """)
-            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
-            conn.commit()
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT
+            )
+        """)
+        conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
+        conn.commit()
 
-            results = resolve_file(conn, "src/test.ts")
-            assert len(results) == 1
-            assert results[0] == "src/test.ts"
-            conn.close()
+        results = resolve_file(conn, "src/test.ts")
+        assert len(results) == 1
+        assert results[0] == "src/test.ts"
+        conn.close()
 
     def test_pattern_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE documents (
-                    id INTEGER PRIMARY KEY,
-                    relative_path TEXT
-                )
-            """)
-            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
-            conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/other.ts",))
-            conn.commit()
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT
+            )
+        """)
+        conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/test.ts",))
+        conn.execute("INSERT INTO documents (relative_path) VALUES (?)", ("src/other.ts",))
+        conn.commit()
 
-            results = resolve_file(conn, "test")
-            assert len(results) == 1
-            assert results[0] == "src/test.ts"
-            conn.close()
+        results = resolve_file(conn, "test")
+        assert len(results) == 1
+        assert results[0] == "src/test.ts"
+        conn.close()
 
     def test_bare_filename_prefers_non_test(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE documents (
-                    id INTEGER PRIMARY KEY,
-                    relative_path TEXT
-                )
-            """)
-            conn.execute(
-                "INSERT INTO documents (relative_path) VALUES (?)",
-                ("pkg/src/helper.ts",),
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT
             )
-            conn.execute(
-                "INSERT INTO documents (relative_path) VALUES (?)",
-                ("pkg/src/helper.test.ts",),
-            )
-            conn.commit()
+        """)
+        conn.execute(
+            "INSERT INTO documents (relative_path) VALUES (?)",
+            ("pkg/src/helper.ts",),
+        )
+        conn.execute(
+            "INSERT INTO documents (relative_path) VALUES (?)",
+            ("pkg/src/helper.test.ts",),
+        )
+        conn.commit()
 
-            results = resolve_file(conn, "helper.ts")
-            assert len(results) >= 1
-            assert results[0] == "pkg/src/helper.ts"
-            conn.close()
+        results = resolve_file(conn, "helper.ts")
+        assert len(results) >= 1
+        assert results[0] == "pkg/src/helper.ts"
+        conn.close()
 
     def test_no_match(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute("""
-                CREATE TABLE documents (
-                    id INTEGER PRIMARY KEY,
-                    relative_path TEXT
-                )
-            """)
-            conn.commit()
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY,
+                relative_path TEXT
+            )
+        """)
+        conn.commit()
 
-            results = resolve_file(conn, "nonexistent.ts")
-            assert len(results) == 0
-            conn.close()
+        results = resolve_file(conn, "nonexistent.ts")
+        assert len(results) == 0
+        conn.close()
 
 
 class TestReadSourceLines:
