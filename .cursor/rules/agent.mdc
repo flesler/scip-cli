@@ -7,16 +7,22 @@ alwaysApply: true
 
 **Work from repo root.** CLI usage, flags, and user gotchas: `scip-cli skill` (source: `scip_cli/SKILL.md`). Read once per task — do not duplicate SKILL here.
 
-Use **`.venv/bin/scip-cli`** / **`.venv/bin/pytest`**. Uncommitted code: `PYTHONPATH=$PWD python -m scip_cli …` if the venv binary is stale.
+**Almost always:** bare `scip-cli` on PATH must be **this checkout live** (`pip install -e ".[dev]"`). All examples use `scip-cli` — never `.venv/bin/scip-cli`, `python -m scip_cli`, or other paths. Only swap to PyPI briefly to smoke-test a release.
 
 ## Bootstrap
 
+From repo root — keep this mapping for the whole dev session:
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+scip-cli --version    # must match scip_cli/__init__.py
 pre-commit install
-scip-cli skill
+scip-cli skill ~/.claude/skills/scip-cli/
 ```
+
+After publishing: `pip install scip-cli` → smoke-test → `pip install -e ".[dev]"` to restore local.
+
+Optional venv for isolation only: create/activate, then same `pip install -e ".[dev]"` — `scip-cli` still runs from PATH, not a venv-relative path.
 
 Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `SCIP_CLI_DEBUG=1` (SQL to stderr, truncated).
 
@@ -24,9 +30,9 @@ Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `S
 
 | Task | Command |
 |------|---------|
-| Full suite | `.venv/bin/pytest` |
-| E2e loop | `.venv/bin/pytest tests/test_e2e.py` |
-| Lint / format | `.venv/bin/ruff check .` / `ruff format .` |
+| Full suite | `pytest` |
+| E2e loop | `pytest tests/test_e2e.py` |
+| Lint / format | `ruff check .` / `ruff format .` |
 
 Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command changes.
 
@@ -35,11 +41,11 @@ Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command chang
 **Dogfood on the repo itself** — faster and more honest than spawning reviewers:
 
 ```bash
-.venv/bin/scip-cli reindex
-.venv/bin/scip-cli analyze --limit 25
-.venv/bin/scip-cli analyze --priority high --limit 25   # dead code & cycles only
-.venv/bin/scip-cli analyze scip_cli --limit 15              # directory
-.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20   # file (+ scoped project)
+scip-cli reindex
+scip-cli analyze --limit 25
+scip-cli analyze --priority high --limit 25   # dead code & cycles only
+scip-cli analyze scip_cli --limit 15              # directory
+scip-cli analyze scip_cli/queries.py --limit 20   # file (+ scoped project)
 ```
 
 Interpretation: README § *Finding easy wins with analyze*. Target = omit (project), directory, file, or symbol — not `--path` for scope.

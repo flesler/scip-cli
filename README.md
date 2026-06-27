@@ -42,17 +42,24 @@ scip-cli skill
 pip install scip-cli
 ```
 
-**Local development** (use a project venv — do not rely on global `pip`):
+**Local development** — almost always keep bare `scip-cli` mapped to this checkout via editable install. You edit the repo; the CLI you run is live code, not a frozen PyPI copy.
 
 ```bash
 cd scip-cli
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 scip-cli --version
 ```
 
-`pip install -e .` keeps `scip-cli` on your PATH inside the venv while you edit the repo. Run tests with `pytest` from the same venv.
+All docs and examples use `scip-cli` (never `.venv/bin/scip-cli` or `python -m scip_cli`). After publishing, briefly `pip install scip-cli` to smoke-test PyPI, then `pip install -e ".[dev]"` again.
+
+Optional venv for isolation — activate it, run the same editable install, still invoke `scip-cli` on PATH:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Tests and lint: `pytest`, `ruff check .` from the same environment.
 
 ### 2. Install prerequisites (optional)
 

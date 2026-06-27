@@ -7,6 +7,8 @@ TypeScript/JavaScript (.ts, .tsx, .js, .jsx) and Python (.py) — not GraphQL, C
 
 All commands are sub-commands of `scip-cli`. Run from the project root.
 
+**Contributors:** keep `pip install -e .` (or `pip install -e ".[dev]"` in this repo) so bare `scip-cli` on PATH runs your live checkout — not a venv-relative path.
+
 ## Quick Decision Guide
 
 | Question                                  | Use                 | What you get                                                                              |
