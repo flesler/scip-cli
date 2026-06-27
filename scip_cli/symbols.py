@@ -14,10 +14,6 @@ class SymbolKind(str, Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def values(cls):
-        return [k.value for k in cls]
-
-    @classmethod
     def filterable_values(cls):
         """Values suitable for --kind filtering (excludes UNKNOWN)."""
         return [k.value for k in cls if k != cls.UNKNOWN]

@@ -230,13 +230,15 @@ scip_cli/
 ├── source.py        # Filesystem source reads
 ├── output.py        # CLI formatting helpers
 ├── session.py       # setup() and single-match resolution
+├── targets.py       # file vs symbol target heuristics
+├── analyze/         # SQL dashboard queries (project/file/symbol)
 └── commands/        # Subcommand implementations
 ```
 
 ## Development
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 pytest tests/ -q
 pytest tests/ -m integration -q   # indexes tests/fixtures/sample-project (needs scip-typescript)
 ```

@@ -247,33 +247,6 @@ def get_importer_paths(db, symbol_ids, exclude_path, limit=None):
     return [row[0] for row in rows]
 
 
-def get_refs_for_symbols(db, symbol_ids):
-    """Get all references for multiple symbol_ids in one query."""
-    if not symbol_ids:
-        return {}
-
-    placeholders = ",".join("?" * len(symbol_ids))
-    rows = debug_execute(
-        db,
-        f"""
-        SELECT m.symbol_id, d.relative_path, c.start_line
-        FROM mentions m
-        JOIN chunks c ON m.chunk_id = c.id
-        JOIN documents d ON c.document_id = d.id
-        WHERE m.symbol_id IN ({placeholders}) AND m.role != 1
-    """,
-        symbol_ids,
-    ).fetchall()
-
-    result = {}
-    for symbol_id, path, line in rows:
-        if symbol_id not in result:
-            result[symbol_id] = []
-        result[symbol_id].append((path, line))
-
-    return result
-
-
 def get_members(db, symbol_id):
     """Get members (children) of a symbol via SCIP symbol prefix."""
     row = debug_execute(db, "SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()

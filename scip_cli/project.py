@@ -11,10 +11,6 @@ class Language(str, Enum):
     TYPESCRIPT = "typescript"
     PYTHON = "python"
 
-    @classmethod
-    def values(cls):
-        return [lang.value for lang in cls]
-
 
 def find_project_root_and_language(start_dir=None):
     """Walk up from start_dir (or cwd) to find project root and detect language.

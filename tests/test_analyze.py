@@ -85,3 +85,19 @@ class TestSymbolAnalyze:
         ).fetchone()[0]
         sections = symbol_checks.run_all(db, foo_id, limit=5)
         assert len(sections) == 5
+
+
+class TestAnalyzeCommand:
+    def test_project_analyze_rejects_path(self, tmp_path, monkeypatch):
+        from argparse import Namespace
+
+        import pytest
+
+        from scip_cli.commands import analyze as analyze_cmd
+
+        monkeypatch.setattr(analyze_cmd, "setup", lambda: (None, tmp_path))
+        monkeypatch.setattr(analyze_cmd, "path_scope_from_args", lambda _a, _r: "pkg")
+
+        with pytest.raises(SystemExit) as exc:
+            analyze_cmd.main(Namespace(target=None, limit=20, path="pkg"))
+        assert exc.value.code == 1

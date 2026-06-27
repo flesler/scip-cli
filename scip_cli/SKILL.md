@@ -39,7 +39,7 @@ code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path P
 
 Kinds: `function`, `method`, `class`, `property` — use `--kind` when the bare name isn't in the default set above.
 
-`--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (no line or char cap). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines **of the definition body** (not file-absolute); the truncation hint uses the same body-relative offset. `--line-numbers` prefixes each line with its line number. Override line cap via `SCIP_CLI_MAX_DEF_LINES`.
+`--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80); bodies are also capped at 32 000 characters unless `--full` or `--max-lines 0`. `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines **of the definition body** (not file-absolute); the truncation hint uses the same body-relative offset. `--line-numbers` prefixes each line with its line number. Override line cap via `SCIP_CLI_MAX_DEF_LINES`.
 
 For large classes, prefer `members ClassName` first, then `code Class.method` for one member.
 
@@ -76,10 +76,10 @@ Each `xargs` invocation reopens the index (fast on cache hit). Use `--limit` on 
 ### search
 
 ```bash
-search [--kind <kind>] [--limit N] [--path PATH] [--names-only] [--paths-only] <pattern>
+search [--kind <kind>] [--limit N] [--path PATH] [--names-only] [--paths-only] <pattern> [<pattern> ...]
 ```
 
-Returns `file:line kind symbolName` (kinds are lowercase: `function`, `class`, etc.). Filters noisy symbols (file-level, parameters, type literals).
+Returns `file:line kind symbolName` (kinds are lowercase: `function`, `class`, etc.). Multiple patterns are OR'd. Filters noisy symbols (file-level, parameters, type literals).
 
 Default `--limit` is 10.
 
@@ -109,12 +109,12 @@ Default `--limit` is 10.
 members [--limit N] [--path PATH] [--names-only] <symbol>
 ```
 
-Returns `startLine:endLine kind name` for each member. Note: limited by database coverage — `enclosing_symbol` data is sparse for many indexers.
+Returns `startLine:endLine kind name` for each member. Members are found via SCIP symbol-prefix matching under the parent; line ranges may be missing and are filled by scanning the parent source when needed.
 
 ### analyze
 
 ```bash
-analyze [--limit N] [target]
+analyze [--limit N] [--path PATH] [target]
 ```
 
-Auto-detects scope: no target → project (bottlenecks, hotspots, cycles, stale types, dead exports, coupling); path with `.` → file (change-surface, unused imports, consumers, dead exports, imports, coupling); else symbol (context, pressure, consumers, affected, dependencies). SQL-only from the index — coarser than dedicated static-analysis tools. Human-readable sections on stdout; not pipe-friendly.
+Auto-detects scope: no target → project-wide (bottlenecks, hotspots, cycles, stale types, dead exports, coupling); path with a file extension or `/` → file checks; else symbol checks. `--path` narrows file/symbol resolution; it does not scope project-wide `analyze` (pass a file or symbol target).

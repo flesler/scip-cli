@@ -1,5 +1,7 @@
 """analyze command — run SQL-based analysis dashboards."""
 
+import sys
+
 from ..analyze import file as file_checks
 from ..analyze import project as project_checks
 from ..analyze import symbol as symbol_checks
@@ -25,6 +27,12 @@ def main(args):
         target = getattr(args, "target", None)
 
         if target is None:
+            if path_scope:
+                print(
+                    "Error: analyze --path requires a file or symbol target (not project-wide)",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
             sections = project_checks.run_all(db, limit=limit)
         elif looks_like_file_target(target):
             path = resolve_one_file(db, target, path_scope=path_scope)
@@ -35,4 +43,5 @@ def main(args):
 
         _print_sections(sections)
     finally:
-        db.close()
+        if db is not None:
+            db.close()

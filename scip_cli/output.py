@@ -63,7 +63,7 @@ def limit_and_warn(items, limit, label="results"):
 
 
 def resolve_max_def_lines(cli_value=None):
-    """Resolve per-definition line cap for def output (0 = unlimited)."""
+    """Resolve per-definition line cap for code output (0 = unlimited)."""
     if cli_value is not None:
         if cli_value < 0:
             raise RuntimeError(f"--max-lines must be >= 0, got {cli_value}")
