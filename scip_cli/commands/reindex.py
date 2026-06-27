@@ -11,7 +11,7 @@ from ..cache import (
 )
 from ..indexing import _index_project, log_index_complete
 from ..paths import normalize_path_scope
-from ..project import find_project_root_and_language
+from ..project import Language, find_project_root_and_language
 from ..scope import save_index_scope
 
 
@@ -22,6 +22,10 @@ def main(args):
         sys.exit(1)
 
     path_args = getattr(args, "path", None) or []
+    if path_args and lang == Language.PYTHON:
+        print("Error: reindex --path is only supported for TypeScript projects", file=sys.stderr)
+        sys.exit(1)
+
     if path_args:
         scope_paths = [normalize_path_scope(path, root) for path in path_args]
         save_index_scope(root, scope_paths)

@@ -114,6 +114,7 @@ def main():
         nargs="?",
         help="Omit for project-wide; file path for file checks; symbol name for symbol checks",
     )
+    add_path_argument(analyze_parser)
     add_limit_argument(analyze_parser, default=20, help_suffix="rows per section")
 
     # reindex

@@ -1,5 +1,6 @@
 """refs command - find all references to a symbol."""
 
+import re
 import sys
 
 from ..cli_args import path_scope_from_args
@@ -9,6 +10,14 @@ from ..queries import resolve_symbol
 from ..session import setup
 from ..source import read_source_lines
 from ..symbols import extract_leaf_name
+
+
+def _leaf_appears_on_line(leaf: str, line: str) -> bool:
+    """Match leaf as a whole identifier, not a substring of another name."""
+    if not leaf:
+        return False
+    pattern = rf"(?<![\w$`]){re.escape(leaf)}(?![\w$`])"
+    return re.search(pattern, line) is not None
 
 
 def _refs_from_chunk_groups(by_doc, project_root, leaf):
@@ -43,7 +52,7 @@ def _refs_from_chunk_groups(by_doc, project_root, leaf):
             offset = min_line
             found = False
             for line_idx in range(start_line - offset, min(end_line - offset + 1, len(lines))):
-                if leaf in lines[line_idx]:
+                if _leaf_appears_on_line(leaf, lines[line_idx]):
                     results.append((rel_path, line_idx + offset + 1))
                     found = True
                     break

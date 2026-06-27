@@ -27,7 +27,7 @@ def setup():
 
 def resolve_one_symbol(db, name, kind_filter=None, path_scope=None):
     """Resolve a symbol name to a single symbol, warning if ambiguous."""
-    symbols = resolve_symbol(db, name, kind_filter, path_scope=path_scope)
+    symbols = resolve_symbol(db, name, kind_filter, limit=2, path_scope=path_scope)
     if not symbols:
         print(f"Symbol '{name}' not found", file=sys.stderr)
         sys.exit(1)

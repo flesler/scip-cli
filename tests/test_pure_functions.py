@@ -4,7 +4,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from scip_cli.commands.refs import get_exact_refs
+from scip_cli.commands.refs import _leaf_appears_on_line, get_exact_refs
 from scip_cli.commands.search import is_noisy_symbol, kind_to_display, parse_symbol
 from scip_cli.output import format_def_body, format_line_range, print_def_truncation_notice
 from scip_cli.project import detect_language
@@ -567,6 +567,12 @@ class TestFormatLineRange:
 
 class TestGetExactRefs:
     """Tests for get_exact_refs function in refs command."""
+
+    def test_leaf_appears_on_line_rejects_substrings(self):
+        assert not _leaf_appears_on_line("id", "const valid = 1")
+        assert _leaf_appears_on_line("id", "const id = 1")
+        assert _leaf_appears_on_line("run", "foo.run()")
+        assert not _leaf_appears_on_line("run", "truncate()")
 
     def _create_test_db(self):
         """Create a test database with minimal schema."""

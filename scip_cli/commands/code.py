@@ -57,7 +57,7 @@ def main(args):
             max_def_chars = 0
         else:
             max_def_lines = resolve_max_def_lines(getattr(args, "max_lines", None))
-            max_def_chars = None
+            max_def_chars = 0 if max_def_lines == 0 else None
 
         printed = 0
         for query_name, symbols in groups:
@@ -112,7 +112,9 @@ def main(args):
                 print(source_snippet)
                 if truncated:
                     lines_shown = shown_end - shown_start + 1 if shown_start is not None else 0
-                    print_def_truncation_notice(query_name, offset, lines_shown, def_body_lines)
+                    line_limited = max_def_lines > 0 and lines_shown >= max_def_lines
+                    if line_limited and offset + lines_shown < def_body_lines:
+                        print_def_truncation_notice(query_name, offset, lines_shown, def_body_lines)
                 printed += 1
 
         if printed == 0:

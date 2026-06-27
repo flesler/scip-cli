@@ -3,6 +3,8 @@
 import contextlib
 from argparse import Namespace
 
+import pytest
+
 from scip_cli.commands import reindex
 from scip_cli.project import Language
 from scip_cli.scope import load_index_scope, save_index_scope
@@ -36,3 +38,16 @@ def test_full_reindex_clears_persisted_scope(tmp_path, monkeypatch):
     reindex.main(Namespace(path=None))
 
     assert load_index_scope(root) is None
+
+
+def test_reindex_path_rejected_for_python(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.PYTHON))
+
+    with pytest.raises(SystemExit) as exc:
+        reindex.main(Namespace(path=["src"]))
+    assert exc.value.code == 1

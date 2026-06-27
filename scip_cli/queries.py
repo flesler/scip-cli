@@ -166,12 +166,20 @@ def resolve_file(db, file_pattern, path_scope=None):
                 WHERE relative_path LIKE ? ESCAPE '\\'
                    OR relative_path LIKE ? ESCAPE '\\'
                    OR relative_path LIKE ? ESCAPE '\\'
+                   OR relative_path LIKE ? ESCAPE '\\'
+                   OR relative_path LIKE ? ESCAPE '\\'
+                   OR relative_path LIKE ? ESCAPE '\\'
+                   OR relative_path LIKE ? ESCAPE '\\'
                 ORDER BY relative_path
                 """,
                 (
                     f"%/{escaped_basename}.ts",
                     f"%/{escaped_basename}.tsx",
                     f"%/{escaped_basename}.js",
+                    f"%/{escaped_basename}.jsx",
+                    f"%/{escaped_basename}.mjs",
+                    f"%/{escaped_basename}.cjs",
+                    f"%/{escaped_basename}.py",
                 ),
             )
         )
@@ -282,6 +290,7 @@ def get_members(db, symbol_id):
         LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
         WHERE gs.symbol LIKE ? ESCAPE '\\' AND gs.symbol != ?
         ORDER BY der.start_line, gs.symbol
+        LIMIT 500
     """,
         (escaped_parent + "%", parent_symbol),
     ).fetchall()
