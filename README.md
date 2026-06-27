@@ -185,7 +185,7 @@ Optional `.scip-cli.json` in the project root:
 Scoped indexing without editing `.scip-cli.json`:
 
 ```bash
-scip-cli reindex --path entrypoints/server
+scip-cli reindex --path packages/server
 scip-cli reindex --path packages/api --path packages/worker
 ```
 
@@ -250,7 +250,7 @@ SCIP_CLI_DEBUG=1 scip-cli refs MyFunction
 # Shows: SQL: SELECT ... | params: (...)
 ```
 
-This is useful for testing and debugging SQL queries without exposing a `--debug` flag to users.
+This is useful for testing and debugging SQL queries
 
 ## License
 

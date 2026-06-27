@@ -27,20 +27,20 @@ class TestIndexScope:
 
     def test_save_and_load_scope(self, tmp_path):
         assert load_index_scope(tmp_path) is None
-        save_index_scope(tmp_path, ["entrypoints/server", "packages/api"])
+        save_index_scope(tmp_path, ["packages/server", "packages/api"])
         scope = load_index_scope(tmp_path)
         assert scope is not None
-        assert scope.paths == ("entrypoints/server", "packages/api")
+        assert scope.paths == ("packages/server", "packages/api")
         save_index_scope(tmp_path, None)
         assert load_index_scope(tmp_path) is None
 
     def test_project_in_scope(self):
-        assert project_in_scope(Path("entrypoints/server"), ("entrypoints/server",))
+        assert project_in_scope(Path("packages/server"), ("packages/server",))
         assert project_in_scope(
-            Path("entrypoints/server/domains/foo"),
-            ("entrypoints/server",),
+            Path("packages/server/domains/foo"),
+            ("packages/server",),
         )
-        assert not project_in_scope(Path("entrypoints/dashboard"), ("entrypoints/server",))
+        assert not project_in_scope(Path("packages/dashboard"), ("packages/server",))
 
     def test_scope_survives_cache_clear(self, tmp_path):
         save_index_scope(tmp_path, ["packages/api"])
