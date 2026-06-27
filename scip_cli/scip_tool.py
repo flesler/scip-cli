@@ -14,19 +14,21 @@ import tempfile
 from pathlib import Path
 from urllib.request import urlopen
 
-SCIP_RELEASES_API = "https://api.github.com/repos/scip-code/scip/releases/latest"
+SCIP_RELEASES_API = "https://api.github.com/repos/scip-code/scip/releases"
+SCIP_PINNED_MINOR = "0.8"
 SCIP_RELEASE_FALLBACK_TAG = "v0.8.1"
 MIN_SCIP_VERSION = (0, 8, 0)
 
 
 def _latest_release_tag() -> str:
-    """Return the latest scip release tag from GitHub."""
+    """Return the latest scip release tag within the pinned minor version."""
     try:
         request = urlopen(SCIP_RELEASES_API, timeout=30)
-        data = json.loads(request.read().decode("utf-8"))
-        tag = data.get("tag_name")
-        if isinstance(tag, str) and tag:
-            return tag
+        releases = json.loads(request.read().decode("utf-8"))
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if tag.startswith(f"v{SCIP_PINNED_MINOR}."):
+                return tag
     except Exception:
         pass
     return SCIP_RELEASE_FALLBACK_TAG
