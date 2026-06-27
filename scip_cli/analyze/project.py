@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, section, short_name
+from .common import (
+    DEFAULT_LIMIT,
+    SYM_DEF_JOIN,
+    analyze_noise,
+    cycle_path_noise,
+    fetch_all,
+    file_pair_noise,
+    section,
+    short_name,
+)
 
 _FILE_EDGES_SQL = """
     SELECT DISTINCT d1.relative_path AS from_file, d2.relative_path AS to_file
@@ -15,7 +24,7 @@ _FILE_EDGES_SQL = """
 """
 
 
-def bottlenecks(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def bottlenecks(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -52,15 +61,17 @@ def bottlenecks(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY score DESC, fi.fan_in DESC
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    return [
+    lines = [
         f"{short_name(symbol)}  score={score}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
         for symbol, path, fan_in, fan_out, score in rows
+        if not analyze_noise(path, symbol, include_tests=include_tests)
     ]
+    return lines[:limit]
 
 
-def hotspots(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def hotspots(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -77,15 +88,17 @@ def hotspots(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY ref_count DESC
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    return [
+    lines = [
         f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
         for symbol, path, ref_count, file_count in rows
+        if not analyze_noise(path, symbol, include_tests=include_tests)
     ]
+    return lines[:limit]
 
 
-def cycles(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def cycles(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -108,7 +121,7 @@ def cycles(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY cycle_path
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
     two_way = fetch_all(
         db,
@@ -121,17 +134,17 @@ def cycles(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY 1
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    lines = [row[0] for row in two_way]
+    lines = [row[0] for row in two_way if not cycle_path_noise(row[0], include_tests=include_tests)]
     for row in rows:
         path = row[0]
-        if path not in lines:
+        if path not in lines and not cycle_path_noise(path, include_tests=include_tests):
             lines.append(path)
     return lines[:limit]
 
 
-def stale_types(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def stale_types(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -152,14 +165,15 @@ def stale_types(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         """,
         (limit * 5,),
     )
-    return [
+    lines = [
         f"{short_name(symbol)}  consumers={consumers}  ({path})"
         for symbol, path, consumers in rows
-        if not analyze_noise(path, symbol)
-    ][:limit]
+        if not analyze_noise(path, symbol, include_tests=include_tests)
+    ]
+    return lines[:limit]
 
 
-def dead_exports(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def dead_exports(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -181,12 +195,14 @@ def dead_exports(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         (limit * 5,),
     )
     lines = [
-        f"{short_name(symbol)}  loc={loc}  ({path})" for symbol, path, loc in rows if not analyze_noise(path, symbol)
+        f"{short_name(symbol)}  loc={loc}  ({path})"
+        for symbol, path, loc in rows
+        if not analyze_noise(path, symbol, include_tests=include_tests)
     ]
     return lines[:limit]
 
 
-def top_coupling(db, limit: int = DEFAULT_LIMIT) -> list[str]:
+def top_coupling(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[str]:
     rows = fetch_all(
         db,
         f"""
@@ -203,17 +219,23 @@ def top_coupling(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY shared DESC
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    return [f"{file1}  <->  {file2}  shared={shared}" for file1, file2, shared in rows]
+    lines = [
+        f"{file1}  <->  {file2}  shared={shared}"
+        for file1, file2, shared in rows
+        if not file_pair_noise(file1, file2, include_tests=include_tests)
+    ]
+    return lines[:limit]
 
 
-def run_all(db, limit: int = DEFAULT_LIMIT) -> list[tuple[str, list[str]]]:
+def run_all(db, limit: int = DEFAULT_LIMIT, *, include_tests: bool = False) -> list[tuple[str, list[str]]]:
+    opts = {"include_tests": include_tests}
     return [
-        section("Bottlenecks (fan-in x fan-out)", bottlenecks(db, limit)),
-        section("Hotspots (most referenced)", hotspots(db, limit)),
-        section("Cycles (file dependencies)", cycles(db, limit)),
-        section("Stale types (≤1 external consumer)", stale_types(db, limit)),
-        section("Dead exports (no external refs)", dead_exports(db, limit)),
-        section("Top coupling (file pairs)", top_coupling(db, limit)),
+        section("Bottlenecks (fan-in x fan-out)", bottlenecks(db, limit, **opts)),
+        section("Hotspots (most referenced)", hotspots(db, limit, **opts)),
+        section("Cycles (file dependencies)", cycles(db, limit, **opts)),
+        section("Stale types (≤1 external consumer)", stale_types(db, limit, **opts)),
+        section("Dead exports (no external refs)", dead_exports(db, limit, **opts)),
+        section("Top coupling (file pairs)", top_coupling(db, limit, **opts)),
     ]

@@ -114,7 +114,11 @@ Returns `startLine:endLine kind name` for each member. Members are found via SCI
 ### analyze
 
 ```bash
-analyze [--limit N] [--path PATH] [target]
+analyze [--limit N] [--path PATH] [--include-tests] [target]
 ```
 
-Auto-detects scope: no target → project-wide (bottlenecks, hotspots, cycles, stale types, dead exports, coupling); path with a file extension or `/` → file checks; else symbol checks. `--path` narrows file/symbol resolution; it does not scope project-wide `analyze` (pass a file or symbol target).
+Project-wide (no target): bottlenecks, hotspots, cycles, stale types, dead exports, coupling. File path → change-surface, dead exports in file, consumers. Symbol → pressure, dependencies, affected.
+
+**Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli/hot_file.py` on suspects. Skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); use `--include-tests` to include them.
+
+**Easy pickings:** **Cycles** and **dead exports** (production paths only) — cross-file cleanup candidates. **Stale types** — low-use classes. Ignore `analyze/*` helpers in dead exports (same-file section runners). “Dead” = no refs from *other* files in the index, not `vulture`. `--path` scopes file/symbol targets only, not project-wide runs.

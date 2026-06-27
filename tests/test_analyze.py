@@ -3,16 +3,28 @@
 from scip_cli.analyze import file as file_checks
 from scip_cli.analyze import project as project_checks
 from scip_cli.analyze import symbol as symbol_checks
-from scip_cli.analyze.common import analyze_noise
+from scip_cli.analyze.common import analyze_noise, is_test_path
 
 from .analyze_db import mini_codebase_db
 
 
 class TestAnalyzeNoise:
+    def test_is_test_path(self):
+        assert is_test_path("tests/test_foo.py")
+        assert is_test_path("src/foo.test.ts")
+        assert is_test_path("src/foo.spec.tsx")
+        assert is_test_path("pkg/__tests__/bar.js")
+        assert is_test_path("conftest.py")
+        assert not is_test_path("scip_cli/queries.py")
+
     def test_skips_tests_and_private(self):
-        assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/TestCase#")
+        assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/helper().")
         assert analyze_noise("scip_cli/foo.py", "scip-python x `t.py`/_helper().")
         assert not analyze_noise("scip_cli/foo.py", "scip-python x `t.py`/helper().")
+
+    def test_include_tests_keeps_test_paths(self):
+        assert not analyze_noise("tests/test_foo.py", "scip-python x `t.py`/helper().", include_tests=True)
+        assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/_helper().", include_tests=True)
 
 
 class TestProjectAnalyze:

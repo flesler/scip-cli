@@ -43,15 +43,13 @@ scip-cli skill                     # familiarize with subcommands and gotchas
 
 ## Dogfood / health check
 
-Before broad code review, index and run analyze on the repo itself:
-
 ```bash
 .venv/bin/scip-cli reindex
-.venv/bin/scip-cli analyze --limit 30
-.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20   # repeat for hot files
+.venv/bin/scip-cli analyze --limit 25
+.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20
 ```
 
-See `dogfood.md` for interpretation (dead exports vs test noise, cycles, etc.).
+See README **Finding easy wins with analyze** and `dogfood.md`. Test paths skipped by default; `--include-tests` to include.
 
 ## Iterate / code review
 

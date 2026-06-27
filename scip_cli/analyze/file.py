@@ -104,7 +104,7 @@ def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
     return [
         f"{short_name(symbol)}  {start + 1}:{end + 1}"
         for symbol, start, end in rows
-        if not analyze_noise(relative_path, symbol)
+        if not analyze_noise(relative_path, symbol, include_tests=True)
     ]
 
 

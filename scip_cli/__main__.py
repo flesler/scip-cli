@@ -116,6 +116,11 @@ def main():
     )
     add_path_argument(analyze_parser)
     add_limit_argument(analyze_parser, default=20, help_suffix="rows per section")
+    analyze_parser.add_argument(
+        "--include-tests",
+        action="store_true",
+        help="Include tests/, *.test.*, *.spec.* paths in project-wide analyze (default: skip)",
+    )
 
     # reindex
     reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")

@@ -24,6 +24,7 @@ def main(args):
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
+        include_tests = getattr(args, "include_tests", False)
         target = getattr(args, "target", None)
 
         if target is None:
@@ -33,7 +34,7 @@ def main(args):
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            sections = project_checks.run_all(db, limit=limit)
+            sections = project_checks.run_all(db, limit=limit, include_tests=include_tests)
         elif looks_like_file_target(target):
             path = resolve_one_file(db, target, path_scope=path_scope)
             sections = file_checks.run_all(db, path, limit=limit)

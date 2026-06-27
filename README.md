@@ -101,7 +101,7 @@ scip-cli <command> [arguments]
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `members <symbol>` - List members of a class/interface (`--path`)
-- `analyze [target]` - SQL health dashboards (`--limit`). No target: project-wide (bottlenecks, hotspots, cycles, stale types, dead exports, coupling). File path: change-surface, unused imports, consumers, dead exports, imports, coupling. Symbol: context, pressure, consumers, affected, dependencies.
+- `analyze [target]` - SQL health dashboards (`--limit`, `--include-tests`). No target: project-wide. File or symbol target for scoped checks. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
 - `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
 - `skill [path]` - Install or dump the SKILL.md
 
@@ -193,6 +193,38 @@ scip-cli reindex --path packages/api --path packages/worker
 `--path` limits which discovered tsconfig projects are indexed (prefix match, same idea as query `--path`). The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`.
 
 Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or when you want a fresh index.
+
+## Finding easy wins with `analyze`
+
+Use `analyze` on the repo itself before broad refactors or agent review — it surfaces cross-file issues from the SCIP index (not Python `vulture`).
+
+**Quick pass** (after `scip-cli reindex`):
+
+```bash
+scip-cli analyze --limit 25
+```
+
+**What to look at first**
+
+| Section | Easy pickings |
+| ------- | ------------- |
+| **Cycles** | Import/mention cycles between production files — break the edge or extract shared code |
+| **Dead exports** | Symbols with no refs from other files — delete or make private (`_`); skip `scip_cli/analyze/*` section helpers (same-file only) |
+| **Stale types** | Classes/types with ≤1 external consumer — merge, inline, or document why they stay |
+| **Top coupling** | Files that share many symbols — refactor boundaries or split modules |
+| **Hotspots / bottlenecks** | High fan-in hubs — stabilize APIs, add tests, or reduce blast radius before edits |
+
+**Per-file drill-down** on hubs or suspects:
+
+```bash
+scip-cli analyze scip_cli/queries.py --limit 20
+```
+
+`Dead exports in file` lists same-module symbols with no *external* refs — module-private `_helpers` are filtered out. Remaining rows are worth a manual `rg` check.
+
+**Defaults:** project-wide analyze skips `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze (`analyze path/to/file`) always analyzes that file.
+
+**Limits:** “Dead export” means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Re-run `reindex` after large changes; the index is a snapshot.
 
 ## Performance
 
