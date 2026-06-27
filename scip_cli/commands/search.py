@@ -104,6 +104,25 @@ def _print_search_results(results, args):
         print(f"{file_path}:{line} {kind_display} {name}")
 
 
+def _qualified_pattern(pattern: str) -> bool:
+    return "." in pattern and "/" not in pattern and "*" not in pattern
+
+
+def _search_results_from_symbols(db, symbols, limit):
+    """Turn resolve_symbol rows into search result tuples."""
+    symbols = limit_and_warn(symbols, limit, "results")
+    results = []
+    for symbol_id, symbol_str, _display_name in symbols:
+        row = get_def_location(db, symbol_id)
+        start_line = row[1] if row else None
+        file_path = row[0] if row else _resolve_file_path(db, symbol_str)
+        kind = infer_kind(symbol_str)
+        line = start_line + 1 if start_line is not None else "?"
+        short = extract_leaf_name(symbol_str)
+        results.append((file_path, line, kind_to_display(kind), short))
+    return results
+
+
 def main(args):
     """Search symbols by pattern."""
     db, project_root = setup()
@@ -112,22 +131,31 @@ def main(args):
         limit = args.limit
         patterns = args.pattern
 
-        # Single dotted pattern (e.g. "Widget.run") - try exact resolve first
-        if len(patterns) == 1 and "." in patterns[0] and "/" not in patterns[0] and "*" not in patterns[0]:
-            symbols = resolve_symbol(db, patterns[0], args.kind, limit=limit + 1, path_scope=path_scope)
-            if symbols:
-                symbols = limit_and_warn(symbols, limit, "results")
-                results = []
-                for symbol_id, symbol_str, _display_name in symbols:
-                    row = get_def_location(db, symbol_id)
-                    start_line = row[1] if row else None
-                    file_path = row[0] if row else _resolve_file_path(db, symbol_str)
-                    kind = infer_kind(symbol_str)
-                    line = start_line + 1 if start_line is not None else "?"
-                    short = extract_leaf_name(symbol_str)
-                    results.append((file_path, line, kind_to_display(kind), short))
-                _print_search_results(results, args)
-                return
+        resolved_symbols = []
+        like_patterns = []
+        for pattern in patterns:
+            if _qualified_pattern(pattern):
+                symbols = resolve_symbol(db, pattern, args.kind, limit=limit + 1, path_scope=path_scope)
+                if symbols:
+                    resolved_symbols.extend(symbols)
+                    continue
+            like_patterns.append(pattern)
+
+        if resolved_symbols and not like_patterns:
+            results = _search_results_from_symbols(db, resolved_symbols, limit)
+            _print_search_results(results, args)
+            return
+
+        prefill = _search_results_from_symbols(db, resolved_symbols, limit) if resolved_symbols else []
+        patterns = like_patterns
+        if not patterns:
+            if prefill:
+                _print_search_results(prefill, args)
+            else:
+                pattern_str = " or ".join(f"'{p}'" for p in args.pattern)
+                print(f"No symbols found matching {pattern_str}", file=sys.stderr)
+                sys.exit(1)
+            return
 
         path_clause, path_params = path_filter_sql(db, path_scope)
         kind_clause = kind_sql_clause(args.kind) if args.kind else ""
@@ -198,6 +226,11 @@ def main(args):
             pattern_str = " or ".join(f"'{p}'" for p in patterns)
             print(f"No symbols found matching {pattern_str}", file=sys.stderr)
             sys.exit(1)
+
+        if prefill:
+            seen = {r[3] for r in prefill}
+            results = prefill + [r for r in results if r[3] not in seen]
+            results = results[:limit]
 
         _print_search_results(results, args)
     finally:

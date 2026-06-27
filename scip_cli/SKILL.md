@@ -21,7 +21,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 
 ## Gotchas
 
-- **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Consts/variables need `code --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `code methodName`.
+- **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Type/object fields use the same form: `search Options.verbose`, `code Options.verbose`. Consts/variables need `code --kind variable X` or `search --kind variable X`. Class methods need `members ClassName`, not bare `code methodName`.
 - **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code` returns all matches; `refs` returns refs for all matching symbols. Use `--limit N` to cap results, or use `search` with a more specific pattern to disambiguate.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use `--path packages/api` (or any file/dir) to scope queries.
@@ -32,24 +32,24 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 ### code
 
 ```bash
-code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path PATH] [--snippet] [--line-numbers] <symbol>
+code [--kind <kind>] [--limit N] [--max-lines N] [--offset N] [--full] [--path PATH] [--snippet] [--line-numbers] <symbol> [<symbol> ...]
 ```
 
 Kinds: `function`, `method`, `class`, `property`, `variable` — use `--kind` when the bare name isn't in the default set above.
 
-`--limit` caps how many matching symbols are shown (default 10). `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (equivalent to `--max-lines 0`). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines (useful for pagination with `--max-lines`). `--line-numbers` prefixes each line with its line number. Override default via `SCIP_CLI_MAX_DEF_LINES`.
+`--limit` caps how many matching symbols are shown per query (default 10). Pass multiple symbol names to fetch several definitions in one run; when more than one definition is printed, each block is prefixed with the query name on stdout. `--max-lines` caps source lines **per definition body** (default 80) so huge functions/classes do not flood context. Use `--full` for the full body (equivalent to `--max-lines 0`). `--snippet` shows only file, line range, and first line (not full body). `--offset N` skips the first N lines (useful for pagination with `--max-lines`). `--line-numbers` prefixes each line with its line number. Override default via `SCIP_CLI_MAX_DEF_LINES`.
 
 For large classes, prefer `members ClassName` first, then `code Class.method` for one member.
 
 ### refs
 
 ```bash
-refs [--limit N] [--path PATH] [--paths-only] <symbol>
+refs [--limit N] [--path PATH] [--paths-only] <symbol> [<symbol> ...]
 ```
 
 Returns `file:line` for each reference. Reads source files to find exact line numbers.
 
-Default `--limit` is 10. When multiple symbols match, refs are grouped by symbol with `# <leaf-name>` headers on **stderr** (stdout stays pipe-clean). Use `--paths-only` for unique file paths (pipe-friendly).
+Default `--limit` is 10 per symbol query. When more than one symbol is output, each group is prefixed on stdout with the query name (or `name (path)` when one query matches multiple symbols). Use `--paths-only` for unique file paths (pipe-friendly).
 
 ### Pipelines
 

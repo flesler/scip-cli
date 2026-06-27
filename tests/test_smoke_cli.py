@@ -122,6 +122,38 @@ class TestSmokeCLI:
         assert HELPER_FILE in result.stdout
         assert "function greet" in result.stdout
 
+    def test_code_multiple_symbols(self, smoke_cli, indexed_sample_project):
+        result = _run(
+            smoke_cli,
+            indexed_sample_project,
+            "code",
+            FN_GREET,
+            "Widget.run",
+            "--snippet",
+            "--limit",
+            "1",
+        )
+        assert result.returncode == 0
+        lines = result.stdout.strip().splitlines()
+        assert lines[0] == FN_GREET
+        assert lines[2] == "Widget.run"
+        assert HELPER_FILE in result.stdout
+        assert "widget.ts" in result.stdout
+
+    def test_refs_multiple_symbols_partial(self, smoke_cli, indexed_sample_project):
+        result = _run(
+            smoke_cli,
+            indexed_sample_project,
+            "refs",
+            FN_GREET,
+            "Widget.run",
+            "--limit",
+            "5",
+        )
+        assert result.returncode == 0
+        assert "consumer.ts" in result.stdout
+        assert "Widget.run" not in result.stdout
+
     def test_members_class(self, smoke_cli, indexed_sample_project):
         result = _run(
             smoke_cli,

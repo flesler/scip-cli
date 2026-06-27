@@ -58,6 +58,21 @@ def infer_kind(symbol):
     return SymbolKind.UNKNOWN
 
 
+def symbol_like_patterns(leaf: str) -> list[str]:
+    """SQL LIKE patterns for finding a symbol by leaf name."""
+    from .sql import escape_like
+
+    escaped = escape_like(leaf)
+    return [
+        f"%/{escaped}().",
+        f"%/{escaped}#",
+        f"%/{escaped}.",
+        f"%#{escaped}().",
+        f"%#{escaped}.",
+        f"%typeLiteral%:{escaped}.",
+    ]
+
+
 def parse_qualified_name(name):
     """Split a dotted symbol query into qualifier segments and leaf name."""
     if "." not in name:
@@ -82,6 +97,11 @@ def symbol_matches_qualifier(symbol_str, qualifier_parts, leaf):
         return True
 
     container = qualifier_parts[-1]
+    if re.search(rf"{re.escape(container)}#typeLiteral\d+:{re.escape(leaf)}\.", tail):
+        if len(qualifier_parts) == 1:
+            return True
+        return all(part in symbol_str for part in qualifier_parts[:-1])
+
     if f"{container}#{leaf}" in tail:
         if len(qualifier_parts) == 1:
             return True

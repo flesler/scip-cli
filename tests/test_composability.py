@@ -122,7 +122,7 @@ class TestMachineOutputFlags:
         db.execute("INSERT INTO mentions VALUES (1, 2, 0)")
         db.commit()
 
-        args = SimpleNamespace(symbol="foo", limit=10, path=None, paths_only=True)
+        args = SimpleNamespace(symbol=["foo"], limit=10, path=None, paths_only=True)
         project_root = Path(tempfile.mkdtemp())
         (project_root / "pkg").mkdir(parents=True)
         (project_root / "pkg" / "a.ts").write_text("const x = foo()\n", encoding="utf-8")

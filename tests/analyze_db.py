@@ -111,6 +111,55 @@ class AnalyzeDbBuilder:
             (chunk_id, sym_id),
         )
 
+    def method(self, path: str, class_name: str, method_name: str, *, start: int = 0, end: int = 10) -> int:
+        """Define a class method. Returns symbol_id."""
+        doc_id, chunk_id = self._ensure_file(path)
+        sym_id = self._next_sym
+        self._next_sym += 1
+        file_label = path.split("/")[-1]
+        symbol = f"scip-typescript npm test 1.0 {path}/`{file_label}`/{class_name}#{method_name}()."
+        self.conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, method_name),
+        )
+        der_id = self._next_der
+        self._next_der += 1
+        self.conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, ?, 0, ?, 0)
+            """,
+            (der_id, doc_id, sym_id, start, end),
+        )
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 1)",
+            (chunk_id, sym_id),
+        )
+        return sym_id
+
+    def type_literal_field(
+        self,
+        path: str,
+        parent_name: str,
+        field_name: str,
+        *,
+        literal_index: int = 0,
+    ) -> int:
+        """Define a type-literal object field (e.g. Options.verbose). Returns symbol_id."""
+        _doc_id, _chunk_id = self._ensure_file(path)
+        sym_id = self._next_sym
+        self._next_sym += 1
+        file_label = path.split("/")[-1]
+        symbol = (
+            f"scip-typescript npm test 1.0 {path}/`{file_label}`/{parent_name}#typeLiteral{literal_index}:{field_name}."
+        )
+        self.conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, field_name),
+        )
+        return sym_id
+
     def _ensure_file(self, path: str) -> tuple[int, int]:
         row = self.conn.execute("SELECT id FROM documents WHERE relative_path = ?", (path,)).fetchone()
         if row:

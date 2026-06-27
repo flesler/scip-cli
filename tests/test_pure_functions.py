@@ -373,6 +373,36 @@ class TestResolveSymbol:
         assert ").(" not in results[0][1]
         conn.close()
 
+    def test_qualified_type_literal_field(self):
+        conn = sqlite3.connect(":memory:")
+        conn.execute("""
+            CREATE TABLE global_symbols (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                display_name TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`helper.ts`/Options#typeLiteral0:verbose.",
+                "verbose",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO global_symbols (symbol, display_name) VALUES (?, ?)",
+            (
+                "scip-typescript npm test 1.0 src/`other.ts`/Other#typeLiteral0:verbose.",
+                "verbose",
+            ),
+        )
+        conn.commit()
+
+        results = resolve_symbol(conn, "Options.verbose")
+        assert len(results) == 1
+        assert "Options#typeLiteral0:verbose" in results[0][1]
+        conn.close()
+
 
 class TestFormatDefBody:
     def test_truncates_long_definitions(self):

@@ -23,6 +23,18 @@ def _ambiguous_label(match):
     return match
 
 
+def symbol_output_label(query_name: str, symbol_str: str, matches_for_query: int) -> str:
+    """Label for a symbol block when multiple symbols are printed."""
+    if matches_for_query > 1:
+        return _ambiguous_label((None, symbol_str))
+    return query_name
+
+
+def maybe_print_symbol_header(label: str, show_header: bool) -> None:
+    if show_header:
+        print(label)
+
+
 def warn_ambiguous(name, matches, context="symbol"):
     """Print warning if multiple matches found."""
     if len(matches) <= 1:

@@ -1,5 +1,6 @@
 """SQLite queries for symbol and document resolution."""
 
+import re
 from pathlib import Path
 
 from .paths import path_filter_sql, path_in_scope
@@ -9,6 +10,7 @@ from .symbols import (
     is_parameter_symbol,
     kind_sql_clause,
     parse_qualified_name,
+    symbol_like_patterns,
     symbol_matches_qualifier,
 )
 
@@ -38,6 +40,8 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     escaped = escape_like(search_name)
     path_clause, path_params = path_filter_sql(db, path_scope)
     kind_clause = kind_sql_clause(kind_filter) if kind_filter else ""
+    like_patterns = symbol_like_patterns(search_name)
+    like_clause = " OR ".join("gs.symbol LIKE ? ESCAPE '\\'" for _ in like_patterns)
 
     # Skip SQL LIMIT when qualifier_parts present (filtered in Python)
     if limit and not qualifier_parts:
@@ -53,22 +57,10 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             FROM global_symbols gs
             LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
             LEFT JOIN documents d ON der.document_id = d.id
-            WHERE (
-                gs.symbol LIKE ? ESCAPE '\\' OR gs.symbol LIKE ? ESCAPE '\\'
-                OR gs.symbol LIKE ? ESCAPE '\\' OR gs.symbol LIKE ? ESCAPE '\\'
-                OR gs.symbol LIKE ? ESCAPE '\\'
-            ){path_clause}{kind_clause}
+            WHERE ({like_clause}){path_clause}{kind_clause}
             {limit_clause}
         """
-        params = (
-            f"%/{escaped}().",
-            f"%/{escaped}#",
-            f"%/{escaped}.",
-            f"%#{escaped}().",
-            f"%#{escaped}.",
-            *path_params,
-            *limit_param,
-        )
+        params = (*like_patterns, *path_params, *limit_param)
         rows = debug_execute(db, sql, params).fetchall()
         results = list(rows)
 
@@ -85,14 +77,13 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
             rows = debug_execute(db, sql, params).fetchall()
             results = [r for r in rows if search_name in r[1].split("/")[-1] or search_name in extract_leaf_name(r[1])]
     else:
+        bare_like = " OR ".join("symbol LIKE ? ESCAPE '\\'" for _ in like_patterns)
         sql = f"""
             SELECT id, symbol, display_name FROM global_symbols
-            WHERE (symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
-               OR symbol LIKE ? ESCAPE '\\' OR symbol LIKE ? ESCAPE '\\'
-               OR symbol LIKE ? ESCAPE '\\'){kind_clause.replace("gs.", "")}
+            WHERE ({bare_like}){kind_clause.replace("gs.", "")}
             {limit_clause}
         """
-        params = (f"%/{escaped}().", f"%/{escaped}#", f"%/{escaped}.", f"%#{escaped}().", f"%#{escaped}.", *limit_param)
+        params = (*like_patterns, *limit_param)
         rows = debug_execute(db, sql, params).fetchall()
         results = list(rows)
 
@@ -250,11 +241,12 @@ def get_refs_for_symbols(db, symbol_ids):
 
 
 def get_members(db, symbol_id):
-    """Get members (children) of a symbol."""
+    """Get members (children) of a symbol via SCIP symbol prefix."""
     row = debug_execute(db, "SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
     if not row:
         return []
     parent_symbol = row[0]
+    escaped_parent = escape_like(parent_symbol)
 
     rows = debug_execute(
         db,
@@ -262,27 +254,28 @@ def get_members(db, symbol_id):
         SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
         FROM global_symbols gs
         LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
-        WHERE gs.enclosing_symbol = ?
-        ORDER BY der.start_line
+        WHERE gs.symbol LIKE ? ESCAPE '\\' AND gs.symbol != ?
+        ORDER BY der.start_line, gs.symbol
     """,
-        (parent_symbol,),
+        (escaped_parent + "%", parent_symbol),
     ).fetchall()
 
-    if not rows:
-        escaped_parent = escape_like(parent_symbol)
-        rows = debug_execute(
-            db,
-            """
-            SELECT gs.id, gs.symbol, gs.display_name, der.start_line, der.end_line
-            FROM global_symbols gs
-            LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
-            WHERE gs.symbol LIKE ? ESCAPE '\\' AND gs.symbol != ?
-            ORDER BY der.start_line
-        """,
-            (escaped_parent + "%", parent_symbol),
-        ).fetchall()
+    return [r for r in rows if ").(" not in r[1] and _is_direct_member(parent_symbol, r[1])]
 
-    return [r for r in rows if ").(" not in r[1]]
+
+def _is_direct_member(parent_symbol: str, member_symbol: str) -> bool:
+    """Keep immediate children (methods, fields, type-literal keys)."""
+    if not member_symbol.startswith(parent_symbol):
+        return False
+    suffix = member_symbol[len(parent_symbol) :]
+    if not suffix:
+        return False
+    if suffix.startswith("typeLiteral"):
+        return bool(re.match(r"typeLiteral\d+:[^#]+\.", suffix))
+    if re.fullmatch(r"[^#]+#", suffix):
+        return True
+    head = suffix.split("().")[0]
+    return "#" not in head
 
 
 def get_def_location(db, symbol_id):

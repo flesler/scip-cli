@@ -30,26 +30,23 @@ scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 
 ### 1. Install scip-cli
 
-**From PyPI:**
+**From PyPI** (end users):
 
 ```bash
 pip install scip-cli
 ```
 
-**From source (local development):**
+**Local development** (use a project venv — do not rely on global `pip`):
 
 ```bash
-git clone https://github.com/flesler/scip-cli.git
 cd scip-cli
-pip install .
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+scip-cli --version
 ```
 
-For editable development (where `pip install -e .` fails due to permissions):
-
-```bash
-export PYTHONPATH=/path/to/scip-cli:$PYTHONPATH
-python -m scip_cli --help
-```
+`pip install -e .` keeps `scip-cli` on your PATH inside the venv while you edit the repo. Run tests with `pytest` from the same venv.
 
 ### 2. Install prerequisites (optional)
 

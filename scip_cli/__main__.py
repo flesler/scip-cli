@@ -29,7 +29,7 @@ def main():
 
     # refs
     refs_parser = subparsers.add_parser("refs", help="Find references to a symbol")
-    refs_parser.add_argument("symbol", help="Symbol name")
+    refs_parser.add_argument("symbol", nargs="+", help="Symbol name(s)")
     refs_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
     add_path_argument(refs_parser)
     add_paths_only_argument(refs_parser)
@@ -69,7 +69,7 @@ def main():
         action="store_true",
         help="Prefix each line with its line number",
     )
-    code_parser.add_argument("symbol", help="Symbol name")
+    code_parser.add_argument("symbol", nargs="+", help="Symbol name(s)")
 
     # search
     search_parser = subparsers.add_parser("search", help="Search symbols by pattern")

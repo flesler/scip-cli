@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "scip-cli"
@@ -23,20 +23,18 @@ Homepage = "https://github.com/flesler/scip-cli"
 [project.scripts]
 scip-cli = "scip_cli.__main__:main"
 
-[tool.setuptools.packages.find]
-exclude = ["tests*"]
+[tool.hatch.version]
+path = "scip_cli/__init__.py"
 
-[tool.setuptools.package-data]
-scip_cli = ["SKILL.md"]
-
-[tool.setuptools.dynamic]
-version = {attr = "scip_cli.__version__"}
+[tool.hatch.build.targets.wheel]
+packages = ["scip_cli"]
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.11",
     "pytest>=7",
     "pre-commit>=4.0",
+    "build>=1",
 ]
 
 [tool.ruff]

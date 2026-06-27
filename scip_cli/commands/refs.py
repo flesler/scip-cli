@@ -3,7 +3,7 @@
 import sys
 
 from ..cli_args import path_scope_from_args
-from ..output import limit_and_warn
+from ..output import limit_and_warn, maybe_print_symbol_header, symbol_output_label
 from ..paths import path_in_scope
 from ..queries import resolve_symbol
 from ..session import setup
@@ -33,7 +33,7 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
 
     if len(chunks) > max_refs:
         chunks = chunks[:max_refs]
-        print(f"# Warning: more than {max_refs} references, truncating", file=sys.stderr)
+        print(f"Warning: more than {max_refs} references, truncating", file=sys.stderr)
 
     if not chunks:
         return []
@@ -85,28 +85,36 @@ def get_exact_refs(db, symbol_id, project_root, max_refs, path_scope=None):
     return results
 
 
+def _resolve_symbol_groups(db, names, limit, path_scope):
+    groups = []
+    for query_name in names:
+        symbols = resolve_symbol(db, query_name, limit=limit + 1, path_scope=path_scope)
+        if not symbols:
+            print(f"Symbol '{query_name}' not found", file=sys.stderr)
+            continue
+        groups.append((query_name, limit_and_warn(symbols, limit, "symbols")))
+    return groups
+
+
 def main(args):
     """Find all references to a symbol."""
     db, project_root = setup()
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
-
-        symbols = resolve_symbol(db, args.symbol, limit=limit + 1, path_scope=path_scope)
-        if not symbols:
-            print(f"Symbol '{args.symbol}' not found", file=sys.stderr)
-            sys.exit(1)
-
-        symbols = limit_and_warn(symbols, limit, "symbols")
+        groups = _resolve_symbol_groups(db, args.symbol, limit, path_scope)
 
         all_refs = []
-        for symbol_id, symbol_str, _display_name in symbols:
-            refs = get_exact_refs(db, symbol_id, project_root, limit, path_scope=path_scope)
-            if refs:
-                all_refs.append((symbol_str, refs))
+        for query_name, symbols in groups:
+            for symbol_id, symbol_str, _display_name in symbols:
+                refs = get_exact_refs(db, symbol_id, project_root, limit, path_scope=path_scope)
+                if refs:
+                    label = symbol_output_label(query_name, symbol_str, len(symbols))
+                    all_refs.append((label, refs))
 
         if not all_refs:
-            print(f"No references found for '{args.symbol}'", file=sys.stderr)
+            names = ", ".join(f"'{n}'" for n in args.symbol)
+            print(f"No references found for {names}", file=sys.stderr)
             sys.exit(1)
 
         paths_only = getattr(args, "paths_only", False)
@@ -117,9 +125,9 @@ def main(args):
                     print(path)
             return
 
-        for symbol_str, refs in all_refs:
-            if len(all_refs) > 1:
-                print(f"# {extract_leaf_name(symbol_str)}", file=sys.stderr)
+        show_headers = len(all_refs) > 1
+        for label, refs in all_refs:
+            maybe_print_symbol_header(label, show_headers)
             seen = set()
             for path, line in refs:
                 key = (path, line)
