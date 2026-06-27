@@ -58,6 +58,10 @@ def main(args):
             for symbol_id, symbol_str, _display_name in symbols:
                 row = resolve_def_location(db, project_root, symbol_id, symbol_str)
                 if not row:
+                    print(
+                        f"Warning: no definition location for '{query_name}'",
+                        file=sys.stderr,
+                    )
                     continue
 
                 rel_path, start_line, end_line = row

@@ -237,8 +237,8 @@ def main(args):
             sys.exit(1)
 
         if prefill:
-            seen = {r[3] for r in prefill}
-            results = prefill + [r for r in results if r[3] not in seen]
+            seen = {(r[0], r[1]) for r in prefill}
+            results = prefill + [r for r in results if (r[0], r[1]) not in seen]
             results = results[:limit]
 
         _print_search_results(results, args)

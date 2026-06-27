@@ -1,0 +1,39 @@
+"""Tests for reindex command."""
+
+from argparse import Namespace
+from pathlib import Path
+
+from scip_cli.commands import reindex
+from scip_cli.project import Language
+from scip_cli.scope import load_index_scope, save_index_scope
+
+
+def test_full_reindex_clears_persisted_scope(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+    save_index_scope(root, ["packages/api"])
+    cache_dir_calls: list[Path] = []
+
+    def fake_get_cache_dir(project_root):
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir_calls.append(cache_dir)
+        return cache_dir
+
+    def fake_index_project(_root, _lang, cache_dir, *, replace=False, log=True):
+        db = cache_dir / ("index.db.next" if replace else "index.db")
+        db.write_text("sqlite", encoding="utf-8")
+        return db, 0, 1
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
+    monkeypatch.setattr(reindex, "get_cache_dir", fake_get_cache_dir)
+    monkeypatch.setattr(reindex, "cleanup_in_progress_index", lambda _cache: None)
+    monkeypatch.setattr(reindex, "_index_project", fake_index_project)
+    monkeypatch.setattr(reindex, "promote_next_index", lambda _cache: None)
+    monkeypatch.setattr(reindex, "log_index_complete", lambda *_a, **_k: None)
+
+    reindex.main(Namespace(path=None))
+
+    assert load_index_scope(root) is None

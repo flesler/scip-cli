@@ -1,5 +1,6 @@
 """Index cache path resolution."""
 
+import os
 import re
 from pathlib import Path
 
@@ -39,9 +40,8 @@ def promote_next_index(cache_dir: Path) -> None:
         raise RuntimeError("index.db.next is missing")
 
     _unlink_sqlite_sidecars(live_db)
-    if live_db.is_file():
-        live_db.unlink()
-    next_db.rename(live_db)
+    _unlink_sqlite_sidecars(next_db)
+    os.replace(next_db, live_db)
 
 
 def project_cache_slug(project_root: Path) -> str:

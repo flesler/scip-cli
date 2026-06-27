@@ -439,7 +439,7 @@ def _index_project(root, lang, cache_dir, *, replace=False, log=True):
                 projects=total if total > 1 else None,
                 skipped=skipped,
             )
-        return output_db
+        return output_db, skipped, total
 
     with tempfile.TemporaryDirectory() as tmpdir:
         index_scip = os.path.join(tmpdir, "index.scip")
@@ -463,7 +463,7 @@ def _index_project(root, lang, cache_dir, *, replace=False, log=True):
         _convert_scip_to_db(index_scip, out)
         if log:
             log_index_complete(out, lang.value)
-        return out
+        return out, 0, 1
 
 
 def get_db(project_root=None):

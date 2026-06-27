@@ -181,6 +181,8 @@ Optional `.scip-cli.json` in the project root:
 
 `SCIP_CLI_INDEX_WORKERS` controls parallel `scip-typescript` runs during first index (default: up to 8). Merge into one database is always serial.
 
+Large monorepos (>10 tsconfig projects) log per-project progress to stderr during indexing; smaller repos stay quiet aside from the final `Indexed … (size)` line.
+
 Scoped indexing without editing `.scip-cli.json`:
 
 ```bash
@@ -197,7 +199,7 @@ Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or
 Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli is a lightweight Python partial reimplementation optimized for speed. Compared to the original:
 
 - `refs`: 6.4s → 0.03s (213x faster)
-- `def`: 2.8s → 0.05s (56x faster)
+- `code`: 2.8s → 0.05s (56x faster)
 - `search`: 2.6s → 0.03s (87x faster)
 - `symbols`: 0.3s → 0.02s (15x faster)
 - `rdeps`: 0.2s → 0.02s (10x faster)
@@ -220,6 +222,8 @@ scip_cli/
 ├── paths.py         # --path scope filtering
 ├── project.py       # Project root + language detection
 ├── cache.py         # Index cache paths
+├── scope.py         # Persisted reindex scope (index-scope.json)
+├── debug.py         # SCIP_CLI_DEBUG stderr helpers
 ├── indexing.py      # SCIP index build + get_db
 ├── symbols.py       # Symbol parsing and kinds
 ├── queries.py       # Symbol/file SQL queries
@@ -239,7 +243,7 @@ pytest tests/ -m integration -q   # indexes tests/fixtures/sample-project (needs
 
 ### Debug Logging
 
-Set `SCIP_CLI_DEBUG=1` to enable SQL query logging to stderr:
+Set `SCIP_CLI_DEBUG=1` to enable SQL query logging to stderr (statements truncated to 200 chars):
 
 ```bash
 SCIP_CLI_DEBUG=1 scip-cli refs MyFunction
