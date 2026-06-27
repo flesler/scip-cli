@@ -16,17 +16,8 @@ from .common import (
     short_name,
     stale_type_noise,
 )
+from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
 from .sections import Check, Priority, run_checks
-
-_FILE_EDGES_SQL = """
-    SELECT DISTINCT d1.relative_path AS from_file, d2.relative_path AS to_file
-    FROM mentions m
-    JOIN chunks c ON m.chunk_id = c.id
-    JOIN documents d1 ON c.document_id = d1.id
-    JOIN defn_enclosing_ranges der ON m.symbol_id = der.symbol_id
-    JOIN documents d2 ON der.document_id = d2.id
-    WHERE d1.id != d2.id AND m.role != 1
-"""
 
 
 def _scope_suffix(scope: str | None) -> str:
@@ -134,34 +125,11 @@ def cycles(
     include_tests: bool = False,
     scope: str | None = None,
 ) -> list[str]:
-    rows = fetch_all(
-        db,
-        f"""
-        WITH RECURSIVE
-        edges AS ({_FILE_EDGES_SQL}),
-        walk(origin, current, depth, path) AS (
-            SELECT from_file, from_file, 0, from_file FROM edges
-            UNION ALL
-            SELECT walk.origin, e.to_file, walk.depth + 1,
-                   walk.path || ' -> ' || e.to_file
-            FROM walk
-            JOIN edges e ON walk.current = e.from_file
-            WHERE walk.depth < 8
-              AND instr(walk.path, e.to_file) = 0
-        )
-        SELECT DISTINCT walk.path || ' -> ' || walk.origin AS cycle_path
-        FROM walk
-        JOIN edges e ON walk.current = e.from_file AND e.to_file = walk.origin
-        WHERE walk.depth > 0
-        ORDER BY cycle_path
-        LIMIT ?
-        """,
-        (limit * 5,),
-    )
+    cap = limit * 5
     two_way = fetch_all(
         db,
         f"""
-        WITH edges AS ({_FILE_EDGES_SQL})
+        WITH edges AS ({FILE_EDGES_SQL})
         SELECT e1.from_file || ' <-> ' || e1.to_file
         FROM edges e1
         JOIN edges e2 ON e1.from_file = e2.to_file AND e1.to_file = e2.from_file
@@ -169,11 +137,11 @@ def cycles(
         ORDER BY 1
         LIMIT ?
         """,
-        (limit * 5,),
+        (cap,),
     )
     lines = [row[0] for row in two_way if not cycle_path_noise(row[0], include_tests=include_tests)]
-    for row in rows:
-        path = row[0]
+    longer = find_longer_cycles(fetch_file_edges(db), max_depth=8, limit=cap)
+    for path in longer:
         if path not in lines and not cycle_path_noise(path, include_tests=include_tests):
             lines.append(path)
     if scope:

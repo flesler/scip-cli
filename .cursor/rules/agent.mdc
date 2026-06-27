@@ -109,6 +109,32 @@ SQLite has **line ranges** (`defn_enclosing_ranges`) so LOC is cheap. That does 
 
 **Rule:** size-only checks stay **low or file-drill-down**; never high/medium unless paired with a **structural smell** (cycle, dead export, zero production consumers). Prefer enriching existing low-tier lines (e.g. show `loc` on bottlenecks) over a new dashboard section.
 
+## SQL / analyze benchmarks
+
+The e2e fixture and this repo's own index are **small** — every query looks fast here. That hides blowups on real projects (40MB+ indexes, dense graphs).
+
+**Before merging new or heavily changed SQL** (`queries.py`, `analyze/*`):
+
+1. Time it against **1–2 existing checks** on a **large cached index** you already have (not the fixture):
+   ```bash
+   python3 -u -c "
+   import sqlite3, time, sys
+   from pathlib import Path
+   sys.path.insert(0, '.')
+   from scip_cli.analyze import project as p
+   from scip_cli.sql import configure_read_connection
+   db_path = Path.home() / '.cache/scip-cli/projects/<project-slug>/index.db'
+   db = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+   configure_read_connection(db)
+   for name, fn in [('hotspots', p.hotspots), ('cycles', p.cycles), ('dead_exports', p.dead_exports)]:
+       t = time.perf_counter(); fn(db, limit=25); print(f'{name}: {(time.perf_counter()-t)*1000:.0f}ms')
+   "
+   ```
+2. Flag anything **notably slower** than peers — orders of magnitude or multi-second, not a few ms drift.
+3. Swap in your new/changed check for one of the rows; keep a fast peer (e.g. `hotspots`) and a heavy peer (e.g. `dead_exports`).
+
+**In CI:** `tests/test_e2e_perf.py` (whole commands) and `tests/test_analyze_perf.py` (per-check on mini DB) catch gross regressions on the tiny fixture only — they **will not** catch large-repo OOMs. Use the manual benchmark above for that.
+
 ## TDD
 
 1. **Red** — `tests/test_e2e.py` + `fixture_catalog` constants.
