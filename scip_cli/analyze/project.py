@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, fetch_all, section, short_name
+from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, section, short_name
 
 _FILE_EDGES_SQL = """
     SELECT DISTINCT d1.relative_path AS from_file, d2.relative_path AS to_file
@@ -150,9 +150,13 @@ def stale_types(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY consumers ASC, def_d.relative_path
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    return [f"{short_name(symbol)}  consumers={consumers}  ({path})" for symbol, path, consumers in rows]
+    return [
+        f"{short_name(symbol)}  consumers={consumers}  ({path})"
+        for symbol, path, consumers in rows
+        if not analyze_noise(path, symbol)
+    ][:limit]
 
 
 def dead_exports(db, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -174,9 +178,12 @@ def dead_exports(db, limit: int = DEFAULT_LIMIT) -> list[str]:
         ORDER BY loc DESC, def_d.relative_path
         LIMIT ?
         """,
-        (limit,),
+        (limit * 5,),
     )
-    return [f"{short_name(symbol)}  loc={loc}  ({path})" for symbol, path, loc in rows]
+    lines = [
+        f"{short_name(symbol)}  loc={loc}  ({path})" for symbol, path, loc in rows if not analyze_noise(path, symbol)
+    ]
+    return lines[:limit]
 
 
 def top_coupling(db, limit: int = DEFAULT_LIMIT) -> list[str]:

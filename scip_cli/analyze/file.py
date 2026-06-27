@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, fetch_all, section, short_name
+from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, section, short_name
 
 
 def change_surface(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
@@ -101,7 +101,11 @@ def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
         """,
         (relative_path, limit),
     )
-    return [f"{short_name(symbol)}  {start + 1}:{end + 1}" for symbol, start, end in rows]
+    return [
+        f"{short_name(symbol)}  {start + 1}:{end + 1}"
+        for symbol, start, end in rows
+        if not analyze_noise(relative_path, symbol)
+    ]
 
 
 def imports_summary(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:

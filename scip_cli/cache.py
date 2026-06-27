@@ -2,17 +2,22 @@
 
 import contextlib
 import fcntl
+import hashlib
 import os
 import re
 from pathlib import Path
 
 from .project import find_project_root
-from .scope import project_root_hash
 
 INDEX_DB = "index.db"
 INDEX_DB_NEXT = "index.db.next"
 CACHE_SLUG_MAX_LEN = 48
 INDEX_LOCK = ".index.lock"
+ROOT_HASH_LEN = 12
+
+
+def project_root_hash(project_root: Path) -> str:
+    return hashlib.sha256(str(Path(project_root).resolve()).encode()).hexdigest()[:ROOT_HASH_LEN]
 
 
 @contextlib.contextmanager

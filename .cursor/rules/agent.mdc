@@ -41,6 +41,18 @@ scip-cli skill                     # familiarize with subcommands and gotchas
 
 **Pre-commit** (`.pre-commit-config.yaml`): `ruff --fix`, `ruff-format`, then full `pytest`. Run `pre-commit run --all-files` before pushing if you skipped hooks.
 
+## Dogfood / health check
+
+Before broad code review, index and run analyze on the repo itself:
+
+```bash
+.venv/bin/scip-cli reindex
+.venv/bin/scip-cli analyze --limit 30
+.venv/bin/scip-cli analyze scip_cli/queries.py --limit 20   # repeat for hot files
+```
+
+See `dogfood.md` for interpretation (dead exports vs test noise, cycles, etc.).
+
 ## Iterate / code review
 
 Reviewers and explore agents: run `scip-cli skill` (or `python -m scip_cli skill`) first for quickstart context before auditing commands vs docs.

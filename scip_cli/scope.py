@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
 SCOPE_FILENAME = "index-scope.json"
-ROOT_HASH_LEN = 12
 
 
 @dataclass(frozen=True)
@@ -16,10 +14,6 @@ class IndexScope:
     """Directory prefixes limiting which tsconfig projects are indexed."""
 
     paths: tuple[str, ...]
-
-
-def project_root_hash(project_root: Path) -> str:
-    return hashlib.sha256(str(Path(project_root).resolve()).encode()).hexdigest()[:ROOT_HASH_LEN]
 
 
 def _scope_path(project_root: Path) -> Path:

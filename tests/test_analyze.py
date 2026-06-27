@@ -3,8 +3,16 @@
 from scip_cli.analyze import file as file_checks
 from scip_cli.analyze import project as project_checks
 from scip_cli.analyze import symbol as symbol_checks
+from scip_cli.analyze.common import analyze_noise
 
 from .analyze_db import mini_codebase_db
+
+
+class TestAnalyzeNoise:
+    def test_skips_tests_and_private(self):
+        assert analyze_noise("tests/test_foo.py", "scip-python x `t.py`/TestCase#")
+        assert analyze_noise("scip_cli/foo.py", "scip-python x `t.py`/_helper().")
+        assert not analyze_noise("scip_cli/foo.py", "scip-python x `t.py`/helper().")
 
 
 class TestProjectAnalyze:

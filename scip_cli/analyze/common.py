@@ -27,6 +27,16 @@ def short_name(symbol: str) -> str:
     return leaf or symbol.split("/")[-1][:60]
 
 
+def analyze_noise(relative_path: str, symbol: str) -> bool:
+    """True for symbols/paths that clutter analyze dashboards (tests, private helpers)."""
+    if relative_path.startswith("tests/"):
+        return True
+    name = short_name(symbol)
+    if name.startswith("_") or name.startswith("test_"):
+        return True
+    return name.startswith("Test")
+
+
 def section(title: str, lines: list[str]) -> tuple[str, list[str]]:
     if not lines:
         return title, ["(none)"]

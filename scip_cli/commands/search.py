@@ -81,6 +81,11 @@ def _resolve_file_path(db, symbol_str, doc_path=None):
     resolved = resolve_document_path(db, symbol_str)
     if resolved:
         return resolved
+    from ..symbols import extract_file_path_from_symbol
+
+    extracted = extract_file_path_from_symbol(symbol_str)
+    if extracted:
+        return extracted
     file_path, _ = parse_symbol(symbol_str)
     return file_path
 
