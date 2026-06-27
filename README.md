@@ -26,8 +26,6 @@ Or install it to your skills folder:
 scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 ```
 
-This enables commands like `def`, `refs`, `search`, `symbols`, `rdeps`, and `members` - just ask "where is X?" or "find references to X".
-
 ## Installation
 
 ### 1. Install scip-cli
@@ -193,11 +191,9 @@ scip-cli reindex --path packages/api --path packages/worker
 
 Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or when you want a fresh index.
 
-This is separate from `.scipquery.json`, which belongs to [scip-query](https://github.com/PlunderStruck/scip-query) and configures its analyzers, watch mode, and diff-gate — not read by scip-cli.
-
 ## Performance
 
-Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli is a lightweight Python reimplementation optimized for speed. Compared to the original bash wrapper scripts:
+Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli is a lightweight Python partial reimplementation optimized for speed. Compared to the original:
 
 - `refs`: 6.4s → 0.03s (213x faster)
 - `def`: 2.8s → 0.05s (56x faster)
@@ -206,7 +202,7 @@ Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli 
 - `rdeps`: 0.2s → 0.02s (10x faster)
 - `members`: 3.1s → 0.03s (103x faster)
 
-The speedup comes from direct SQLite queries instead of shell command chains, eliminating subprocess overhead.
+The speedup comes from using optimized direct SQLite queries and cutting some nice but very slow goodies (like ts-morph).
 
 ## Architecture
 
