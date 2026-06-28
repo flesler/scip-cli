@@ -312,6 +312,14 @@ SCIP_CLI_DEBUG=1 scip-cli refs MyFunction
 
 This is useful for testing and debugging SQL queries
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. By participating, you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+To report a security vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT
