@@ -117,3 +117,8 @@ class TestShouldIndexRootAlongsideProjects:
         _write(tmp_path / "tsconfig.json", '{"include": []}')
         projects = [Path("packages/api")]
         assert should_index_root_alongside_projects(tmp_path, projects) is False
+
+    def test_string_include_is_accepted(self, tmp_path):
+        _write(tmp_path / "tsconfig.json", '{"include": "packages/**/*.ts"}')
+        projects = [Path("packages/api")]
+        assert should_index_root_alongside_projects(tmp_path, projects) is True

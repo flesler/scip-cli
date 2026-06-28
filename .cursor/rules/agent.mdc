@@ -33,8 +33,9 @@ Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `S
 | Full suite | `pytest` |
 | E2e loop | `pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py` |
 | Lint / format | `ruff check .` / `ruff format .` |
+| Typecheck | `basedpyright scip_cli/` |
 
-Pre-commit: ruff + ruff-format + full pytest. E2e before commit on command changes.
+Pre-commit: ruff + ruff-format + basedpyright + full pytest. E2e before commit on command changes.
 
 ## Improving this repo (do this before review subagents)
 

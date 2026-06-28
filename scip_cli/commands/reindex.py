@@ -27,7 +27,13 @@ def main(args):
         sys.exit(1)
 
     if path_args:
-        scope_paths: list[str] = [normalize_path_scope(path, root) or "." for path in path_args]
+        scope_paths: list[str] = []
+        for path in path_args:
+            normalized = normalize_path_scope(path, root)
+            if normalized is None:
+                print(f"Error: invalid or empty --path: {path!r}", file=sys.stderr)
+                sys.exit(1)
+            scope_paths.append(normalized)
         save_index_scope(root, scope_paths)
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
         print(

@@ -51,3 +51,17 @@ def test_reindex_path_rejected_for_python(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as exc:
         reindex.main(Namespace(path=["src"]))
     assert exc.value.code == 1
+
+
+def test_reindex_rejects_empty_path(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
+
+    with pytest.raises(SystemExit) as exc:
+        reindex.main(Namespace(path=[""]))
+    assert exc.value.code == 1
+    assert load_index_scope(root) is None

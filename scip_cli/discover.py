@@ -52,6 +52,8 @@ def _tsconfig_covers_subdirectories(tsconfig_path: Path) -> bool:
     if not data:
         return False
     include = data.get("include")
+    if isinstance(include, str):
+        include = [include]
     if not isinstance(include, list) or not include:
         return False
     return any(isinstance(pattern, str) and ("**" in pattern or "/" in pattern) for pattern in include)

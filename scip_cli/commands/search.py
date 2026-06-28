@@ -1,5 +1,7 @@
 """search command - search symbols by pattern."""
 
+from __future__ import annotations
+
 import re
 import sys
 
