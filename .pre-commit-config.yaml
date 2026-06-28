@@ -5,12 +5,10 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
+  - repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
+    rev: 1.39.9
     hooks:
-      - id: mypy
-        args: [--config-file, pyproject.toml]
-        additional_dependencies: [pytest]
+      - id: basedpyright
   - repo: local
     hooks:
       - id: pytest

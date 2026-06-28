@@ -32,7 +32,7 @@ packages = ["scip_cli"]
 [project.optional-dependencies]
 dev = [
     "ruff>=0.11",
-    "mypy>=1.14",
+    "basedpyright>=1.20.0",
     "pytest>=7",
     "pre-commit>=4.0",
     "build>=1",
@@ -59,8 +59,29 @@ markers = [
     "integration: uses the shared indexed TS fixture (requires npx / scip-typescript)",
 ]
 
-[tool.mypy]
-python_version = "3.10"
-check_untyped_defs = true
-warn_redundant_casts = true
-warn_unused_ignores = true
+[tool.basedpyright]
+pythonVersion = "3.10"
+venvPath = "."
+venv = ".venv"
+include = ["scip_cli"]
+exclude = ["tests"]
+
+# Pragmatic two-tier: core modules are typed, command modules are gradual
+# Disable aggressive unknown* checks that basedpyright enables by default
+reportAny = "none"
+reportUnknownParameterType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUnknownMemberType = "none"
+reportMissingTypeArgument = "none"
+reportMissingParameterType = "none"
+reportUnusedCallResult = "none"
+reportUnusedParameter = "none"
+reportImplicitOverride = "none"
+reportImplicitStringConcatenation = "none"
+reportUnnecessaryComparison = "none"
+reportExplicitAny = "none"
+reportPrivateLocalImportUsage = "none"
+reportPrivateUsage = "none"
+reportDeprecated = "none"
+reportUnnecessaryIsInstance = "none"

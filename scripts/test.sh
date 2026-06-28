@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "Type checking..."
-mypy scip_cli/
+basedpyright scip_cli/
 
 echo "Running tests..."
 python -m pytest tests/ -v
