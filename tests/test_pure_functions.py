@@ -522,6 +522,7 @@ class TestReadSourceLines:
             test_file.write_text("line1\nline2\nline3\n")
 
             lines = read_source_lines(project_root, "test.ts")
+            assert lines is not None
             assert len(lines) == 3
             assert lines[0] == "line1\n"
             assert lines[1] == "line2\n"
@@ -534,6 +535,7 @@ class TestReadSourceLines:
             test_file.write_text("line1\nline2\nline3\nline4\n")
 
             lines = read_source_lines(project_root, "test.ts", 1, 2)
+            assert lines is not None
             assert len(lines) == 2
             assert lines[0] == "line2\n"
             assert lines[1] == "line3\n"

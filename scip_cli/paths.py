@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from .sql import debug_execute, escape_like
@@ -33,7 +34,7 @@ def path_in_scope(relative_path: str, scope: str | None) -> bool:
     return relative_path.startswith(scope.rstrip("/") + "/")
 
 
-def path_filter_sql(db, scope: str | None, doc_alias: str = "d") -> tuple[str, list]:
+def path_filter_sql(db: sqlite3.Connection, scope: str | None, doc_alias: str = "d") -> tuple[str, list[str]]:
     """Build a SQL AND-clause that restricts rows to a file or directory scope."""
     if not scope:
         return "", []
@@ -49,13 +50,13 @@ def path_filter_sql(db, scope: str | None, doc_alias: str = "d") -> tuple[str, l
     return f" AND ({col} = ? OR {col} LIKE ? ESCAPE '\\')", [scope, f"{escaped}/%"]
 
 
-def path_filter_sql_any(db, scope: str | None, *doc_aliases: str) -> tuple[str, list]:
+def path_filter_sql_any(db: sqlite3.Connection, scope: str | None, *doc_aliases: str) -> tuple[str, list[str]]:
     """AND-clause: row matches when any document alias column falls in scope."""
     if not scope:
         return "", []
 
     parts: list[str] = []
-    params: list = []
+    params: list[str] = []
     for alias in doc_aliases:
         clause, clause_params = path_filter_sql(db, scope, doc_alias=alias)
         if not clause:
@@ -69,7 +70,7 @@ def path_filter_sql_any(db, scope: str | None, *doc_aliases: str) -> tuple[str, 
     return " AND (" + " OR ".join(parts) + ")", params
 
 
-def list_indexed_paths_in_scope(db, scope: str) -> list[str]:
+def list_indexed_paths_in_scope(db: sqlite3.Connection, scope: str) -> list[str]:
     """Repo-relative document paths under scope (file or directory), sorted."""
     clause, params = path_filter_sql(db, scope, doc_alias="d")
     if not clause:

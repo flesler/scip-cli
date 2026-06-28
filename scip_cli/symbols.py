@@ -1,5 +1,7 @@
 """SCIP symbol parsing and kind inference."""
 
+from __future__ import annotations
+
 import re
 from enum import Enum
 
@@ -14,12 +16,12 @@ class SymbolKind(str, Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def filterable_values(cls):
+    def filterable_values(cls) -> list[str]:
         """Values suitable for --kind filtering (excludes UNKNOWN)."""
         return [k.value for k in cls if k != cls.UNKNOWN]
 
 
-def kind_sql_clause(kind):
+def kind_sql_clause(kind: SymbolKind | str) -> str:
     """Approximate SQL WHERE fragment to pre-filter symbols by kind."""
     if isinstance(kind, str):
         kind = SymbolKind(kind)
@@ -77,7 +79,7 @@ def cycle_runtime_edge_sql(column: str = "gs.symbol") -> str:
     return f"({c} LIKE '%().' OR ({c} NOT LIKE '%#%' AND {c} NOT LIKE '%#typeLiteral%' AND {c} NOT LIKE '%/'))"
 
 
-def infer_kind(symbol):
+def infer_kind(symbol: str) -> SymbolKind:
     """Infer symbol kind from symbol string pattern."""
     if "#" in symbol and symbol.endswith("()."):
         return SymbolKind.METHOD
@@ -107,7 +109,7 @@ def symbol_like_patterns(leaf: str) -> list[str]:
     ]
 
 
-def parse_qualified_name(name):
+def parse_qualified_name(name: str) -> tuple[list[str], str]:
     """Split a dotted symbol query into qualifier segments and leaf name."""
     if "." not in name:
         return [], name
@@ -115,12 +117,12 @@ def parse_qualified_name(name):
     return parts[:-1], parts[-1]
 
 
-def is_parameter_symbol(symbol_str):
+def is_parameter_symbol(symbol_str: str) -> bool:
     """Return True for function/method parameter symbols."""
     return ").(" in symbol_str
 
 
-def symbol_matches_qualifier(symbol_str, qualifier_parts, leaf):
+def symbol_matches_qualifier(symbol_str: str, qualifier_parts: list[str], leaf: str) -> bool:
     """Return True when a SCIP symbol matches Class.member style qualifiers."""
     if not qualifier_parts:
         return True
@@ -154,7 +156,7 @@ def symbol_matches_qualifier(symbol_str, qualifier_parts, leaf):
     return False
 
 
-def extract_leaf_name(symbol_str):
+def extract_leaf_name(symbol_str: str) -> str:
     """Extract the leaf name from a SCIP symbol string."""
     leaf = symbol_str.split("/")[-1].rstrip(".#")
     if leaf.endswith("()"):
@@ -169,7 +171,7 @@ def extract_leaf_name(symbol_str):
     return leaf
 
 
-def extract_file_path_from_symbol(symbol_str):
+def extract_file_path_from_symbol(symbol_str: str) -> str | None:
     """Extract the source file path encoded in a SCIP symbol string."""
     match = re.search(r"`([^`]+)`", symbol_str)
     if match:

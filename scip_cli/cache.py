@@ -1,5 +1,7 @@
 """Index cache path resolution."""
 
+from __future__ import annotations
+
 import contextlib
 import fcntl
 import hashlib
@@ -78,13 +80,13 @@ def project_cache_slug(project_root: Path) -> str:
     return f"{slug}-{digest}"
 
 
-def get_cache_dir(project_root):
+def get_cache_dir(project_root: Path | str) -> Path:
     """Get the cache directory for a project (one dir per repo root)."""
     root = Path(project_root).resolve()
     return Path.home() / ".cache" / "scip-cli" / "projects" / project_cache_slug(root)
 
 
-def find_db(project_root=None):
+def find_db(project_root: Path | str | None = None) -> Path | None:
     """Find the index.db for the given project (or cwd)."""
     root = project_root or find_project_root()
     if not root:

@@ -1,23 +1,27 @@
 """SQLite helpers shared across query modules."""
 
+from __future__ import annotations
+
 import logging
+import sqlite3
+from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
 
-def debug_execute(db, sql, params=()):
+def debug_execute(db: sqlite3.Connection, sql: str, params: Sequence = ()) -> sqlite3.Cursor:
     """Execute SQL with optional debug logging."""
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("SQL: %s | params: %s", sql.strip()[:200], params)
     return db.execute(sql, params)
 
 
-def escape_like(s):
+def escape_like(s: str) -> str:
     """Escape SQL LIKE special characters in a string."""
     return s.replace("%", "\\%").replace("_", "\\_")
 
 
-def configure_read_connection(db):
+def configure_read_connection(db: sqlite3.Connection) -> None:
     """Tune SQLite for read-heavy CLI queries."""
     db.executescript("""
         PRAGMA query_only = ON;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from pathlib import Path
 
 from .queries import get_def_location, resolve_document_path
@@ -11,7 +12,7 @@ from .symbols import extract_leaf_name
 _resolved_source_paths: dict[tuple[str, str], Path | None] = {}
 
 
-def _resolve_source_path(project_root, relative_path):
+def _resolve_source_path(project_root: Path | str, relative_path: str) -> Path | None:
     """Resolve and validate a project-relative source path (cached per process)."""
     cache_key = (str(project_root), relative_path)
     if cache_key in _resolved_source_paths:
@@ -29,7 +30,12 @@ def _resolve_source_path(project_root, relative_path):
     return full_path
 
 
-def read_source_lines(project_root, relative_path, start_line=None, end_line=None):
+def read_source_lines(
+    project_root: Path | str,
+    relative_path: str,
+    start_line: int | None = None,
+    end_line: int | None = None,
+) -> list[str] | None:
     """Read source lines from filesystem."""
     full_path = _resolve_source_path(project_root, relative_path)
     if full_path is None:
@@ -45,7 +51,9 @@ def read_source_lines(project_root, relative_path, start_line=None, end_line=Non
         return None
 
 
-def _fallback_def_location(db, project_root, symbol_str):
+def _fallback_def_location(
+    db: sqlite3.Connection, project_root: Path | str, symbol_str: str
+) -> tuple[str, int, int] | None:
     """Best-effort definition location when defn_enclosing_ranges is missing."""
     rel_path = resolve_document_path(db, symbol_str)
     if not rel_path:
@@ -68,7 +76,12 @@ def _fallback_def_location(db, project_root, symbol_str):
     return None
 
 
-def resolve_def_location(db, project_root, symbol_id, symbol_str):
+def resolve_def_location(
+    db: sqlite3.Connection,
+    project_root: Path | str,
+    symbol_id: int,
+    symbol_str: str,
+) -> tuple[str, int, int] | None:
     """Index location, then source-file scan when defn_enclosing_ranges is missing."""
     row = get_def_location(db, symbol_id)
     if row:

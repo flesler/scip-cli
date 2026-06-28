@@ -117,12 +117,12 @@ def _qualified_pattern(pattern: str) -> bool:
 def _search_results_from_symbols(db, project_root, symbols, limit):
     """Turn resolve_symbol rows into search result tuples."""
     symbols = limit_and_warn(symbols, limit, "results")
-    results = []
+    results: list[tuple[str, int | str, str, str]] = []
     for symbol_id, symbol_str, _display_name in symbols:
         loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
         if loc:
             file_path, start_line, _end_line = loc
-            line = start_line + 1
+            line: int | str = start_line + 1
         else:
             file_path = _resolve_file_path(db, symbol_str)
             line = "?"
@@ -229,7 +229,7 @@ def main(args):
             loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
             if loc:
                 file_path, resolved_start, _end = loc
-                line = resolved_start + 1
+                line: int | str = resolved_start + 1
             else:
                 file_path = _resolve_file_path(db, symbol_str, doc_path)
                 line = start_line + 1 if start_line is not None else "?"

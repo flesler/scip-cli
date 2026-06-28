@@ -1,11 +1,15 @@
 """SQLite queries for symbol and document resolution."""
 
+from __future__ import annotations
+
 import re
+import sqlite3
 from pathlib import Path
 
 from .paths import path_filter_sql, path_in_scope
 from .sql import debug_execute, escape_like
 from .symbols import (
+    SymbolKind,
     extract_leaf_name,
     is_parameter_symbol,
     kind_sql_clause,
@@ -33,7 +37,13 @@ def _rank_file_matches(paths: list[str], pattern: str) -> list[str]:
     return sorted(paths, key=sort_key)
 
 
-def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
+def resolve_symbol(
+    db: sqlite3.Connection,
+    name: str,
+    kind_filter: SymbolKind | str | None = None,
+    limit: int | None = None,
+    path_scope: str | None = None,
+) -> list[sqlite3.Row]:
     """Resolve bare or qualified name to symbol_id(s)."""
     qualifier_parts, leaf = parse_qualified_name(name)
     search_name = leaf if qualifier_parts else name
@@ -112,7 +122,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     return results
 
 
-def resolve_file(db, file_pattern, path_scope=None):
+def resolve_file(db: sqlite3.Connection, file_pattern: str, path_scope: str | None = None) -> list[str]:
     """Resolve a file path using exact, basename, suffix, then fuzzy matching."""
     pattern = file_pattern.strip()
     if not pattern:
@@ -210,7 +220,7 @@ def resolve_file(db, file_pattern, path_scope=None):
     return ranked
 
 
-def get_file_symbols(db, relative_path, limit=None):
+def get_file_symbols(db: sqlite3.Connection, relative_path: str, limit: int | None = None) -> list[sqlite3.Row]:
     """Get all symbols defined in a file."""
     limit_clause = f"LIMIT {limit}" if limit else ""
     sql = f"""
@@ -225,7 +235,12 @@ def get_file_symbols(db, relative_path, limit=None):
     return debug_execute(db, sql, (relative_path,)).fetchall()
 
 
-def get_importer_paths(db, symbol_ids, exclude_path, limit=None):
+def get_importer_paths(
+    db: sqlite3.Connection,
+    symbol_ids: list[int],
+    exclude_path: str,
+    limit: int | None = None,
+) -> list[str]:
     """Distinct files that reference any of the given symbols (excluding exclude_path)."""
     if not symbol_ids:
         return []
@@ -248,7 +263,7 @@ def get_importer_paths(db, symbol_ids, exclude_path, limit=None):
     return [row[0] for row in rows]
 
 
-def get_members(db, symbol_id):
+def get_members(db: sqlite3.Connection, symbol_id: int) -> list[sqlite3.Row]:
     """Get members (children) of a symbol via SCIP symbol prefix."""
     row = debug_execute(db, "SELECT symbol FROM global_symbols WHERE id = ?", (symbol_id,)).fetchone()
     if not row:
@@ -287,7 +302,7 @@ def _is_direct_member(parent_symbol: str, member_symbol: str) -> bool:
     return "#" not in head
 
 
-def get_def_location(db, symbol_id):
+def get_def_location(db: sqlite3.Connection, symbol_id: int) -> tuple[str, int, int] | None:
     """Get definition location for a symbol."""
     return debug_execute(
         db,
@@ -301,7 +316,7 @@ def get_def_location(db, symbol_id):
     ).fetchone()
 
 
-def resolve_document_path(db, symbol_str):
+def resolve_document_path(db: sqlite3.Connection, symbol_str: str) -> str | None:
     """Map a SCIP symbol to the indexed document relative_path."""
     from .symbols import extract_file_path_from_symbol
 
