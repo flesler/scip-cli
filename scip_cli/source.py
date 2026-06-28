@@ -1,12 +1,14 @@
 """Filesystem source reading and definition fallbacks."""
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
 
 from .queries import get_def_location, resolve_document_path
 from .symbols import extract_leaf_name
 
-_resolved_source_paths = {}
+_resolved_source_paths: dict[tuple[str, str], Path | None] = {}
 
 
 def _resolve_source_path(project_root, relative_path):

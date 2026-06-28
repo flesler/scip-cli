@@ -15,7 +15,7 @@ from .symbols import (
 )
 
 
-def _query_document_paths(db, sql: str, params: tuple) -> list[str]:
+def _query_document_paths(db, sql: str, params: tuple[str, ...]) -> list[str]:
     rows = debug_execute(db, sql, params).fetchall()
     return [row[0] for row in rows]
 
@@ -23,7 +23,7 @@ def _query_document_paths(db, sql: str, params: tuple) -> list[str]:
 def _rank_file_matches(paths: list[str], pattern: str) -> list[str]:
     """Prefer exact basename hits and non-test files when multiple paths match."""
 
-    def sort_key(path: str) -> tuple:
+    def sort_key(path: str) -> tuple[bool, bool, str]:
         name = Path(path).name
         stem = Path(path).stem
         is_test = ".test." in name or name.endswith(".spec.ts") or name.endswith(".spec.tsx")
@@ -44,6 +44,7 @@ def resolve_symbol(db, name, kind_filter=None, limit=None, path_scope=None):
     like_clause = " OR ".join("gs.symbol LIKE ? ESCAPE '\\'" for _ in like_patterns)
 
     # Qualified names need post-filtering; use a generous SQL cap before Python qualifier match.
+    limit_param: tuple[int, ...]
     if limit and not qualifier_parts:
         limit_clause = "LIMIT ?"
         limit_param = (limit,)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 from scip_cli.analyze import project as project_checks
 from tests.analyze_db import mini_codebase_db
 from tests.perf_util import median_elapsed, outliers_vs_median
@@ -25,9 +27,9 @@ class TestAnalyzeCheckPerf:
             "same_file": project_checks.same_file_only,
             "test_only": project_checks.symbols_test_only_consumers,
         }
-        timings = {
-            name: median_elapsed(lambda fn=fn: fn(db, limit=20), runs=5, warmup=2) for name, fn in checks.items()
-        }
+        timings = {}
+        for name, fn in checks.items():
+            timings[name] = median_elapsed(partial(fn, db, limit=20), runs=5, warmup=2)
 
         baseline = {k: timings[k] for k in BASELINE_CHECKS if k in timings}
         slow = outliers_vs_median(timings, ratio=CHECK_RATIO)

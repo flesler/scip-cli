@@ -30,8 +30,8 @@ def _latest_release_tag() -> str:
             tag = release.get("tag_name", "")
             if tag.startswith(f"v{SCIP_PINNED_MINOR}."):
                 return tag
-    except Exception:
-        pass
+    except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
+        print(f"Warning: Failed to fetch latest scip release: {e}", file=sys.stderr)
     return SCIP_RELEASE_FALLBACK_TAG
 
 
@@ -63,7 +63,8 @@ def parse_scip_version(output: str) -> tuple[int, int, int] | None:
     match = re.search(r"v?(\d+)\.(\d+)\.(\d+)", output)
     if not match:
         return None
-    return tuple(int(part) for part in match.groups())
+    parts = match.groups()
+    return (int(parts[0]), int(parts[1]), int(parts[2]))
 
 
 def _scip_version_at(path: Path) -> tuple[int, int, int] | None:
@@ -141,8 +142,8 @@ def ensure_scip_binary() -> Path:
         if version is None and path_binary.is_file():
             print(
                 "Warning: 'scip' on PATH is not the SCIP indexer "
-                "(brew install scip installs an unrelated solver). "
-                "Downloading the correct binary...",
+                + "(brew install scip installs an unrelated solver). "
+                + "Downloading the correct binary...",
                 file=sys.stderr,
             )
 
@@ -154,8 +155,8 @@ def ensure_scip_binary() -> Path:
     except Exception as exc:
         raise RuntimeError(
             "scip CLI not found and auto-download failed. "
-            f"Install manually from https://github.com/scip-code/scip/releases. "
-            f"Reason: {exc}"
+            + "Install manually from https://github.com/scip-code/scip/releases. "
+            + f"Reason: {exc}"
         ) from exc
 
     version = _scip_version_at(cached)

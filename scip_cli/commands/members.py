@@ -79,7 +79,7 @@ def main(args):
 
                 for i, line in enumerate(source_lines):
                     if any(re.match(p, line) for p in patterns):
-                        start_line = parent_start + i
+                        start_line = (parent_start or 0) + i
                         end_line = start_line
                         break
 

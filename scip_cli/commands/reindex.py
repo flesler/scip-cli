@@ -27,7 +27,7 @@ def main(args):
         sys.exit(1)
 
     if path_args:
-        scope_paths = [normalize_path_scope(path, root) for path in path_args]
+        scope_paths: list[str] = [normalize_path_scope(path, root) or "." for path in path_args]
         save_index_scope(root, scope_paths)
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
         print(

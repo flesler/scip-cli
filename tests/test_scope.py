@@ -49,8 +49,9 @@ class TestIndexScope:
         (cache_dir / "index.db").write_text("old", encoding="utf-8")
         shutil.rmtree(cache_dir)
         save_index_scope(tmp_path, ["packages/api"])
-        assert load_index_scope(tmp_path) is not None
-        assert load_index_scope(tmp_path).paths == ("packages/api",)
+        loaded = load_index_scope(tmp_path)
+        assert loaded is not None
+        assert loaded.paths == ("packages/api",)
 
     def test_typescript_projects_filtered_by_scope(self, tmp_path):
         _write(tmp_path / "package.json", json.dumps({"workspaces": ["packages/api"]}))

@@ -1,5 +1,7 @@
 """analyze command — run SQL-based analysis dashboards."""
 
+from __future__ import annotations
+
 import sys
 
 from ..analyze import file as file_checks
@@ -127,29 +129,28 @@ def main(args):
             )
         else:
             resolved = resolve_analyze_target(db, target, project_root, path_scope)
+            scope = resolved.scope or ""
             if resolved.kind == "dir":
                 sections = _dir_sections(
                     db,
-                    resolved.scope,
+                    scope,
                     limit=limit,
                     include_tests=include_tests,
                     priorities=priorities,
                     budget=budget,
                 )
             elif resolved.kind == "file":
-                file_include = _project_include_tests(include_tests, resolved.scope)
+                file_include = _project_include_tests(include_tests, scope)
                 sections = _project_sections(
                     db,
                     limit=limit,
                     include_tests=file_include,
-                    scope=resolved.scope,
+                    scope=scope,
                     priorities=priorities,
                     budget=budget,
                 )
                 if not budget.exhausted():
-                    sections.extend(
-                        _file_sections(db, resolved.scope, limit=limit, priorities=priorities, budget=budget)
-                    )
+                    sections.extend(_file_sections(db, scope, limit=limit, priorities=priorities, budget=budget))
             else:
                 symbol_id, _symbol_str, _display = resolve_one_symbol(
                     db,

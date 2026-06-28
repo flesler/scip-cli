@@ -188,8 +188,8 @@ def _warn_old_scip(binary):
         _scip_version_warned = True
         print(
             f"Warning: {binary} {'.'.join(map(str, version))} is older than 0.8.0; "
-            "upgrade from "
-            f"{SCIP_INSTALL_URL} if indexing fails.",
+            + "upgrade from "
+            + f"{SCIP_INSTALL_URL} if indexing fails.",
             file=sys.stderr,
         )
 
@@ -388,6 +388,7 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
                     ): index
                     for index, project in enumerate(projects, start=1)
                 }
+                indexed_parts: list[tuple[int, Path]] = []
                 for future in as_completed(futures):
                     label, db_path, error = future.result()
                     completed += 1
@@ -395,10 +396,10 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
                         skipped += 1
                         print(f"Warning: skipped {label}: {error}", file=sys.stderr)
                     else:
-                        part_dbs.append((futures[future], db_path))
+                        indexed_parts.append((futures[future], db_path))
                         if show_progress:
                             print(f"Indexed {completed}/{total}: {label}", file=sys.stderr)
-            part_dbs = [db for _, db in sorted(part_dbs, key=lambda item: item[0])]
+            part_dbs = [db for _, db in sorted(indexed_parts, key=lambda item: item[0])]
         else:
             for index, project in enumerate(projects, start=1):
                 label = "." if project == Path(".") else str(project)
