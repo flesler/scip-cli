@@ -5,8 +5,8 @@ import sys
 from ..cli_args import path_scope_from_args
 from ..output import limit_and_warn
 from ..paths import path_in_scope
-from ..queries import debug_execute
 from ..session import resolve_one_file, resolve_one_symbol, setup
+from ..sql import debug_execute
 from ..symbols import extract_leaf_name
 
 

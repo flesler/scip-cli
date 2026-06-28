@@ -153,7 +153,9 @@ def print_def_truncation_notice(query_name, body_offset, lines_shown, def_body_l
         return
     at_line = body_offset + lines_shown
     print(
-        f"Warning: truncated at line {at_line}/{def_body_lines} of definition. "
-        f"Continue: code --offset {next_offset} {query_name}",
+        (
+            f"Warning: truncated at line {at_line}/{def_body_lines} of definition. "
+            f"Continue: code --offset {next_offset} {query_name}"
+        ),
         file=sys.stderr,
     )

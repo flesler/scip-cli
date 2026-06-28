@@ -9,7 +9,7 @@ from ..cache import (
     index_db_path,
     promote_next_index,
 )
-from ..indexing import _index_project, log_index_complete
+from ..indexing import index_project, log_index_complete
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
 from ..scope import save_index_scope
@@ -31,8 +31,10 @@ def main(args):
         save_index_scope(root, scope_paths)
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
         print(
-            "Warning: scoped reindex replaces the cache with only these projects; "
-            "run reindex with no --path to restore the full index",
+            (
+                "Warning: scoped reindex replaces the cache with only these projects; "
+                "run reindex with no --path to restore the full index"
+            ),
             file=sys.stderr,
         )
     else:
@@ -48,7 +50,7 @@ def main(args):
     with index_build_lock(cache_dir):
         cleanup_in_progress_index(cache_dir)
         try:
-            _output_db, skipped, total = _index_project(root, lang, cache_dir, replace=True, log=False)
+            _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
         except RuntimeError as e:
             cleanup_in_progress_index(cache_dir)
             print(f"Error: {e}", file=sys.stderr)

@@ -298,7 +298,7 @@ def top_symbol_pressure(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> l
 
 
 def _bind_path(fn, relative_path: str):
-    def run(db, limit: int, **kwargs):
+    def run(db, limit: int, **_kwargs):
         return fn(db, relative_path, limit)
 
     return run

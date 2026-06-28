@@ -8,14 +8,14 @@ from .sections import Check, Priority, run_checks
 
 
 def _bind_symbol(fn, symbol_id: int):
-    def run(db, limit: int, **kwargs):
+    def run(db, limit: int, **_kwargs):
         return fn(db, symbol_id, limit)
 
     return run
 
 
 def _bind_symbol0(fn, symbol_id: int):
-    def run(db, limit: int, **kwargs):
+    def run(db, _limit: int, **_kwargs):
         return fn(db, symbol_id)
 
     return run

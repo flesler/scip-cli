@@ -31,7 +31,7 @@ def test_full_reindex_clears_persisted_scope(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "get_cache_dir", fake_get_cache_dir)
     monkeypatch.setattr(reindex, "index_build_lock", lambda _cache: contextlib.nullcontext())
     monkeypatch.setattr(reindex, "cleanup_in_progress_index", lambda _cache: None)
-    monkeypatch.setattr(reindex, "_index_project", fake_index_project)
+    monkeypatch.setattr(reindex, "index_project", fake_index_project)
     monkeypatch.setattr(reindex, "promote_next_index", lambda _cache: None)
     monkeypatch.setattr(reindex, "log_index_complete", lambda *_a, **_k: None)
 

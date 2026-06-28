@@ -9,7 +9,6 @@ import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
 
 from .cache import (
     cleanup_in_progress_index,
@@ -59,7 +58,7 @@ def log_index_complete(
     db_path: Path,
     lang: str,
     *,
-    projects: Optional[int] = None,
+    projects: int | None = None,
     skipped: int = 0,
 ) -> None:
     """One-line stderr summary after a successful index write."""
@@ -428,7 +427,7 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
         return output_db, len(part_dbs), skipped, total
 
 
-def _index_project(root, lang, cache_dir, *, replace=False, log=True):
+def index_project(root, lang, cache_dir, *, replace=False, log=True):
     """Run the language-specific indexer and convert to DB."""
     from .project import Language
 
@@ -498,7 +497,7 @@ def get_db(project_root=None):
             else:
                 cleanup_in_progress_index(cache_dir)
                 try:
-                    _output_db, skipped, total = _index_project(root, lang, cache_dir, replace=True, log=False)
+                    _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
                     promote_next_index(cache_dir)
                     log_index_complete(
                         index_db_path(cache_dir),

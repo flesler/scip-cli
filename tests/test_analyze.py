@@ -265,12 +265,13 @@ class TestAnalyzeCommand:
 
     def test_project_analyze_rejects_path(self, tmp_path, monkeypatch):
         from argparse import Namespace
+        from unittest.mock import MagicMock
 
         import pytest
 
         from scip_cli.commands import analyze as analyze_cmd
 
-        monkeypatch.setattr(analyze_cmd, "setup", lambda: (None, tmp_path))
+        monkeypatch.setattr(analyze_cmd, "setup", lambda: (MagicMock(), tmp_path))
         monkeypatch.setattr(analyze_cmd, "path_scope_from_args", lambda _a, _r: "pkg")
 
         with pytest.raises(SystemExit) as exc:

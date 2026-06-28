@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 from .common import section
 
@@ -101,20 +100,23 @@ def run_checks(
     db,
     limit: int,
     priorities: set[Priority] | None,
-    **kwargs: Any,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+    budget: RowBudget | None = None,
 ) -> list[tuple[str, list[str], str | None]]:
     """Run checks in priority order (high → low), optionally filtered."""
     selected = [check for check in checks if priorities is None or check.priority in priorities]
     selected.sort(key=lambda check: (_ORDER.index(check.priority), check.key))
-    budget: RowBudget = kwargs.pop("budget", None) or RowBudget(remaining=limit)
+    budget_obj: RowBudget = budget or RowBudget(remaining=limit)
     sections: list[tuple[str, list[str], str | None]] = []
     for check in selected:
-        if budget.exhausted():
+        if budget_obj.exhausted():
             break
-        lines = check.run(db, budget.remaining, **kwargs)
+        lines = check.run(db, budget_obj.remaining, include_tests=include_tests, scope=scope)
         if lines != ["(none)"]:
-            lines = lines[: budget.remaining]
-            budget.remaining -= len(lines)
+            lines = lines[: budget_obj.remaining]
+            budget_obj.remaining -= len(lines)
         preface = check.false_positive_preface if check.false_positive_preface else _preface_for(check.key)
         sections.append(section(check.labeled_title(), lines, preface=preface))
     return sections

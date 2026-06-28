@@ -87,8 +87,10 @@ def _dir_sections(
         )
     elif total > MAX_DIR_FILES:
         print(
-            f"Note: {total} indexed files under {scope}; showing first {MAX_DIR_FILES} "
-            f"(analyze one file for full detail)",
+            (
+                f"Note: {total} indexed files under {scope}; showing first {MAX_DIR_FILES} "
+                f"(analyze one file for full detail)"
+            ),
             file=sys.stderr,
         )
         files = files[:MAX_DIR_FILES]
@@ -161,5 +163,4 @@ def main(args):
 
         _print_sections(sections)
     finally:
-        if db is not None:
-            db.close()
+        db.close()

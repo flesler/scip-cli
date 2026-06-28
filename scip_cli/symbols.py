@@ -23,7 +23,7 @@ class SymbolKind(str, Enum):
 
 def kind_sql_clause(kind: SymbolKind | str) -> str:
     """Approximate SQL WHERE fragment to pre-filter symbols by kind."""
-    if isinstance(kind, str):
+    if not isinstance(kind, SymbolKind):
         kind = SymbolKind(kind)
     if kind == SymbolKind.FUNCTION:
         return " AND gs.symbol LIKE '%().' AND gs.symbol NOT LIKE '%#%().'"

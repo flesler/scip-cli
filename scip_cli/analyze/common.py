@@ -16,7 +16,7 @@ SYM_DEF_JOIN = """
 """
 
 
-def fetch_all(db, sql: str, params=()) -> list:
+def fetch_all(db, sql: str, params=()):
     return debug_execute(db, sql, params).fetchall()
 
 

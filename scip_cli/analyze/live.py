@@ -15,7 +15,7 @@ _EXTERNAL_MENTION = """
 """
 
 
-def _fetch_all(db, sql: str, params=()) -> list:
+def _fetch_all(db, sql: str, params=()):
     return debug_execute(db, sql, params).fetchall()
 
 

@@ -23,7 +23,7 @@ _SKIP_DIR_NAMES = frozenset(
 )
 
 
-def _read_json(path: Path) -> dict | None:
+def _read_json(path: Path) -> dict[str, object] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -52,7 +52,7 @@ def _tsconfig_covers_subdirectories(tsconfig_path: Path) -> bool:
     if not data:
         return False
     include = data.get("include")
-    if include is None or not include:
+    if not isinstance(include, list) or not include:
         return False
     return any(isinstance(pattern, str) and ("**" in pattern or "/" in pattern) for pattern in include)
 

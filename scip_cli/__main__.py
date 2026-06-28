@@ -1,11 +1,14 @@
 """CLI entry point for scip-cli."""
 
+from __future__ import annotations
+
 import argparse
 import logging
 import os
 import shutil
 import sqlite3
 import sys
+from collections.abc import Callable
 
 from . import __version__
 from .cli_args import add_limit_argument, add_names_only_argument, add_path_argument, add_paths_only_argument
@@ -19,7 +22,7 @@ else:
     logging.disable(logging.DEBUG)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         prog="scip-cli",
         description="Fast code intelligence via SCIP indexes",
@@ -45,7 +48,7 @@ def main():
         type=int,
         default=None,
         metavar="N",
-        help=("Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). Use 0 for unlimited."),
+        help="Max source lines per definition body (default: 80, env SCIP_CLI_MAX_DEF_LINES). Use 0 for unlimited.",
     )
     code_parser.add_argument(
         "--full",
@@ -151,7 +154,7 @@ def main():
         return
 
     # Dispatch to command handlers
-    dispatch = {
+    dispatch: dict[str, Callable[..., None]] = {
         "refs": refs.main,
         "code": code.main,
         "search": search.main,

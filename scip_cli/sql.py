@@ -9,7 +9,7 @@ from collections.abc import Sequence
 logger = logging.getLogger(__name__)
 
 
-def debug_execute(db: sqlite3.Connection, sql: str, params: Sequence = ()) -> sqlite3.Cursor:
+def debug_execute(db: sqlite3.Connection, sql: str, params: Sequence[object] = ()) -> sqlite3.Cursor:
     """Execute SQL with optional debug logging."""
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("SQL: %s | params: %s", sql.strip()[:200], params)

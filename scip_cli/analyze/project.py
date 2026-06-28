@@ -416,7 +416,6 @@ def run_all(
     budget=None,
 ) -> list[tuple[str, list[str], str | None]]:
     suffix = _scope_suffix(scope)
-    opts = {"include_tests": include_tests, "scope": scope, "budget": budget}
     checks = [
         Check("cycles", Priority.HIGH, f"Cycles (file dependencies){suffix}", cycles),
         Check("unreferenced", Priority.HIGH, f"Unreferenced symbols (no refs){suffix}", unreferenced_symbols),
@@ -438,4 +437,12 @@ def run_all(
         Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
         Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),
     ]
-    return run_checks(checks, db, limit, priorities, **opts)
+    return run_checks(
+        checks,
+        db,
+        limit,
+        priorities,
+        include_tests=include_tests,
+        scope=scope,
+        budget=budget,
+    )
