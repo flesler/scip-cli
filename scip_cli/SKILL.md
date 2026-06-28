@@ -18,6 +18,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 | "What's in this file?"                    | `symbols file`      | Up to `--limit` symbols (default 10). Bare filename works (`helper.ts`)                     |
 | "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes |
 | "What files depend on this file?"         | `rdeps file`        | Importers — bare name works                                                               |
+| "What does this symbol/file depend on?"   | `deps target`       | Outbound dependencies — symbols referenced within a function or file                        |
 | "What methods does this class have?"      | `members ClassName` | All methods/fields with line ranges                                                       |
 | "Health / risk / stale code?"             | `analyze`           | Multi-section SQL dashboard — omit target (project), pass file, or symbol                 |
 
@@ -70,8 +71,9 @@ Commands emit one record per line on stdout; warnings and progress go to stderr.
 | Find functions, show callers | `scip-cli search Publish --kind function --names-only \| xargs -I{} scip-cli refs {} --paths-only`                                                           |
 | Files touching a topic       | `scip-cli search Dynamo --paths-only`                                                                                                                        |
 | Count importers              | `scip-cli rdeps file.ts \| wc -l`                                                                                                                            |
+| Outbound dependency files    | `scip-cli deps file.ts --paths-only`                                                                                                                         |
 
-`rdeps` already prints bare paths. `refs` defaults to `path:line`; add `--paths-only` to dedupe files. `search` / `members` need `--names-only` or `--paths-only` instead of `awk`.
+`rdeps` already prints bare paths. `deps --paths-only` deduplicates to unique files. `refs` defaults to `path:line`; add `--paths-only` to dedupe files. `search` / `members` need `--names-only` or `--paths-only` instead of `awk`.
 
 Each `xargs` invocation reopens the index (fast on cache hit). Use `--limit` on the first command to cap fan-out.
 
@@ -102,6 +104,20 @@ rdeps [--limit N] [--path PATH] <file>
 ```
 
 Returns list of files that import from this file.
+
+Default `--limit` is 10.
+
+### deps
+
+```bash
+deps [--limit N] [--path PATH] [--paths-only] <symbol|file>
+```
+
+Returns outbound dependencies — symbols referenced within a function/method or file.
+
+For a symbol target, finds all symbols mentioned within the definition range (function body). For a file target, finds all external symbols referenced in that file (excluding the file's own symbols).
+
+Output format: `file:line  symbolName` for each dependency. Use `--paths-only` to output unique file paths only (pipe-friendly).
 
 Default `--limit` is 10.
 

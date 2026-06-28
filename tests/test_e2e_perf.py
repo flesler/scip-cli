@@ -29,6 +29,7 @@ class TestE2eCommandPerf:
             "refs": _time_cli(cli, "refs", FN_GREET, "--paths-only", "--limit", "10"),
             "members": _time_cli(cli, "members", CLASS_WIDGET, "--names-only"),
             "rdeps": _time_cli(cli, "rdeps", HELPER_FILE, "--limit", "10"),
+            "deps": _time_cli(cli, "deps", FN_GREET, "--limit", "10"),
         }
         analyze_high = _time_cli(cli, "analyze", "--priority", "high", "--limit", "5")
         analyze_all = _time_cli(cli, "analyze", "--limit", "5")

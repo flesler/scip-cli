@@ -113,6 +113,7 @@ scip-cli <command> [arguments]
 - `search <pattern>` - Search symbols by name pattern (`--path`)
 - `symbols <file>` - List all symbols in a file (`--path`; bare filename OK)
 - `rdeps <file>` - Find files that depend on a file (`--path`)
+- `deps <symbol|file>` - Find outbound dependencies (what a symbol or file calls) (`--path`, `--paths-only`)
 - `members <symbol>` - List members of a class/interface (`--path`)
 - `analyze [target]` - SQL health dashboards (`--limit`, `--priority`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
 - `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
@@ -139,6 +140,12 @@ scip-cli symbols helper.ts
 # Find files that import from a module
 scip-cli rdeps src/helper.ts
 
+# Find what a function calls
+scip-cli deps greet
+
+# Find what a file depends on
+scip-cli deps src/helper.ts --paths-only
+
 # List members of a class
 scip-cli members Widget
 
@@ -151,7 +158,7 @@ scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 
 ### Pipelines
 
-Stdout is one record per line; stderr carries warnings and ambiguity notices. Kinds are lowercase (`function`, `class`, `method`, `property`). Pipe-friendly flags: `refs --paths-only`, `search --names-only` / `--paths-only`, `members --names-only`. `rdeps` already prints bare file paths.
+Stdout is one record per line; stderr carries warnings and ambiguity notices. Kinds are lowercase (`function`, `class`, `method`, `property`). Pipe-friendly flags: `refs --paths-only`, `search --names-only` / `--paths-only`, `members --names-only`, `deps --paths-only`. `rdeps` already prints bare file paths.
 
 ```bash
 # What do importers of this file export?
@@ -165,6 +172,9 @@ scip-cli search Handler --kind class --names-only | xargs -I{} scip-cli members 
 
 # Walk class members to their definitions
 scip-cli members Widget --names-only | xargs -I{} scip-cli code Widget.{}
+
+# Find all files that a symbol depends on (outbound dependencies)
+scip-cli deps greet --paths-only | sort -u
 ```
 
 ## How It Works
@@ -250,7 +260,7 @@ scip-cli analyze scip_cli --limit 15              # directory: scoped project + 
 
 **Defaults:** project-wide and directory analyze skip `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze always includes that file.
 
-**Limits:** “Dead export” means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Re-run `reindex` after large changes; the index is a snapshot.
+**Limits:** "Dead export" means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Re-run `reindex` after large changes; the index is a snapshot.
 
 ## Performance
 

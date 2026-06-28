@@ -9,7 +9,7 @@ import sys
 
 from . import __version__
 from .cli_args import add_limit_argument, add_names_only_argument, add_path_argument, add_paths_only_argument
-from .commands import analyze, code, members, rdeps, refs, reindex, search, skill, symbols
+from .commands import analyze, code, deps, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
@@ -93,6 +93,13 @@ def main():
     add_path_argument(rdeps_parser)
     rdeps_parser.add_argument("file", help="File path or pattern")
 
+    # deps
+    deps_parser = subparsers.add_parser("deps", help="Find outbound dependencies (what a symbol/file calls)")
+    add_limit_argument(deps_parser, default=10, help_suffix="dependencies")
+    add_path_argument(deps_parser)
+    add_paths_only_argument(deps_parser)
+    deps_parser.add_argument("target", help="Symbol name or file path")
+
     # members
     members_parser = subparsers.add_parser("members", help="List members of a class/interface")
     add_limit_argument(members_parser, default=10, help_suffix="members")
@@ -150,6 +157,7 @@ def main():
         "search": search.main,
         "symbols": symbols.main,
         "rdeps": rdeps.main,
+        "deps": deps.main,
         "members": members.main,
         "skill": skill.main,
         "analyze": analyze.main,

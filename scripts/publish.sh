@@ -22,6 +22,12 @@ case "$BUMP" in
         ;;
 esac
 
+# Run tests first
+./scripts/test.sh
+
+# Build
+./scripts/build.sh
+
 if [[ -n "$BUMP" ]]; then
     if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
         echo "Error: working tree has uncommitted changes; commit or stash before bumping"
@@ -66,12 +72,6 @@ PY
     git add scip_cli/__init__.py
     git commit -m "Release $NEW_VERSION."
 fi
-
-# Run tests first
-./scripts/test.sh
-
-# Build
-./scripts/build.sh
 
 # Get version from package
 VERSION=$(python -c "from scip_cli import __version__; print(__version__)")

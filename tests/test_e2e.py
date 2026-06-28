@@ -150,6 +150,25 @@ class TestRdeps:
         assert CONSUMER_FILE in result.stdout or WIDGET_FILE in result.stdout
 
 
+class TestDeps:
+    def test_symbol_deps(self, cli):
+        result = cli.run("deps", "useWidget", "--limit", "10")
+        assert result.returncode == 0
+        assert "Widget" in result.stdout or "greet" in result.stdout
+
+    def test_file_deps(self, cli):
+        result = cli.run("deps", USER_FILE, "--limit", "10")
+        assert result.returncode == 0
+        assert "Widget" in result.stdout or "greet" in result.stdout
+
+    def test_paths_only(self, cli):
+        result = cli.run("deps", USER_FILE, "--paths-only", "--limit", "10")
+        assert result.returncode == 0
+        assert WIDGET_FILE in result.stdout
+        # Should not contain line numbers in paths-only mode
+        assert ":" not in result.stdout
+
+
 class TestAnalyze:
     def test_project_dashboard(self, cli):
         result = cli.run("analyze", "--limit", "5")

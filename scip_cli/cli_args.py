@@ -39,7 +39,7 @@ def add_paths_only_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--paths-only",
         action="store_true",
-        help="Print unique file paths only (one per line, for piping to symbols/rdeps)",
+        help="Print unique file paths only (one per line, for piping to symbols/rdeps/deps)",
     )
 
 
