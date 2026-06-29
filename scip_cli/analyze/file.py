@@ -257,16 +257,6 @@ def coupling_for(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
     return [f"{other}  shared={shared}" for other, shared in rows]
 
 
-def count_file_importers(db, relative_path: str) -> int:
-    from ..queries import get_file_symbols, get_importer_paths
-
-    symbols = get_file_symbols(db, relative_path)
-    if not symbols:
-        return 0
-    symbol_ids = [row[0] for row in symbols]
-    return len(get_importer_paths(db, symbol_ids, relative_path))
-
-
 def top_symbol_pressure(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     """Pressure metrics for the most-consumed exports in a file."""
     cap = min(5, limit)

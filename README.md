@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/scip-cli.svg)](https://badge.fury.io/py/scip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Token-efficient code intelligence for AI agents. Precise refs, definitions, and repo health analysis via SCIP indexes — TypeScript/JavaScript, Python, Go, and Rust.
+Python CLI for AI agents. Queries SCIP indexes for precise refs, definitions, and repo health analysis — TypeScript/JavaScript, Python, Go, Rust.
 
 ## Why
 

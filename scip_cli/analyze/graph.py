@@ -25,6 +25,7 @@ def fetch_file_edges(db) -> list[tuple[str, str]]:
 
 
 def _tarjan_sccs(graph: dict[str, list[str]], nodes: set[str]) -> list[list[str]]:
+    """Iterative Tarjan's SCC — avoids RecursionError on large graphs."""
     index = 0
     stack: list[str] = []
     on_stack: set[str] = set()
@@ -32,32 +33,41 @@ def _tarjan_sccs(graph: dict[str, list[str]], nodes: set[str]) -> list[list[str]
     lowlink: dict[str, int] = {}
     sccs: list[list[str]] = []
 
-    def strongconnect(vertex: str) -> None:
-        nonlocal index
-        indices[vertex] = index
-        lowlink[vertex] = index
-        index += 1
-        stack.append(vertex)
-        on_stack.add(vertex)
-        for neighbor in graph.get(vertex, ()):
-            if neighbor not in indices:
-                strongconnect(neighbor)
+    for root in nodes:
+        if root in indices:
+            continue
+        call_stack: list[tuple[str, int]] = [(root, 0)]
+        while call_stack:
+            vertex, ni = call_stack.pop()
+            neighbors = graph.get(vertex, ())
+            if ni == 0:
+                indices[vertex] = index
+                lowlink[vertex] = index
+                index += 1
+                stack.append(vertex)
+                on_stack.add(vertex)
+            else:
+                neighbor = neighbors[ni - 1]
                 lowlink[vertex] = min(lowlink[vertex], lowlink[neighbor])
-            elif neighbor in on_stack:
-                lowlink[vertex] = min(lowlink[vertex], indices[neighbor])
-        if lowlink[vertex] == indices[vertex]:
-            component: list[str] = []
-            while True:
-                w = stack.pop()
-                on_stack.remove(w)
-                component.append(w)
-                if w == vertex:
+            while ni < len(neighbors):
+                neighbor = neighbors[ni]
+                ni += 1
+                if neighbor not in indices:
+                    call_stack.append((vertex, ni))
+                    call_stack.append((neighbor, 0))
                     break
-            sccs.append(component)
-
-    for node in nodes:
-        if node not in indices:
-            strongconnect(node)
+                if neighbor in on_stack:
+                    lowlink[vertex] = min(lowlink[vertex], indices[neighbor])
+            else:
+                if lowlink[vertex] == indices[vertex]:
+                    component: list[str] = []
+                    while True:
+                        w = stack.pop()
+                        on_stack.remove(w)
+                        component.append(w)
+                        if w == vertex:
+                            break
+                    sccs.append(component)
     return sccs
 
 

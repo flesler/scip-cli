@@ -61,17 +61,12 @@ def kind_to_display(kind):
 def _search_rows_with_kind(db, sql, params, kind, limit):
     """Fetch search rows matching kind, stopping once limit is exceeded."""
     rows = []
-    cursor = db.execute(sql, params)
-    while True:
-        batch = cursor.fetchmany(500)
-        if not batch:
-            break
-        for row in batch:
-            if infer_kind(row[1]) != kind:
-                continue
-            rows.append(row)
-            if len(rows) > limit:
-                break
+    scan_limit = max(limit * 10, 1000)
+    cursor = db.execute(f"{sql} LIMIT ?", (*params, scan_limit))
+    for row in cursor:
+        if infer_kind(row[1]) != kind:
+            continue
+        rows.append(row)
         if len(rows) > limit:
             break
     return limit_and_warn(rows, limit, "results")

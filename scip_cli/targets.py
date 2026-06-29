@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-_FILE_TARGET_RE = re.compile(r"\.(ts|tsx|js|jsx|mjs|cjs|py)$", re.I)
+_FILE_TARGET_RE = re.compile(r"\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs)$", re.I)
 
 
 def looks_like_file_target(target: str) -> bool:

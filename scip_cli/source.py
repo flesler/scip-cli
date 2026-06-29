@@ -47,7 +47,7 @@ def read_source_lines(
             if start_line is not None and end_line is not None:
                 return lines[start_line : end_line + 1]
             return lines
-    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
+    except OSError:
         return None
 
 

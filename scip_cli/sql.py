@@ -23,12 +23,10 @@ def escape_like(s: str) -> str:
 
 def configure_read_connection(db: sqlite3.Connection) -> None:
     """Tune SQLite for read-heavy CLI queries."""
-    db.executescript("""
-        PRAGMA query_only = ON;
-        PRAGMA temp_store = MEMORY;
-        PRAGMA cache_size = -64000;
-        PRAGMA mmap_size = 268435456;
-    """)
+    db.execute("PRAGMA query_only = ON")
+    db.execute("PRAGMA temp_store = MEMORY")
+    db.execute("PRAGMA cache_size = -64000")
+    db.execute("PRAGMA mmap_size = 268435456")
 
 
 def configure_bulk_write_connection(db: sqlite3.Connection) -> None:

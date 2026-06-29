@@ -8,6 +8,7 @@ from ..paths import path_in_scope
 from ..session import resolve_one_file, resolve_one_symbol, setup
 from ..sql import debug_execute
 from ..symbols import extract_leaf_name
+from ..targets import looks_like_file_target
 
 
 def _deps_from_symbol(db, symbol_id, limit):
@@ -101,7 +102,7 @@ def main(args):
         deps = []
         target_label = target
 
-        if target.endswith((".ts", ".tsx", ".js", ".jsx", ".py")):
+        if looks_like_file_target(target):
             file_path = resolve_one_file(db, target, path_scope=path_scope)
             deps = _deps_from_file(db, file_path, limit)
             target_label = file_path
