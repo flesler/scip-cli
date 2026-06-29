@@ -28,13 +28,13 @@ Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `S
 
 ## Lint / test
 
-| Task | Command |
-|------|---------|
-| **All checks** | `scripts/test.sh` (lint + format + types + tests) |
-| Full suite | `pytest` |
-| E2e loop | `pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py` |
-| Lint / format | `ruff check .` / `ruff format .` |
-| Typecheck | `basedpyright scip_cli/` |
+|Task|Command|
+|---|---|
+|**All checks**|`scripts/test.sh` (lint + format + types + tests)|
+|Full suite|`pytest`|
+|E2e loop|`pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py`|
+|Lint / format|`ruff check .` / `ruff format .`|
+|Typecheck|`basedpyright scip_cli/`|
 
 Pre-commit: ruff + ruff-format + basedpyright + full pytest. E2e before commit on command changes.
 
@@ -54,12 +54,12 @@ scip-cli analyze scip_cli/queries.py --limit 20   # file (+ scoped project)
 
 Interpretation: README § *Finding easy wins with analyze*. Target = omit (project), directory, file, or symbol — not `--path` for scope.
 
-| Priority | Section | Action |
-|----------|---------|--------|
-| 1 | **Cycles** | Break production file dependency cycles (`cache`↔`scope` was one) |
-| 2 | **Unreferenced / dead exports** | No ref usage / no external refs — verify with `rg`, delete or `_` prefix |
-| 3 | **Same-file only** | Module-private by usage — rename to `_` |
-| 4 | **Stale types** | Low-consumer classes — merge or justify |
+|Priority|Section|Action|
+|---|---|---|
+|1|**Cycles**|Break production file dependency cycles (`cache`↔`scope` was one)|
+|2|**Unreferenced / dead exports**|No ref usage / no external refs — verify with `rg`, delete or `_` prefix|
+|3|**Same-file only**|Module-private by usage — rename to `_`|
+|4|**Stale types**|Low-consumer classes — merge or justify|
 
 `analyze` skips test paths by default (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include. Reindex after large edits.
 
@@ -82,19 +82,19 @@ Only skip step 1 when the issue is **outside the index** (runtime, CLI UX, docs 
 
 ### Retrospective: caught manually, SQLite already had it
 
-| Issue we hit | Index signal | Analyze today | Gap / next check |
-|--------------|--------------|---------------|------------------|
-| `cache` ↔ `scope` import cycle | cross-file `mentions` edges | `[high] Cycles` | **Caught** — keep dogfooding cycles |
-| Cross-file dead export (`get_refs_for_symbols`) | def with no external `mentions` | `[high] Dead exports` | **Caught** |
-| Same-file-only dead code | def, `role=0` only in def file | `[high] Unreferenced` or `[medium] Same-file only` | **Caught** (since extended) |
-| Same-file helper without `_` (`run_with_fallback`) | same-file `role=0` or none | `[medium] Same-file only` / unreferenced | **Caught** — rename to `_` |
-| Typing-only dataclasses (`ProjectSettings`, `IndexScope`) | type `#` symbol, 0 consumer files | `[high] Stale types` + `stale_type_noise` | **Filtered** — index can't see annotations; document or optional `--types` |
-| `analyze/*` section runners “dead” | no external refs | noise filter in `common.py` | **Filtered** — framework pattern |
-| Unused import | `role=2` mention, no in-file use | `[high] Unused imports` (per file) | **Caught** on file target |
-| Hub before editing (`resolve_symbol`, `queries.py`) | fan-in / consumer count | `[medium] Change surface` / `[low] Hotspots` | **Caught** on file target; project hubs are low tier |
-| Symbol only used from tests | consumers all under `tests/` | `[low] Test-only consumers` | **Partial** — Python index often omits same-file `role=0`; verify with `rg` |
-| Indexer omits same-file Python calls | no `role=0` for in-module use | unreferenced / test-only false positives | **Index gap** — not fixable in SQL alone; demoted test-only to low |
-| Duplicate / parallel helpers | — | — | **Not in index** — `rg`, not analyze |
+|Issue we hit|Index signal|Analyze today|Gap / next check|
+|---|---|---|---|
+|`cache` ↔ `scope` import cycle|cross-file `mentions` edges|`[high] Cycles`|**Caught** — keep dogfooding cycles|
+|Cross-file dead export (`get_refs_for_symbols`)|def with no external `mentions`|`[high] Dead exports`|**Caught**|
+|Same-file-only dead code|def, `role=0` only in def file|`[high] Unreferenced` or `[medium] Same-file only`|**Caught** (since extended)|
+|Same-file helper without `_` (`run_with_fallback`)|same-file `role=0` or none|`[medium] Same-file only` / unreferenced|**Caught** — rename to `_`|
+|Typing-only dataclasses (`ProjectSettings`, `IndexScope`)|type `#` symbol, 0 consumer files|`[high] Stale types` + `stale_type_noise`|**Filtered** — index can't see annotations; document or optional `--types`|
+|`analyze/*` section runners “dead”|no external refs|noise filter in `common.py`|**Filtered** — framework pattern|
+|Unused import|`role=2` mention, no in-file use|`[high] Unused imports` (per file)|**Caught** on file target|
+|Hub before editing (`resolve_symbol`, `queries.py`)|fan-in / consumer count|`[medium] Change surface` / `[low] Hotspots`|**Caught** on file target; project hubs are low tier|
+|Symbol only used from tests|consumers all under `tests/`|`[low] Test-only consumers`|**Partial** — Python index often omits same-file `role=0`; verify with `rg`|
+|Indexer omits same-file Python calls|no `role=0` for in-module use|unreferenced / test-only false positives|**Index gap** — not fixable in SQL alone; demoted test-only to low|
+|Duplicate / parallel helpers|—|—|**Not in index** — `rg`, not analyze|
 
 Add new rows to `dogfood.md` when you find another gap; implement the SQL check before the next manual review pass.
 
@@ -102,15 +102,15 @@ Add new rows to `dogfood.md` when you find another gap; implement the SQL check 
 
 SQLite has **line ranges** (`defn_enclosing_ranges`) so LOC is cheap. That does **not** mean “big function” belongs next to dead exports.
 
-| Idea | In index? | Verdict |
-|------|-----------|---------|
-| **LOC ≥ N** alone | Yes | **LOW at best** — noisy (`main`, argparse, legitimate parsers). Not a nuke candidate. |
-| **LOC + fan-in** (large hub) | Yes | **Already covered** by `[low] Bottlenecks` (fan-in × fan-out). Add `loc=` to that output if helpful; don’t duplicate as medium. |
-| **LOC + consumers** on file target | Yes | **Change surface** (medium) already sorts by consumers with line ranges — drill there. |
-| **Symbol pressure** | Yes | **Per-symbol** `analyze Foo` shows `loc × fan_in × fan_out`. |
-| **God class / many members** | Yes | Use `members Class` — not analyze. |
-| **File byte size / cyclomatic complexity** | No | Out of scope for SCIP index. |
-| **Fat file (many symbols)** | Yes | Low value; coupling/hotspots approximate module heat. |
+|Idea|In index?|Verdict|
+|---|---|---|
+|**LOC ≥ N** alone|Yes|**LOW at best** — noisy (`main`, argparse, legitimate parsers). Not a nuke candidate.|
+|**LOC + fan-in** (large hub)|Yes|**Already covered** by `[low] Bottlenecks` (fan-in × fan-out). Add `loc=` to that output if helpful; don’t duplicate as medium.|
+|**LOC + consumers** on file target|Yes|**Change surface** (medium) already sorts by consumers with line ranges — drill there.|
+|**Symbol pressure**|Yes|**Per-symbol** `analyze Foo` shows `loc × fan_in × fan_out`.|
+|**God class / many members**|Yes|Use `members Class` — not analyze.|
+|**File byte size / cyclomatic complexity**|No|Out of scope for SCIP index.|
+|**Fat file (many symbols)**|Yes|Low value; coupling/hotspots approximate module heat.|
 
 **Rule:** size-only checks stay **low or file-drill-down**; never high/medium unless paired with a **structural smell** (cycle, dead export, zero production consumers). Prefer enriching existing low-tier lines (e.g. show `loc` on bottlenecks) over a new dashboard section.
 
@@ -187,23 +187,23 @@ When dogfooding **another repo** surfaces a bug or false positive (analyze noise
 
 **Prefer fixture e2e over fake SQLite graphs.** `tests/analyze_db.py` (`AnalyzeDbBuilder`, `:memory:`) is for SQL/dashboard **plumbing** and graph primitives (`test_analyze_graph.py`, `mini_codebase_db`) — not for reproducing production SCIP symbol shapes. Hand-built symbols often diverge from scip-typescript (path format, `0:` aliases, module rows) and can pass while production still breaks.
 
-| Use fixture e2e | Use `analyze_db` unit |
-|-----------------|----------------------|
-| False positives / analyze checks from real projects | Tarjan, edge-type SQL, `run_all` section wiring |
-| Any behavior that depends on indexer symbol strings | Noise filters with one or two synthetic rows |
-| CLI commands (`refs`, `search`, `analyze` output) | Merge/index prune tests |
+|Use fixture e2e|Use `analyze_db` unit|
+|---|---|
+|False positives / analyze checks from real projects|Tarjan, edge-type SQL, `run_all` section wiring|
+|Any behavior that depends on indexer symbol strings|Noise filters with one or two synthetic rows|
+|CLI commands (`refs`, `search`, `analyze` output)|Merge/index prune tests|
 
 If both layers help during development, **keep both until e2e passes**, then delete duplicate in-memory repros — fixture is the source of truth.
 
 ## Codebase map (contributors)
 
-| Area | Path | Notes |
-|------|------|-------|
-| Commands | `scip_cli/commands/` | Thin; SQL in `queries.py` / `analyze/` |
-| Index build | `scip_cli/indexing.py` | `index.db.next` → promote; flock; `>10` tsconfigs log progress |
-| Variable prune | postprocess + `merge.py` | Omit const/let/var on **COPY**, not DELETE — no `variable` kind |
-| Session | `scip_cli/session.py` | `setup()`, `resolve_one_symbol` (limit 2 for ambiguity) |
-| Analyze filters | `scip_cli/analyze/common.py` | `is_test_path`, `analyze_noise` (`_` helpers) |
+|Area|Path|Notes|
+|---|---|---|
+|Commands|`scip_cli/commands/`|Thin; SQL in `queries.py` / `analyze/`|
+|Index build|`scip_cli/indexing.py`|`index.db.next` → promote; flock; `>10` tsconfigs log progress|
+|Variable prune|postprocess + `merge.py`|Omit const/let/var on **COPY**, not DELETE — no `variable` kind|
+|Session|`scip_cli/session.py`|`setup()`, `resolve_one_symbol` (limit 2 for ambiguity)|
+|Analyze filters|`scip_cli/analyze/common.py`|`is_test_path`, `analyze_noise` (`_` helpers)|
 
 `todo.md` = tracked work; `dogfood.md` = future ideas only. Wishlist/backlog in `docs/` per workspace rules.
 
