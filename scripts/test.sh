@@ -3,16 +3,27 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Use venv-local binaries
+RUFF=".venv/bin/ruff"
+PYRIGHT=".venv/bin/basedpyright"
+PYTEST=".venv/bin/pytest"
+
+# Check venv binaries exist
+if [ ! -f "$RUFF" ]; then
+    echo "Error: ruff not found in .venv. Run: pip install -e '.[dev]'"
+    exit 1
+fi
+
 echo "Linting..."
-ruff check .
+$RUFF check .
 
 echo "Formatting..."
-ruff format --check .
+$RUFF format --check .
 
 echo "Type checking..."
-basedpyright scip_cli/
+$PYRIGHT scip_cli/
 
 echo "Running tests..."
-pytest
+$PYTEST
 
 echo "All checks passed!"
