@@ -150,8 +150,6 @@ def discover_golang_modules(root: Path) -> list[Path]:
     modules = _walk_marker_files(root, frozenset({"go.mod"}))
     if modules:
         return sorted(set(modules), key=str)
-    if (root / "go.mod").is_file():
-        return [Path(".")]
     return [Path(".")]
 
 
@@ -161,8 +159,6 @@ def discover_python_projects(root: Path) -> list[Path]:
     projects = _walk_marker_files(root, frozenset({"pyproject.toml", "setup.py"}))
     if projects:
         return sorted(set(projects), key=str)
-    if (root / "pyproject.toml").is_file() or (root / "setup.py").is_file():
-        return [Path(".")]
     return [Path(".")]
 
 
@@ -172,6 +168,4 @@ def discover_rust_crates(root: Path) -> list[Path]:
     crates = _walk_marker_files(root, frozenset({"Cargo.toml"}))
     if crates:
         return sorted(set(crates), key=str)
-    if (root / "Cargo.toml").is_file():
-        return [Path(".")]
     return [Path(".")]

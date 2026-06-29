@@ -119,7 +119,11 @@ def _download_scip_binary(dest: Path) -> None:
                 raise RuntimeError("scip archive did not contain a scip binary")
             member = members[0]
             _safe_tar_member_path(Path(tmpdir), member.name)
-            tar.extract(member, path=tmpdir)
+            # Python 3.12+ requires filter parameter for security
+            if sys.version_info >= (3, 12):
+                tar.extract(member, path=tmpdir, filter="data")  # pyright: ignore[reportUnreachable]
+            else:
+                tar.extract(member, path=tmpdir)
             extracted = Path(tmpdir) / member.name
             shutil.move(str(extracted), dest)
 

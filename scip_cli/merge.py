@@ -161,7 +161,7 @@ def _merge_one_attached(dest: sqlite3.Connection, alias: str) -> None:
         """)
 
         dest.execute("COMMIT")
-    except Exception:
+    except sqlite3.Error:
         dest.execute("ROLLBACK")
         raise
     finally:
