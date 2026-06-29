@@ -146,53 +146,91 @@ def typescript_projects(root: Path) -> list[Path]:
     return sorted(merged.values(), key=str)
 
 
-def _run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None, go_package=None):
-    """Try binary first, fallback to npx or go install if not found."""
-    run_env = env if env is not None else os.environ.copy()
+def _run_indexer_command(binary, args, cwd, env):
+    """Try to run an indexer binary. Returns (success, result)."""
+    try:
+        result = _run_subprocess([binary, *args], cwd, env=env)
+        if result.returncode == 0:
+            return True, result
+        if "not found" in result.stderr.lower():
+            return False, result
+        return True, result  # Command ran but failed - return the error
+    except FileNotFoundError:
+        return False, None
 
-    def run_npx():
-        npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
-        debug_log("Tool not found, trying npx (will download automatically)...")
-        return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
 
-    def run_go_install():
-        # Ensure ~/go/bin is in PATH (standard Go install location)
-        go_bin_dir = Path.home() / "go" / "bin"
-        go_env = run_env.copy()
-        go_env["PATH"] = f"{go_bin_dir}:{go_env.get('PATH', '')}"
+def _install_via_npx(package, version, args, cwd, env):
+    """Install and run via npx."""
+    npx_spec = f"{package}@~{version}" if version else package
+    debug_log("Tool not found, trying npx (will download automatically)...")
+    return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=env)
 
-        # Check if already installed in ~/go/bin
-        go_binary = go_bin_dir / binary
-        if go_binary.exists():
-            debug_log(f"Found {binary} at {go_binary}")
-            # Also ensure go toolchain is in PATH for scip-go
-            go_toolchain = (
-                Path.home() / "go" / "pkg" / "mod" / "golang.org" / "toolchain@v0.0.1-go1.25.11.linux-amd64" / "bin"
-            )
-            if go_toolchain.exists():
-                go_env["PATH"] = f"{go_toolchain}:{go_env['PATH']}"
-            return _run_subprocess([str(go_binary), *args], cwd, env=go_env)
 
-        debug_log("Tool not found, installing via go install (will download to ~/go/bin)...")
-        install_result = _run_subprocess(
-            ["go", "install", f"{go_package}@latest"],
-            cwd,
-            env=go_env,
+def _install_via_go_install(package, binary, args, cwd, env):
+    """Install via go install and run from ~/go/bin."""
+    go_bin_dir = Path.home() / "go" / "bin"
+    go_env = env.copy()
+    go_env["PATH"] = f"{go_bin_dir}:{go_env.get('PATH', '')}"
+
+    go_binary = go_bin_dir / binary
+    if go_binary.exists():
+        debug_log(f"Found {binary} at {go_binary}")
+        go_toolchain = (
+            Path.home() / "go" / "pkg" / "mod" / "golang.org" / "toolchain@v0.0.1-go1.25.11.linux-amd64" / "bin"
         )
-        if install_result.returncode != 0:
-            raise RuntimeError(f"Failed to install {binary} via go install: {install_result.stderr}")
-        debug_log(f"{binary} installed, retrying...")
+        if go_toolchain.exists():
+            go_env["PATH"] = f"{go_toolchain}:{go_env['PATH']}"
         return _run_subprocess([str(go_binary), *args], cwd, env=go_env)
 
-    try:
-        result = _run_subprocess([binary, *args], cwd, env=run_env)
-        if result.returncode == 0:
-            return result
-        if "not found" in result.stderr.lower():
-            return run_go_install() if go_package else run_npx()
+    debug_log("Tool not found, installing via go install (will download to ~/go/bin)...")
+    install_result = _run_subprocess(
+        ["go", "install", f"{package}@latest"],
+        cwd,
+        env=go_env,
+    )
+    if install_result.returncode != 0:
+        raise RuntimeError(f"Failed to install {binary} via go install: {install_result.stderr}")
+    debug_log(f"{binary} installed, retrying...")
+    return _run_subprocess([str(go_binary), *args], cwd, env=go_env)
+
+
+def _install_via_rustup(component, binary, args, cwd, env):
+    """Install via rustup component add and run."""
+    debug_log(f"Tool not found, installing rustup component {component}...")
+    install_result = _run_subprocess(
+        ["rustup", "component", "add", component],
+        cwd,
+        env=env,
+    )
+    if install_result.returncode != 0:
+        raise RuntimeError(f"Failed to install {component} via rustup: {install_result.stderr}")
+    debug_log(f"{binary} installed via rustup, retrying...")
+    return _run_subprocess([binary, *args], cwd, env=env)
+
+
+def run_indexer_with_fallback(
+    binary, args, cwd, env=None, npx_package=None, npx_version=None, go_package=None, rustup_component=None
+) -> subprocess.CompletedProcess[str]:
+    """Run an indexer, installing it automatically if not found."""
+    run_env = env if env is not None else os.environ.copy()
+
+    success, result = _run_indexer_command(binary, args, cwd, run_env)
+    if success:
+        assert result is not None
         return result
-    except FileNotFoundError:
-        return run_go_install() if go_package else run_npx()
+
+    # Binary not found - use appropriate fallback
+    if go_package:
+        return _install_via_go_install(go_package, binary, args, cwd, run_env)
+    if rustup_component:
+        return _install_via_rustup(rustup_component, binary, args, cwd, run_env)
+    if npx_package:
+        return _install_via_npx(npx_package, npx_version, args, cwd, run_env)
+
+    # No fallback available - return the original error or raise if None
+    if result is None:
+        raise RuntimeError(f"Binary '{binary}' not found and no fallback available")
+    return result
 
 
 def _scip_version(binary):
@@ -371,12 +409,12 @@ def _index_one_ts_project(root, project, work_dir, env):
     label = "." if project == Path(".") else str(project)
     part_scip = work_dir / "index.scip"
     index_args = _typescript_index_args(root, part_scip, [project])
-    result = _run_with_fallback(
+    result = run_indexer_with_fallback(
         "scip-typescript",
-        "@sourcegraph/scip-typescript",
-        str(root),
         index_args,
+        str(root),
         env=env,
+        npx_package="@sourcegraph/scip-typescript",
         npx_version=SCIP_TYPESCRIPT_VERSION,
     )
     if result.returncode != 0:
@@ -483,22 +521,29 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
     with tempfile.TemporaryDirectory() as tmpdir:
         index_scip = os.path.join(tmpdir, "index.scip")
         if lang == Language.PYTHON:
-            result = _run_with_fallback(
+            result = run_indexer_with_fallback(
                 "scip-python",
-                "@sourcegraph/scip-python",
-                str(root),
                 ["index", ".", "--output", index_scip],
+                str(root),
                 env=env,
+                npx_package="@sourcegraph/scip-python",
                 npx_version=SCIP_PYTHON_VERSION,
             )
         elif lang == Language.GOLANG:
-            result = _run_with_fallback(
+            result = run_indexer_with_fallback(
                 "scip-go",
-                None,
-                str(root),
                 ["--output", index_scip],
+                str(root),
                 env=env,
                 go_package="github.com/scip-code/scip-go/cmd/scip-go",
+            )
+        elif lang == Language.RUST:
+            result = run_indexer_with_fallback(
+                "rust-analyzer",
+                ["scip", str(root), "--output", index_scip],
+                str(root),
+                env=env,
+                rustup_component="rust-analyzer",
             )
         else:
             raise RuntimeError(f"Unsupported language '{lang}'")

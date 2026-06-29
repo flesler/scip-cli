@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/scip-cli.svg)](https://badge.fury.io/py/scip-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Token-efficient code intelligence for AI agents. Precise refs, definitions, and repo health analysis via SCIP indexes — TypeScript/JavaScript and Python.
+Token-efficient code intelligence for AI agents. Precise refs, definitions, and repo health analysis via SCIP indexes — TypeScript/JavaScript, Python, Go, and Rust.
 
 ## Why
 
@@ -69,7 +69,7 @@ On **first index**, scip-cli runs language indexers and builds a SQLite cache. Y
 
 Install `scip-cli` and run it. On first index, scip-cli will:
 
-- Download `scip-typescript` / `scip-python` via `npx` or `scip-go` via `go install` when not already on PATH
+- Download `scip-typescript` / `scip-python` via `npx`, `scip-go` via `go install`, or `rust-analyzer` via `rustup` when not already on PATH
 - Download the `scip` converter binary from [GitHub releases](https://github.com/scip-code/scip/releases) into `~/.cache/scip-cli/bin/` when not already on PATH
 - Walk the repo for `tsconfig*.json` project roots (TypeScript monorepos), run `scip-typescript` per project (parallel by default), convert each partial index, then merge into one `index.db`
 
@@ -88,6 +88,9 @@ npm install -g @sourcegraph/scip-python
 
 # Go indexer
 go install github.com/scip-code/scip-go/cmd/scip-go@latest
+
+# Rust indexer (rust-analyzer with SCIP support)
+rustup component add rust-analyzer
 
 # SCIP CLI for index conversion (GitHub release — not on npm)
 # https://github.com/scip-code/scip/releases  (v0.8.1+ recommended)
@@ -182,9 +185,9 @@ scip-cli deps greet --paths-only | sort -u
 
 ## How It Works
 
-1. On first query, automatically detects project language from `package.json` (TS/JS), `pyproject.toml`/`setup.py` (Python), or `go.mod` (Go)
+1. On first query, automatically detects project language from `package.json` (TS/JS), `pyproject.toml`/`setup.py` (Python), `go.mod` (Go), or `Cargo.toml` (Rust)
 2. For TypeScript monorepos, walks the repository for `tsconfig*.json` project roots (nested ancestors deduped; root included only when its `include` is broad)
-3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), `scip-python` for Python, or `scip-go` for Go
+3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), `scip-python` for Python, `scip-go` for Go, or `rust-analyzer scip` for Rust
 4. Converts each SCIP output to SQLite with `scip expt-convert`, then merges partial databases when needed
 5. Caches the result in `~/.cache/scip-cli/projects/<dirname>-<hash>/index.db` (e.g. `my-monorepo-1a3f7a`)
 6. Subsequent queries are SQLite lookups against that cache (not re-indexing)

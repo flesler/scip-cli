@@ -11,6 +11,7 @@ class Language(str, Enum):
     TYPESCRIPT = "typescript"
     PYTHON = "python"
     GOLANG = "golang"
+    RUST = "rust"
 
 
 def find_project_root_and_language(start_dir=None):
@@ -22,6 +23,8 @@ def find_project_root_and_language(start_dir=None):
     while d != d.parent:
         if (d / "package.json").exists() or (d / "tsconfig.json").exists():
             return d, Language.TYPESCRIPT
+        if (d / "Cargo.toml").exists():
+            return d, Language.RUST
         if (d / "pyproject.toml").exists() or (d / "setup.py").exists():
             return d, Language.PYTHON
         if (d / "go.mod").exists():

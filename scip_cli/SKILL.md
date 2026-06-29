@@ -1,9 +1,9 @@
 ---
 name: scip-cli
-description: Read when needing symbols, definitions, refs, members, or SQL health dashboards in TS/JS or Python
+description: Read when needing symbols, definitions, refs, members, or SQL health dashboards in TS/JS, Python, Go, or Rust
 ---
 
-TypeScript/JavaScript (.ts, .tsx, .js, .jsx) and Python (.py) — not GraphQL, CSS, or other files.
+TypeScript/JavaScript (.ts, .tsx, .js, .jsx), Python (.py), Go (.go), and Rust (.rs) — not GraphQL, CSS, or other files.
 
 All commands are sub-commands of `scip-cli`. Run from the project root.
 
@@ -30,7 +30,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 - **Query `--path` vs `reindex --path`** — query `--path` filters results only. `reindex --path` persists scope and **replaces** the cached index with only those tsconfig projects; run full `reindex` (no `--path`) to restore.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). Repos with more than 10 tsconfig projects log per-project progress to stderr. JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use query `--path packages/api` to scope lookups.
-- **Prerequisites**: Node.js (for TypeScript/Python via `npx`) or Go toolchain (for Go via `go install`). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`; `scip-go` downloads via `go install` to `~/go/bin`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
+- **Prerequisites**: Node.js (for TypeScript/Python via `npx`), Go toolchain (for Go via `go install`), or Rust toolchain (for Rust via `rustup`). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`; `scip-go` downloads via `go install` to `~/go/bin`; `rust-analyzer` installs via `rustup component add`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
 
 ## Details
 
