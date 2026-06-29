@@ -166,7 +166,7 @@ for name, fn in [('hotspots', p.hotspots), ('cycles', p.cycles), ('dead_exports'
 
 ### Default: extend the shared fixture
 
-**One indexed TS project** — `tests/fixtures/sample-project/` — indexed once per session via `indexed_fixture` (`conftest.py`). Stable names live in `tests/fixture_catalog.py`.
+**One indexed TS project** — `tests/fixtures/typescript-project/` — indexed once per session via `indexed_fixture` (`conftest.py`). Stable names live in `tests/fixture_catalog.py`.
 
 1. **Red** — add a **minimal** `.ts` file (or tweak an existing one) that reproduces the SCIP shape; assert in `tests/test_e2e.py` or `tests/test_e2e_analyze_patterns.py` using `cli` / `open_index_db` + analyze helpers.
 2. **Green** — fix `scip_cli/` (commands, `analyze/*`, `queries.py`, …).
@@ -181,7 +181,7 @@ for name, fn in [('hotspots', p.hotspots), ('cycles', p.cycles), ('dead_exports'
 When dogfooding **another repo** surfaces a bug or false positive (analyze noise, dead-export mistake, cycle, stale type, refs mismatch):
 
 1. **Capture the pattern, not the project** — note the SCIP shape (module `/`, export alias `foo0:`, lazy import, `Props#`, barrel cycle, …). Do **not** copy real repo names, paths, or filenames into tests or docs.
-2. **Red on the fixture** — smallest TS repro under `tests/fixtures/sample-project/` with generic names (`LazyPanel`, `evictItem`, `OrphanWidget`, …). E2e test proves the bug against **real `scip-typescript`** output.
+2. **Red on the fixture** — smallest TS repro under `tests/fixtures/typescript-project/` with generic names (`LazyPanel`, `evictItem`, `OrphanWidget`, …). E2e test proves the bug against **real `scip-typescript`** output.
 3. **Green** — fix analyze heuristics / SQL / CLI; dogfood on this repo if applicable.
 4. **Verify** — `pytest tests/test_e2e_analyze_patterns.py` (or full `pytest`); only then trim redundant tests.
 

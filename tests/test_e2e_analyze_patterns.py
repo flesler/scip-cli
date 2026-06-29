@@ -1,4 +1,4 @@
-"""E2e analyze checks against real scip-typescript index of sample-project patterns."""
+"""E2e analyze checks against real scip-typescript index of typescript-project patterns."""
 
 import sqlite3
 

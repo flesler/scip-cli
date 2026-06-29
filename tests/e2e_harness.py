@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from scip_cli.sql import configure_read_connection
 
-FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "sample-project"
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "typescript-project"
 
 COMMAND_SETUP_PATHS = (
     "scip_cli.commands.analyze.setup",

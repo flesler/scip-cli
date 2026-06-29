@@ -9,7 +9,7 @@ from tests.e2e_harness import FIXTURE_ROOT, CliRunner, IndexedFixture, index_fix
 
 @pytest.fixture(scope="session")
 def indexed_fixture(tmp_path_factory):
-    """Copy sample-project, index once with real tooling, reuse for all e2e tests."""
+    """Copy typescript-project, index once with real tooling, reuse for all e2e tests."""
     root = tmp_path_factory.mktemp("scip-fixture")
     shutil.copytree(FIXTURE_ROOT, root, dirs_exist_ok=True)
     try:

@@ -1,4 +1,4 @@
-"""Stable names and paths in tests/fixtures/sample-project."""
+"""Stable names and paths in tests/fixtures/typescript-project."""
 
 HELPER_FILE = "src/helper.ts"
 WIDGET_FILE = "src/widget.ts"

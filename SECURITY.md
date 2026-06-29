@@ -11,7 +11,7 @@
 
 **Do not open public issues for security vulnerabilities.**
 
-If you discover a security vulnerability, please email **ariel.flesler@gmail.com** with:
+If you discover a security vulnerability, please email **aflesler@gmail.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce or proof of concept

@@ -326,7 +326,7 @@ scip_cli/
 ```bash
 pip install -e ".[dev]"
 pytest tests/ -q
-pytest tests/ -m integration -q   # indexes tests/fixtures/sample-project (needs scip-typescript)
+pytest tests/ -m integration -q   # indexes tests/fixtures/typescript-project (needs scip-typescript)
 ```
 
 ### Debug Logging
