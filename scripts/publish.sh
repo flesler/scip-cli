@@ -94,3 +94,9 @@ python -m twine upload dist/* --username __token__ --password "$(grep PYPI_TOKEN
 
 echo "Published v$VERSION successfully!"
 echo "View at: https://pypi.org/project/scip-cli/$VERSION/"
+
+echo "Smoke testing PyPI..."
+pip install "scip-cli==$VERSION"
+scip-cli --version
+pip install -e ".[dev]"
+scip-cli --version
