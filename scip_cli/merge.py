@@ -27,8 +27,8 @@ def merge_batch_size() -> int:
         if parsed > MAX_MERGE_BATCH_SIZE:
             raise RuntimeError(
                 f"SCIP_CLI_MERGE_BATCH_SIZE={parsed} exceeds SQLite limit ({MAX_MERGE_BATCH_SIZE} attached "
-                "source DBs per merge batch). Lower the value or raise scip-typescript batch size so fewer "
-                "part DBs need merging."
+                + "source DBs per merge batch). Lower the value or raise scip-typescript batch size so fewer "
+                + "part DBs need merging."
             )
         return parsed
     return DEFAULT_MERGE_BATCH_SIZE

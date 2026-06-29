@@ -18,7 +18,12 @@ from .common import (
     stale_type_noise,
 )
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
-from .live import LiveIndex, file_has_scip_importers, has_same_file_reference_usage
+from .live import (
+    LiveIndex,
+    file_has_scip_importers,
+    has_same_file_reference_usage,
+    has_same_file_usage_mention,
+)
 from .sections import Check, Priority, run_checks
 
 
@@ -164,6 +169,8 @@ def _format_dead_export_rows(
         if analyze_noise(path, symbol, include_tests=include_tests):
             continue
         if has_same_file_reference_usage(db, symbol_id, def_doc_id):
+            continue
+        if has_same_file_usage_mention(db, symbol_id, def_doc_id):
             continue
         if live.dead_export_noise(symbol, def_doc_id):
             continue

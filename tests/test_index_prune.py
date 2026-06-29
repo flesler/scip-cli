@@ -137,9 +137,7 @@ class TestDocumentPathPrefix:
     def test_prefix_document_paths(self, tmp_path):
         db = tmp_path / "index.db"
         conn = sqlite3.connect(db)
-        conn.execute(
-            "CREATE TABLE documents (id INTEGER PRIMARY KEY, relative_path TEXT NOT NULL UNIQUE)"
-        )
+        conn.execute("CREATE TABLE documents (id INTEGER PRIMARY KEY, relative_path TEXT NOT NULL UNIQUE)")
         conn.execute("INSERT INTO documents (relative_path) VALUES ('main.go')")
         conn.commit()
         conn.close()
@@ -158,11 +156,7 @@ class TestPostprocessSchema:
         _postprocess_index(db_path)
 
         conn = sqlite3.connect(db_path)
-        pk_cols = {
-            row[1]
-            for row in conn.execute("PRAGMA table_info(mentions)").fetchall()
-            if row[5]
-        }
+        pk_cols = {row[1] for row in conn.execute("PRAGMA table_info(mentions)").fetchall() if row[5]}
         conn.close()
 
         assert pk_cols == {"chunk_id", "symbol_id", "role"}

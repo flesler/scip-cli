@@ -31,7 +31,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scip_cli.indexing import (  # noqa: E402
-    SCIP_TYPESCRIPT_VERSION,
     _convert_scip_to_db,
     _postprocess_index,
     _resolve_scip_binary,
@@ -47,9 +46,7 @@ def _table_counts(db: Path) -> dict[str, int]:
     try:
         tables = [
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            )
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         ]
         return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in sorted(tables)}
     finally:
@@ -105,7 +102,7 @@ def capture_fixture(tsconfig_path: str, output: Path, *, raw_db: Path) -> None:
     cmd = [
         "npx",
         "-y",
-        f"@sourcegraph/scip-typescript@~{SCIP_TYPESCRIPT_VERSION}",
+        "@sourcegraph/scip-typescript",
         "index",
         "--output",
         str(output),
@@ -144,7 +141,10 @@ def run_postprocess_only(raw: Path, runs: int) -> None:
                 print()
 
     avg = sum(times) / len(times)
-    print(f"postprocess (ours)     avg={avg*1000:7.0f}ms  min={min(times)*1000:7.0f}ms  max={max(times)*1000:7.0f}ms")
+    print(
+        f"postprocess (ours)     avg={avg * 1000:7.0f}ms  "
+        f"min={min(times) * 1000:7.0f}ms  max={max(times) * 1000:7.0f}ms"
+    )
     if post_db is not None:
         print(f"\nSize: raw {raw_mb:.1f} MB -> post {post_mb:.1f} MB")
 
@@ -184,7 +184,7 @@ def run_benchmark(scip: Path, runs: int, *, raw_db: Path | None) -> None:
 
     def summary(name: str, values: list[float]) -> None:
         avg = sum(values) / len(values)
-        print(f"{name:22} avg={avg*1000:7.0f}ms  min={min(values)*1000:7.0f}ms  max={max(values)*1000:7.0f}ms")
+        print(f"{name:22} avg={avg * 1000:7.0f}ms  min={min(values) * 1000:7.0f}ms  max={max(values) * 1000:7.0f}ms")
 
     summary("expt-convert (3rd party)", convert_times)
     summary("postprocess (ours)", post_times)

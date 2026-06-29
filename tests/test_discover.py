@@ -166,6 +166,12 @@ class TestDiscoverPythonProjects:
             Path("packages/worker"),
         ]
 
+    def test_skips_venv(self, tmp_path):
+        _write(tmp_path / "pyproject.toml", "[project]\nname = 'root'\n")
+        _write(tmp_path / ".venv" / "lib" / "pkg" / "pyproject.toml", "[project]\nname = 'dep'\n")
+
+        assert discover_python_projects(tmp_path) == [Path(".")]
+
 
 class TestDiscoverRustCrates:
     def test_single_crate_repo(self, tmp_path):

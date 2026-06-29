@@ -75,3 +75,8 @@ reportUnknownVariableType = "none"
 reportUnknownMemberType = "none"
 reportMissingParameterType = "none"
 reportUnusedCallResult = "none"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "scip_cli/indexing"
+reportUnusedFunction = "none"
+reportPrivateUsage = "none"

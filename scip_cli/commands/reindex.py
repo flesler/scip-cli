@@ -22,7 +22,7 @@ def main(args):
         sys.exit(1)
 
     path_args = getattr(args, "path", None) or []
-    if path_args and lang == Language.PYTHON:
+    if path_args and lang != Language.TYPESCRIPT:
         print("Error: reindex --path is only supported for TypeScript projects", file=sys.stderr)
         sys.exit(1)
 

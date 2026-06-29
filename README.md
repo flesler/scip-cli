@@ -208,7 +208,19 @@ Optional `.scip-cli.json` in the project root:
 - `indexRoots` — extra TypeScript project directories to include on **first index**, merged with auto-discovered projects.
 - `onlyIndexRoots` — skip auto-discovery and index **only** `indexRoots` (smaller initial index when you only care about part of a monorepo).
 
-`SCIP_CLI_INDEX_WORKERS` controls parallel `scip-typescript` runs during first index (default: up to 8). Merge into one database is always serial.
+`SCIP_CLI_INDEX_WORKERS` controls parallel indexer runs during first index (default: up to 8). Merge into one database is always serial.
+
+Other environment variables:
+
+| Variable                       | Purpose                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `SCIP_CLI_MAX_HEAP_MB`         | Node heap for `scip-typescript` / `scip-python` (overrides `maxHeapMb` in config)             |
+| `SCIP_CLI_TS_INDEX_BATCH_SIZE` | Split large TS repos into multiple `scip-typescript` runs (default: all tsconfigs in one run) |
+| `SCIP_CLI_MERGE_BATCH_SIZE`    | SQLite ATTACH batch size when merging part DBs (max 9)                                        |
+| `SCIP_CLI_MAX_DEF_LINES`       | Max definition lines in `code` output                                                         |
+| `SCIP_CLI_DEBUG`               | Log SQL queries to stderr                                                                     |
+
+**Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. Language indexers (`scip-typescript`, `scip-python` via `npx`; `scip-go` via `go install @latest`) install at latest on first use. `rust-analyzer` installs via `rustup component add`.
 
 Large monorepos (>10 tsconfig projects) log per-project progress to stderr during indexing; smaller repos stay quiet aside from the final `Indexed … (size)` line.
 
@@ -219,7 +231,7 @@ scip-cli reindex --path packages/server
 scip-cli reindex --path packages/api --path packages/worker
 ```
 
-`--path` limits which discovered tsconfig projects are indexed (prefix match, same idea as query `--path`). The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`.
+`--path` limits which discovered tsconfig projects are indexed (prefix match, same idea as query `--path`). **TypeScript only** — other languages reject `reindex --path`. The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`.
 
 Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or when you want a fresh index.
 
@@ -236,24 +248,24 @@ scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 
 Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 
-| Tier | Project sections | Action |
-| ---- | ---------------- | ------ |
-| **high** | Cycles, unreferenced, dead exports, stale types | Nuke or fix cycles; delete unused; `_` prefix |
-| **medium** | Same-file only, change surface (file target) | Module-private by usage |
-| **low** | Test-only consumers, coupling, bottlenecks, hotspots | Noisy on Python (index omits many same-file calls); verify with `rg` |
+| Tier       | Project sections                                     | Action                                                               |
+| ---------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
+| **high**   | Cycles, unreferenced, dead exports, stale types      | Nuke or fix cycles; delete unused; `_` prefix                        |
+| **medium** | Same-file only, change surface (file target)         | Module-private by usage                                              |
+| **low**    | Test-only consumers, coupling, bottlenecks, hotspots | Noisy on Python (index omits many same-file calls); verify with `rg` |
 
 Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
 
 **What to look at first**
 
-| Section | Easy pickings |
-| ------- | ------------- |
-| **Cycles** | Import/mention cycles between production files — break the edge or extract shared code |
-| **Unreferenced** | No usage in the index at all — delete |
-| **Dead exports** | No external refs — delete or `_` prefix |
-| **Stale types** | Classes/types with no external consumer in the index — verify in-file or type-only use before removing |
-| **Same-file only** | Used only inside defining file — rename to `_` |
-| **Test-only consumers** | Cross-file refs are all from tests — promote to e2e or accept as internal |
+| Section                 | Easy pickings                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Cycles**              | Import/mention cycles between production files — break the edge or extract shared code                 |
+| **Unreferenced**        | No usage in the index at all — delete                                                                  |
+| **Dead exports**        | No external refs — delete or `_` prefix                                                                |
+| **Stale types**         | Classes/types with no external consumer in the index — verify in-file or type-only use before removing |
+| **Same-file only**      | Used only inside defining file — rename to `_`                                                         |
+| **Test-only consumers** | Cross-file refs are all from tests — promote to e2e or accept as internal                              |
 
 **Per-file or package drill-down** on hubs or suspects:
 
@@ -262,7 +274,7 @@ scip-cli analyze scip_cli/queries.py --limit 20   # file: scoped project + per-f
 scip-cli analyze scip_cli --limit 15              # directory: scoped project + each file under it
 ```
 
-`Dead exports in file` lists same-module symbols with no *external* refs — module-private `_helpers` are filtered out. Remaining rows are worth a manual `rg` check.
+`Dead exports in file` lists same-module symbols with no _external_ refs — module-private `_helpers` are filtered out. Remaining rows are worth a manual `rg` check.
 
 **Defaults:** project-wide and directory analyze skip `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze always includes that file.
 

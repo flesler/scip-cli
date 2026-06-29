@@ -155,6 +155,21 @@ def has_same_file_reference_usage(db, symbol_id: int, def_doc_id: int) -> bool:
     return row is not None
 
 
+def has_same_file_usage_mention(db, symbol_id: int, def_doc_id: int) -> bool:
+    """Non-definition mention in the defining file (in-file callers)."""
+    row = _fetch_one(
+        db,
+        """
+        SELECT 1 FROM mentions m
+        JOIN chunks c ON m.chunk_id = c.id
+        WHERE m.symbol_id = ? AND c.document_id = ? AND m.role != 1
+        LIMIT 1
+        """,
+        (symbol_id, def_doc_id),
+    )
+    return row is not None
+
+
 def file_has_scip_importers(db, relative_path: str, *, live: LiveIndex, def_doc_id: int) -> bool:
     """True when the index shows another file importing this module or its symbols."""
     if def_doc_id in live.live_module_docs:
