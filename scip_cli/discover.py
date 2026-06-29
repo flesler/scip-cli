@@ -121,3 +121,55 @@ def should_index_root_alongside_projects(root: Path, projects: list[Path]) -> bo
     if not root_tsconfig.is_file():
         return False
     return _tsconfig_covers_subdirectories(root_tsconfig)
+
+
+def _walk_marker_files(root: Path, marker_names: frozenset[str]) -> list[Path]:
+    """Return directories containing any of marker_names (relative to root)."""
+    root = root.resolve()
+    found: list[Path] = []
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith(".")]
+        if not any(name in marker_names for name in filenames):
+            continue
+        project_dir = Path(dirpath).resolve()
+        try:
+            relative = project_dir.relative_to(root)
+        except ValueError:
+            continue
+        found.append(relative if relative.parts else Path("."))
+
+    return found
+
+
+def discover_golang_modules(root: Path) -> list[Path]:
+    """Return Go module directories (go.mod roots) under the repository."""
+    root = root.resolve()
+    modules = _walk_marker_files(root, frozenset({"go.mod"}))
+    if modules:
+        return sorted({p for p in modules}, key=str)
+    if (root / "go.mod").is_file():
+        return [Path(".")]
+    return [Path(".")]
+
+
+def discover_python_projects(root: Path) -> list[Path]:
+    """Return Python package roots (pyproject.toml or setup.py) under the repository."""
+    root = root.resolve()
+    projects = _walk_marker_files(root, frozenset({"pyproject.toml", "setup.py"}))
+    if projects:
+        return sorted({p for p in projects}, key=str)
+    if (root / "pyproject.toml").is_file() or (root / "setup.py").is_file():
+        return [Path(".")]
+    return [Path(".")]
+
+
+def discover_rust_crates(root: Path) -> list[Path]:
+    """Return Rust crate directories (Cargo.toml roots) under the repository."""
+    root = root.resolve()
+    crates = _walk_marker_files(root, frozenset({"Cargo.toml"}))
+    if crates:
+        return sorted({p for p in crates}, key=str)
+    if (root / "Cargo.toml").is_file():
+        return [Path(".")]
+    return [Path(".")]

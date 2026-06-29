@@ -1,8 +1,13 @@
 """Tests for index post-processing (column trim, variable omission)."""
 
 import sqlite3
+from pathlib import Path
 
-from scip_cli.indexing import _postprocess_index
+from scip_cli.indexing import (
+    _document_path_prefix,
+    _postprocess_index,
+    _prefix_document_paths,
+)
 from scip_cli.symbols import is_variable_symbol, sql_exclude_variable_symbols
 
 
@@ -118,5 +123,46 @@ class TestIndexLogging:
         assert "Indexed" in err
         assert "1.0 KB" in err
         assert "typescript" in err
-        assert "3 tsconfigs" in err
+        assert "3 projects" in err
         assert "1 skipped" in err
+
+
+class TestDocumentPathPrefix:
+    def test_document_path_prefix_root(self):
+        assert _document_path_prefix(Path(".")) is None
+
+    def test_document_path_prefix_nested(self):
+        assert _document_path_prefix(Path("packages/api")) == "packages/api"
+
+    def test_prefix_document_paths(self, tmp_path):
+        db = tmp_path / "index.db"
+        conn = sqlite3.connect(db)
+        conn.execute(
+            "CREATE TABLE documents (id INTEGER PRIMARY KEY, relative_path TEXT NOT NULL UNIQUE)"
+        )
+        conn.execute("INSERT INTO documents (relative_path) VALUES ('main.go')")
+        conn.commit()
+        conn.close()
+
+        _prefix_document_paths(db, "services/api")
+
+        conn = sqlite3.connect(db)
+        assert conn.execute("SELECT relative_path FROM documents").fetchone()[0] == "services/api/main.go"
+        conn.close()
+
+
+class TestPostprocessSchema:
+    def test_postprocess_preserves_mentions_primary_key(self, tmp_path):
+        db_path = tmp_path / "index.db"
+        _seed_db(db_path)
+        _postprocess_index(db_path)
+
+        conn = sqlite3.connect(db_path)
+        pk_cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(mentions)").fetchall()
+            if row[5]
+        }
+        conn.close()
+
+        assert pk_cols == {"chunk_id", "symbol_id", "role"}

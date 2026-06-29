@@ -22,7 +22,12 @@ from .cache import (
 )
 from .config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from .debug import debug_log
-from .discover import discover_typescript_projects
+from .discover import (
+    discover_golang_modules,
+    discover_python_projects,
+    discover_rust_crates,
+    discover_typescript_projects,
+)
 from .merge import merge_sqlite_indexes
 from .scip_tool import ensure_scip_binary
 from .scope import load_index_scope, projects_matching_scope
@@ -37,11 +42,62 @@ SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 SCIP_TYPESCRIPT_VERSION = "0.4.0"
 SCIP_PYTHON_VERSION = "0.6.6"
 SCIP_GO_VERSION = "0.2.7"
+# scip-typescript accepts many tsconfig paths per invocation (one .scip, one convert, no merge).
+# Split only when SCIP_CLI_TS_INDEX_BATCH_SIZE is set (OOM/timeout tuning).
+DEFAULT_TS_INDEX_BATCH_SIZE = None
+MAX_TS_INDEX_BATCH_SIZE = 2_147_483_647
 
 
 def default_index_workers() -> int:
-    """Default parallel TypeScript project indexers (merge stays single-threaded)."""
+    """Default parallel per-project indexers (merge stays single-threaded)."""
     return min(8, os.cpu_count() or 4)
+
+
+def ts_index_batch_size() -> int | None:
+    """Max TypeScript projects per scip-typescript invocation (None = all in one run)."""
+    env_val = os.environ.get("SCIP_CLI_TS_INDEX_BATCH_SIZE")
+    if env_val is not None:
+        try:
+            parsed = int(env_val)
+        except ValueError:
+            raise RuntimeError(
+                f"Invalid SCIP_CLI_TS_INDEX_BATCH_SIZE: expected an integer, got {env_val!r}"
+            ) from None
+        if parsed < 1:
+            raise RuntimeError(
+                f"Invalid SCIP_CLI_TS_INDEX_BATCH_SIZE: expected a positive integer, got {parsed}"
+            )
+        if parsed > MAX_TS_INDEX_BATCH_SIZE:
+            raise RuntimeError(
+                f"SCIP_CLI_TS_INDEX_BATCH_SIZE={parsed} exceeds max ({MAX_TS_INDEX_BATCH_SIZE})"
+            )
+        return parsed
+    return DEFAULT_TS_INDEX_BATCH_SIZE
+
+
+def _batch_projects(projects: list[Path], batch_size: int | None) -> list[list[Path]]:
+    if not projects:
+        return []
+    if batch_size is None:
+        return [projects]
+    return [projects[i : i + batch_size] for i in range(0, len(projects), batch_size)]
+
+
+def _ts_batch_limit_display(batch_size: int | None, total: int) -> str:
+    if batch_size is None or batch_size >= total:
+        return "all tsconfigs per run"
+    return f"up to {batch_size} tsconfigs per run"
+
+
+def _project_label(project: Path) -> str:
+    return "." if project == Path(".") else str(project)
+
+
+def _project_batch_label(projects: list[Path]) -> str:
+    if len(projects) == 1:
+        return _project_label(projects[0])
+    first = _project_label(projects[0])
+    return f"{first} +{len(projects) - 1} more"
 
 
 _scip_version_warned = False
@@ -68,7 +124,7 @@ def log_index_complete(
     size = format_db_size(db_path)
     suffix = ""
     if projects is not None and projects > 1:
-        suffix = f", {projects} tsconfigs"
+        suffix = f", {projects} projects"
         if skipped:
             suffix += f", {skipped} skipped"
     print(f"Indexed {db_path} ({size}, {lang}{suffix})", file=sys.stderr)
@@ -263,7 +319,7 @@ def _warn_old_scip(binary):
         )
 
 
-def _convert_scip_to_db(scip_path, db_path):
+def _convert_scip_to_db(scip_path, db_path, *, document_path_prefix: Path | str | None = None):
     """Convert a SCIP protobuf file to a SQLite index at db_path."""
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -284,18 +340,54 @@ def _convert_scip_to_db(scip_path, db_path):
         raise RuntimeError("Failed to convert index")
 
     _postprocess_index(db_path)
+    prefix = _document_path_prefix(document_path_prefix)
+    if prefix is not None:
+        _prefix_document_paths(db_path, prefix)
+
+
+def _document_path_prefix(project: Path | str | None) -> str | None:
+    if project is None:
+        return None
+    path = Path(project)
+    if path == Path("."):
+        return None
+    return path.as_posix()
+
+
+def _prefix_document_paths(db_path: Path, prefix: str) -> None:
+    """Rewrite document paths to be relative to the repository root."""
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute(
+            "UPDATE documents SET relative_path = ? || '/' || relative_path",
+            (prefix,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _postprocess_index(db_path):
     """Shrink index: drop unused columns and omit prunable symbol rows (copy-filter, no DELETE)."""
+    from .sql import configure_bulk_write_connection
+
     conn = sqlite3.connect(str(db_path))
     try:
+        configure_bulk_write_connection(conn)
+        # Rebuild tables first; indexes are recreated once at the end (expt-convert indexes
+        # are dropped with table swaps — avoid maintaining them during bulk inserts).
         _trim_unused_columns(conn)
         _trim_mentions_to_known_symbols(conn)
         _trim_defn_to_known_symbols(conn)
+        _recreate_postprocess_indexes(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _replace_table(conn, old_name: str, new_name: str) -> None:
+    conn.execute(f"DROP TABLE {old_name}")
+    conn.execute(f"ALTER TABLE {new_name} RENAME TO {old_name}")
 
 
 def _trim_unused_columns(conn):
@@ -306,9 +398,8 @@ def _trim_unused_columns(conn):
             relative_path TEXT NOT NULL UNIQUE
         )
     """)
-    conn.execute("INSERT INTO documents_new SELECT id, relative_path FROM documents")
-    conn.execute("DROP TABLE documents")
-    conn.execute("ALTER TABLE documents_new RENAME TO documents")
+    conn.execute("INSERT INTO documents_new (id, relative_path) SELECT id, relative_path FROM documents")
+    _replace_table(conn, "documents", "documents_new")
 
     from .symbols import sql_exclude_variable_symbols
 
@@ -322,12 +413,11 @@ def _trim_unused_columns(conn):
         )
     """)
     conn.execute(f"""
-        INSERT INTO global_symbols_new
+        INSERT INTO global_symbols_new (id, symbol, display_name, kind)
         SELECT id, symbol, display_name, kind FROM global_symbols
         WHERE {exclude}
     """)
-    conn.execute("DROP TABLE global_symbols")
-    conn.execute("ALTER TABLE global_symbols_new RENAME TO global_symbols")
+    _replace_table(conn, "global_symbols", "global_symbols_new")
 
 
 def _trim_mentions_to_known_symbols(conn):
@@ -348,8 +438,7 @@ def _trim_mentions_to_known_symbols(conn):
         FROM mentions m
         JOIN global_symbols g ON g.id = m.symbol_id
     """)
-    conn.execute("DROP TABLE mentions")
-    conn.execute("ALTER TABLE mentions_new RENAME TO mentions")
+    _replace_table(conn, "mentions", "mentions_new")
 
 
 def _trim_defn_to_known_symbols(conn):
@@ -377,8 +466,16 @@ def _trim_defn_to_known_symbols(conn):
         FROM defn_enclosing_ranges d
         JOIN global_symbols g ON g.id = d.symbol_id
     """)
-    conn.execute("DROP TABLE defn_enclosing_ranges")
-    conn.execute("ALTER TABLE defn_enclosing_ranges_new RENAME TO defn_enclosing_ranges")
+    _replace_table(conn, "defn_enclosing_ranges", "defn_enclosing_ranges_new")
+
+
+def _recreate_postprocess_indexes(conn: sqlite3.Connection) -> None:
+    """expt-convert indexes are dropped when tables are rebuilt."""
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_global_symbols_symbol ON global_symbols(symbol)")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentions' LIMIT 1").fetchone():
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mentions_symbol_id_role ON mentions(symbol_id, role)"
+        )
 
 
 def _typescript_index_args(root, output_scip, projects):
@@ -391,7 +488,7 @@ def _typescript_index_args(root, output_scip, projects):
 
 
 def _index_workers():
-    """Parallel workers for per-project scip-typescript runs (merge stays serial)."""
+    """Parallel workers for per-project indexer runs (merge stays serial)."""
     env_val = os.environ.get("SCIP_CLI_INDEX_WORKERS")
     if env_val is not None:
         try:
@@ -401,14 +498,15 @@ def _index_workers():
     return default_index_workers()
 
 
-def _index_one_ts_project(root, project, work_dir, env):
-    """Index one TypeScript project into work_dir/index.db."""
+def _index_ts_projects(root, projects, work_dir, env, *, output_db: Path | None = None):
+    """Index one or more TypeScript projects into work_dir/index.db (or output_db when set)."""
     root = Path(root)
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
-    label = "." if project == Path(".") else str(project)
+    label = _project_batch_label(projects)
     part_scip = work_dir / "index.scip"
-    index_args = _typescript_index_args(root, part_scip, [project])
+    db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
+    index_args = _typescript_index_args(root, part_scip, projects)
     result = run_indexer_with_fallback(
         "scip-typescript",
         index_args,
@@ -419,28 +517,46 @@ def _index_one_ts_project(root, project, work_dir, env):
     )
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
-    _convert_scip_to_db(part_scip, work_dir / "index.db")
-    return label, work_dir / "index.db", None
+    try:
+        _convert_scip_to_db(part_scip, db_path)
+    finally:
+        part_scip.unlink(missing_ok=True)
+    return label, db_path, None
 
 
-def _index_typescript(root, cache_dir, projects, env, *, replace=False):
-    """Index one or more TypeScript projects and write the merged index.db."""
-    root = Path(root)
-    cache_dir = Path(cache_dir)
+def _finalize_part_dbs(part_dbs: list[Path], output_db: Path) -> None:
+    if len(part_dbs) == 1:
+        if part_dbs[0] != output_db:
+            shutil.move(str(part_dbs[0]), str(output_db))
+    else:
+        merge_sqlite_indexes(part_dbs, output_db)
+
+
+def _index_discovered_projects(
+    root: Path,
+    cache_dir: Path,
+    projects: list[Path],
+    env,
+    *,
+    replace: bool,
+    progress_noun: str,
+    index_one,
+) -> tuple[Path, int, int, int]:
+    """Index one SCIP unit per project path; merge when multiple part DBs."""
     output_db = index_db_path(cache_dir, replace=replace)
     workers = _index_workers()
-    use_parallel = len(projects) > 1 and workers > 1
+    total = len(projects)
+    use_parallel = total > 1 and workers > 1
+    show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         part_dbs: list[Path] = []
         skipped = 0
-        total = len(projects)
-        show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
         if show_progress and use_parallel:
             print(
-                f"Indexing {total} TypeScript projects ({workers} workers; merge is serial)...",
+                f"Indexing {total} {progress_noun} ({workers} workers; merge is serial)...",
                 file=sys.stderr,
             )
 
@@ -449,36 +565,39 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = {
                     pool.submit(
-                        _index_one_ts_project,
+                        index_one,
                         root,
                         project,
                         tmpdir_path / f"part-{index}",
                         env,
-                    ): index
+                    ): (index, project)
                     for index, project in enumerate(projects, start=1)
                 }
                 indexed_parts: list[tuple[int, Path]] = []
                 for future in as_completed(futures):
+                    part_index, project = futures[future]
                     label, db_path, error = future.result()
                     completed += 1
                     if db_path is None:
                         skipped += 1
                         print(f"Warning: skipped {label}: {error}", file=sys.stderr)
                     else:
-                        indexed_parts.append((futures[future], db_path))
+                        indexed_parts.append((part_index, db_path))
                         if show_progress:
                             print(f"Indexed {completed}/{total}: {label}", file=sys.stderr)
             part_dbs = [db for _, db in sorted(indexed_parts, key=lambda item: item[0])]
         else:
             for index, project in enumerate(projects, start=1):
-                label = "." if project == Path(".") else str(project)
+                label = _project_label(project)
                 if show_progress:
                     print(f"Indexing {index}/{total}: {label}", file=sys.stderr)
-                label, db_path, error = _index_one_ts_project(
+                direct_output = output_db if total == 1 else None
+                label, db_path, error = index_one(
                     root,
                     project,
-                    tmpdir_path / f"part-{index}",
+                    cache_dir if direct_output else tmpdir_path / f"part-{index}",
                     env,
+                    output_db=direct_output,
                 )
                 if db_path is None:
                     skipped += 1
@@ -489,10 +608,164 @@ def _index_typescript(root, cache_dir, projects, env, *, replace=False):
         if not part_dbs:
             raise RuntimeError("Failed to index project")
 
-        if len(part_dbs) == 1:
-            shutil.copy2(part_dbs[0], output_db)
+        _finalize_part_dbs(part_dbs, output_db)
+        return output_db, len(part_dbs), skipped, total
+
+
+def _project_cwd(root: Path, project: Path) -> Path:
+    return root if project == Path(".") else root / project
+
+
+def _index_python_project(root, project, work_dir, env, *, output_db=None):
+    """Index one Python package directory into work_dir/index.db (or output_db when set)."""
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    label = _project_label(Path(project))
+    cwd = _project_cwd(Path(root), Path(project))
+    part_scip = work_dir / "index.scip"
+    db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
+    result = run_indexer_with_fallback(
+        "scip-python",
+        ["index", ".", "--output", str(part_scip)],
+        str(cwd),
+        env=env,
+        npx_package="@sourcegraph/scip-python",
+        npx_version=SCIP_PYTHON_VERSION,
+    )
+    if result.returncode != 0:
+        return label, None, result.stderr.strip() or "indexing failed"
+    try:
+        _convert_scip_to_db(part_scip, db_path, document_path_prefix=project)
+    finally:
+        part_scip.unlink(missing_ok=True)
+    return label, db_path, None
+
+
+def _index_golang_module(root, module, work_dir, env, *, output_db=None):
+    """Index one Go module directory into work_dir/index.db (or output_db when set)."""
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    label = _project_label(Path(module))
+    cwd = _project_cwd(Path(root), Path(module))
+    part_scip = work_dir / "index.scip"
+    db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
+    result = run_indexer_with_fallback(
+        "scip-go",
+        ["--output", str(part_scip)],
+        str(cwd),
+        env=env,
+        go_package="github.com/scip-code/scip-go/cmd/scip-go",
+    )
+    if result.returncode != 0:
+        return label, None, result.stderr.strip() or "indexing failed"
+    try:
+        _convert_scip_to_db(part_scip, db_path, document_path_prefix=module)
+    finally:
+        part_scip.unlink(missing_ok=True)
+    return label, db_path, None
+
+
+def _index_rust_crate(root, crate, work_dir, env, *, output_db=None):
+    """Index one Rust crate directory into work_dir/index.db (or output_db when set)."""
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    label = _project_label(Path(crate))
+    cwd = _project_cwd(Path(root), Path(crate))
+    part_scip = work_dir / "index.scip"
+    db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
+    result = run_indexer_with_fallback(
+        "rust-analyzer",
+        ["scip", str(cwd), "--output", str(part_scip)],
+        str(cwd),
+        env=env,
+        rustup_component="rust-analyzer",
+    )
+    if result.returncode != 0:
+        return label, None, result.stderr.strip() or "indexing failed"
+    try:
+        _convert_scip_to_db(part_scip, db_path, document_path_prefix=crate)
+    finally:
+        part_scip.unlink(missing_ok=True)
+    return label, db_path, None
+
+
+def _index_typescript(root, cache_dir, projects, env, *, replace=False):
+    """Index one or more TypeScript projects and write the merged index.db."""
+    root = Path(root)
+    cache_dir = Path(cache_dir)
+    output_db = index_db_path(cache_dir, replace=replace)
+    workers = _index_workers()
+    batches = _batch_projects(projects, ts_index_batch_size())
+    use_parallel = len(batches) > 1 and workers > 1
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        part_dbs: list[Path] = []
+        skipped = 0
+        total = len(projects)
+        show_progress = total > PROGRESS_LOG_MIN_PROJECTS
+
+        if show_progress and use_parallel:
+            batch_size = ts_index_batch_size()
+            batch_desc = _ts_batch_limit_display(batch_size, total)
+            print(
+                f"Indexing {total} TypeScript projects "
+                f"({workers} workers, {batch_desc}; merge is serial)...",
+                file=sys.stderr,
+            )
+
+        if use_parallel:
+            completed = 0
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(
+                        _index_ts_projects,
+                        root,
+                        batch,
+                        tmpdir_path / f"part-{index}",
+                        env,
+                    ): (index, batch)
+                    for index, batch in enumerate(batches, start=1)
+                }
+                indexed_parts: list[tuple[int, Path]] = []
+                for future in as_completed(futures):
+                    batch_index, batch = futures[future]
+                    label, db_path, error = future.result()
+                    completed += len(batch)
+                    if db_path is None:
+                        skipped += len(batch)
+                        print(f"Warning: skipped {label}: {error}", file=sys.stderr)
+                    else:
+                        indexed_parts.append((batch_index, db_path))
+                        if show_progress:
+                            print(f"Indexed {completed}/{total}: {label}", file=sys.stderr)
+            part_dbs = [db for _, db in sorted(indexed_parts, key=lambda item: item[0])]
         else:
-            merge_sqlite_indexes(part_dbs, output_db)
+            indexed = 0
+            for index, batch in enumerate(batches, start=1):
+                label = _project_batch_label(batch)
+                if show_progress:
+                    end = indexed + len(batch)
+                    print(f"Indexing {indexed + 1}-{end}/{total}: {label}", file=sys.stderr)
+                direct_output = output_db if len(batches) == 1 else None
+                label, db_path, error = _index_ts_projects(
+                    root,
+                    batch,
+                    cache_dir if direct_output else tmpdir_path / f"part-{index}",
+                    env,
+                    output_db=direct_output,
+                )
+                indexed += len(batch)
+                if db_path is None:
+                    skipped += len(batch)
+                    print(f"Warning: skipped {label}: {error}", file=sys.stderr)
+                    continue
+                part_dbs.append(db_path)
+
+        if not part_dbs:
+            raise RuntimeError("Failed to index project")
+
+        _finalize_part_dbs(part_dbs, output_db)
 
         return output_db, len(part_dbs), skipped, total
 
@@ -518,45 +791,67 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
             )
         return output_db, skipped, total
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        index_scip = os.path.join(tmpdir, "index.scip")
-        if lang == Language.PYTHON:
-            result = run_indexer_with_fallback(
-                "scip-python",
-                ["index", ".", "--output", index_scip],
-                str(root),
-                env=env,
-                npx_package="@sourcegraph/scip-python",
-                npx_version=SCIP_PYTHON_VERSION,
-            )
-        elif lang == Language.GOLANG:
-            result = run_indexer_with_fallback(
-                "scip-go",
-                ["--output", index_scip],
-                str(root),
-                env=env,
-                go_package="github.com/scip-code/scip-go/cmd/scip-go",
-            )
-        elif lang == Language.RUST:
-            result = run_indexer_with_fallback(
-                "rust-analyzer",
-                ["scip", str(root), "--output", index_scip],
-                str(root),
-                env=env,
-                rustup_component="rust-analyzer",
-            )
-        else:
-            raise RuntimeError(f"Unsupported language '{lang}'")
-
-        if result.returncode != 0:
-            print(result.stderr, file=sys.stderr)
-            raise RuntimeError("Failed to index project")
-
-        out = index_db_path(cache_dir, replace=replace)
-        _convert_scip_to_db(index_scip, out)
+    if lang == Language.PYTHON:
+        projects = discover_python_projects(root)
+        output_db, _indexed, skipped, total = _index_discovered_projects(
+            root,
+            cache_dir,
+            projects,
+            env,
+            replace=replace,
+            progress_noun="Python packages",
+            index_one=_index_python_project,
+        )
         if log:
-            log_index_complete(out, lang.value)
-        return out, 0, 1
+            log_index_complete(
+                output_db,
+                lang.value,
+                projects=total if total > 1 else None,
+                skipped=skipped,
+            )
+        return output_db, skipped, total
+
+    if lang == Language.GOLANG:
+        modules = discover_golang_modules(root)
+        output_db, _indexed, skipped, total = _index_discovered_projects(
+            root,
+            cache_dir,
+            modules,
+            env,
+            replace=replace,
+            progress_noun="Go modules",
+            index_one=_index_golang_module,
+        )
+        if log:
+            log_index_complete(
+                output_db,
+                lang.value,
+                projects=total if total > 1 else None,
+                skipped=skipped,
+            )
+        return output_db, skipped, total
+
+    if lang == Language.RUST:
+        crates = discover_rust_crates(root)
+        output_db, _indexed, skipped, total = _index_discovered_projects(
+            root,
+            cache_dir,
+            crates,
+            env,
+            replace=replace,
+            progress_noun="Rust crates",
+            index_one=_index_rust_crate,
+        )
+        if log:
+            log_index_complete(
+                output_db,
+                lang.value,
+                projects=total if total > 1 else None,
+                skipped=skipped,
+            )
+        return output_db, skipped, total
+
+    raise RuntimeError(f"Unsupported language '{lang}'")
 
 
 def get_db(project_root=None):

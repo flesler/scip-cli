@@ -222,6 +222,42 @@ class TestMergeSqliteIndexes:
         assert "scheme a/symA()." in symbols
         assert "scheme b/symC()." in symbols
 
+    def test_merge_distinct_paths_with_same_basename(self, tmp_path):
+        first = tmp_path / "first.db"
+        second = tmp_path / "second.db"
+        output = tmp_path / "merged.db"
+        _make_db(first, "services/api/main.go", "scheme a/symA().")
+        _make_db(second, "services/worker/main.go", "scheme b/symB().")
+
+        merge_sqlite_indexes([first, second], output)
+
+        conn = sqlite3.connect(output)
+        docs = conn.execute("SELECT relative_path FROM documents ORDER BY 1").fetchall()
+        symbols = conn.execute("SELECT COUNT(*) FROM global_symbols").fetchone()[0]
+        conn.close()
+
+        assert docs == [("services/api/main.go",), ("services/worker/main.go",)]
+        assert symbols == 2
+
     def test_merge_requires_inputs(self):
         with pytest.raises(ValueError, match="at least one input"):
             merge_sqlite_indexes([], Path("out.db"))
+
+    def test_merge_three_indexes_in_one_batch(self, tmp_path):
+        paths = []
+        for index in range(3):
+            db = tmp_path / f"part-{index}.db"
+            _make_db(db, f"src/p{index}.ts", f"scheme p{index}/sym().")
+            paths.append(db)
+        output = tmp_path / "merged.db"
+        merge_sqlite_indexes(paths, output)
+
+        conn = sqlite3.connect(output)
+        docs = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+        symbols = conn.execute("SELECT COUNT(*) FROM global_symbols").fetchone()[0]
+        mentions = conn.execute("SELECT COUNT(*) FROM mentions").fetchone()[0]
+        conn.close()
+
+        assert docs == 3
+        assert symbols == 3
+        assert mentions == 3

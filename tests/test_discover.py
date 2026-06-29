@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 
 from scip_cli.discover import (
+    discover_golang_modules,
+    discover_python_projects,
+    discover_rust_crates,
     discover_typescript_projects,
     should_index_root_alongside_projects,
 )
@@ -122,3 +125,66 @@ class TestShouldIndexRootAlongsideProjects:
         _write(tmp_path / "tsconfig.json", '{"include": "packages/**/*.ts"}')
         projects = [Path("packages/api")]
         assert should_index_root_alongside_projects(tmp_path, projects) is True
+
+
+class TestDiscoverGolangModules:
+    def test_single_module_repo(self, tmp_path):
+        _write(tmp_path / "go.mod", "module example.com/app\n\ngo 1.22\n")
+        assert discover_golang_modules(tmp_path) == [Path(".")]
+
+    def test_nested_modules(self, tmp_path):
+        _write(tmp_path / "go.mod", "module example.com/root\n\ngo 1.22\n")
+        _write(tmp_path / "services" / "api" / "go.mod", "module example.com/api\n\ngo 1.22\n")
+        _write(tmp_path / "services" / "worker" / "go.mod", "module example.com/worker\n\ngo 1.22\n")
+
+        assert discover_golang_modules(tmp_path) == [
+            Path("."),
+            Path("services/api"),
+            Path("services/worker"),
+        ]
+
+    def test_skips_vendor(self, tmp_path):
+        _write(tmp_path / "go.mod", "module example.com/root\n\ngo 1.22\n")
+        _write(tmp_path / "vendor" / "lib" / "go.mod", "module example.com/vendor\n\ngo 1.22\n")
+
+        assert discover_golang_modules(tmp_path) == [Path(".")]
+
+
+class TestDiscoverPythonProjects:
+    def test_single_package_repo(self, tmp_path):
+        _write(tmp_path / "pyproject.toml", "[project]\nname = 'app'\n")
+        assert discover_python_projects(tmp_path) == [Path(".")]
+
+    def test_nested_packages(self, tmp_path):
+        _write(tmp_path / "pyproject.toml", "[project]\nname = 'root'\n")
+        _write(tmp_path / "packages" / "api" / "pyproject.toml", "[project]\nname = 'api'\n")
+        _write(tmp_path / "packages" / "worker" / "setup.py", "from setuptools import setup\nsetup(name='worker')\n")
+
+        assert discover_python_projects(tmp_path) == [
+            Path("."),
+            Path("packages/api"),
+            Path("packages/worker"),
+        ]
+
+
+class TestDiscoverRustCrates:
+    def test_single_crate_repo(self, tmp_path):
+        _write(tmp_path / "Cargo.toml", '[package]\nname = "app"\nversion = "0.1.0"\n')
+        assert discover_rust_crates(tmp_path) == [Path(".")]
+
+    def test_nested_crates(self, tmp_path):
+        _write(tmp_path / "Cargo.toml", '[workspace]\nmembers = ["crates/a", "crates/b"]\n')
+        _write(tmp_path / "crates" / "a" / "Cargo.toml", '[package]\nname = "a"\nversion = "0.1.0"\n')
+        _write(tmp_path / "crates" / "b" / "Cargo.toml", '[package]\nname = "b"\nversion = "0.1.0"\n')
+
+        assert discover_rust_crates(tmp_path) == [
+            Path("."),
+            Path("crates/a"),
+            Path("crates/b"),
+        ]
+
+    def test_skips_target(self, tmp_path):
+        _write(tmp_path / "Cargo.toml", '[package]\nname = "root"\nversion = "0.1.0"\n')
+        _write(tmp_path / "target" / "debug" / "build" / "dep" / "Cargo.toml", '[package]\nname = "dep"\n')
+
+        assert discover_rust_crates(tmp_path) == [Path(".")]
