@@ -69,7 +69,7 @@ On **first index**, scip-cli runs language indexers and builds a SQLite cache. Y
 
 Install `scip-cli` and run it. On first index, scip-cli will:
 
-- Download `scip-typescript` / `scip-python` via `npx` when not already on PATH
+- Download `scip-typescript` / `scip-python` via `npx` or `scip-go` via `go install` when not already on PATH
 - Download the `scip` converter binary from [GitHub releases](https://github.com/scip-code/scip/releases) into `~/.cache/scip-cli/bin/` when not already on PATH
 - Walk the repo for `tsconfig*.json` project roots (TypeScript monorepos), run `scip-typescript` per project (parallel by default), convert each partial index, then merge into one `index.db`
 
@@ -85,6 +85,9 @@ npm install -g @sourcegraph/scip-typescript
 
 # Python indexer
 npm install -g @sourcegraph/scip-python
+
+# Go indexer
+go install github.com/scip-code/scip-go/cmd/scip-go@latest
 
 # SCIP CLI for index conversion (GitHub release — not on npm)
 # https://github.com/scip-code/scip/releases  (v0.8.1+ recommended)
@@ -179,9 +182,9 @@ scip-cli deps greet --paths-only | sort -u
 
 ## How It Works
 
-1. On first query, automatically detects project language from `package.json` (TS/JS) or `pyproject.toml`/`setup.py` (Python)
+1. On first query, automatically detects project language from `package.json` (TS/JS), `pyproject.toml`/`setup.py` (Python), or `go.mod` (Go)
 2. For TypeScript monorepos, walks the repository for `tsconfig*.json` project roots (nested ancestors deduped; root included only when its `include` is broad)
-3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), or `scip-python` for Python
+3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), `scip-python` for Python, or `scip-go` for Go
 4. Converts each SCIP output to SQLite with `scip expt-convert`, then merges partial databases when needed
 5. Caches the result in `~/.cache/scip-cli/projects/<dirname>-<hash>/index.db` (e.g. `my-monorepo-1a3f7a`)
 6. Subsequent queries are SQLite lookups against that cache (not re-indexing)
@@ -198,7 +201,7 @@ Optional `.scip-cli.json` in the project root:
 }
 ```
 
-- `maxHeapMb` — Node heap for `scip-typescript` / `scip-python` (default **8192 MB** when omitted). Overridden by `SCIP_CLI_MAX_HEAP_MB`. This is the V8 heap cap, not total RAM usage.
+- `maxHeapMb` — Node heap for `scip-typescript` / `scip-python` (default **8192 MB** when omitted). Overridden by `SCIP_CLI_MAX_HEAP_MB`. This is the V8 heap cap, not total RAM usage. Does not affect `scip-go`.
 - `indexRoots` — extra TypeScript project directories to include on **first index**, merged with auto-discovered projects.
 - `onlyIndexRoots` — skip auto-discovery and index **only** `indexRoots` (smaller initial index when you only care about part of a monorepo).
 

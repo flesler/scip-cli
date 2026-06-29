@@ -187,3 +187,20 @@ If both layers help during development, **keep both until e2e passes**, then del
 - User install + analyze guide → `README.md`
 - Agent/user CLI reference → `scip_cli/SKILL.md` (must match `__main__.py` flags)
 - After flag changes: update SKILL + README command list; run `scip-cli skill` to verify output
+
+
+## Dogfood Notes
+
+Future improvements from using the CLI on real projects.
+
+### Workflow
+
+Requires bare `scip-cli` mapped to local (`pip install -e ".[dev]"` from repo root).
+
+```bash
+scip-cli reindex
+scip-cli analyze --limit 25
+scip-cli analyze scip_cli/queries.py --limit 20   # drill into hubs
+```
+
+Project-wide analyze skips test paths by default; `--include-tests` to include. See README **Finding easy wins with analyze**.

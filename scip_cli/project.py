@@ -10,6 +10,7 @@ class Language(str, Enum):
 
     TYPESCRIPT = "typescript"
     PYTHON = "python"
+    GOLANG = "golang"
 
 
 def find_project_root_and_language(start_dir=None):
@@ -23,6 +24,8 @@ def find_project_root_and_language(start_dir=None):
             return d, Language.TYPESCRIPT
         if (d / "pyproject.toml").exists() or (d / "setup.py").exists():
             return d, Language.PYTHON
+        if (d / "go.mod").exists():
+            return d, Language.GOLANG
         d = d.parent
     return None, None
 

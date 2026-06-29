@@ -36,6 +36,7 @@ SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 # Revisit these periodically to confirm compatibility before bumping.
 SCIP_TYPESCRIPT_VERSION = "0.4.0"
 SCIP_PYTHON_VERSION = "0.6.6"
+SCIP_GO_VERSION = "0.2.7"
 
 
 def default_index_workers() -> int:
@@ -145,24 +146,53 @@ def typescript_projects(root: Path) -> list[Path]:
     return sorted(merged.values(), key=str)
 
 
-def _run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None):
-    """Try binary first, fallback to npx if not found."""
+def _run_with_fallback(binary, npx_package, cwd, args, env=None, npx_version=None, go_package=None):
+    """Try binary first, fallback to npx or go install if not found."""
     run_env = env if env is not None else os.environ.copy()
-    npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
 
     def run_npx():
+        npx_spec = f"{npx_package}@~{npx_version}" if npx_version else npx_package
         debug_log("Tool not found, trying npx (will download automatically)...")
         return _run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=run_env)
+
+    def run_go_install():
+        # Ensure ~/go/bin is in PATH (standard Go install location)
+        go_bin_dir = Path.home() / "go" / "bin"
+        go_env = run_env.copy()
+        go_env["PATH"] = f"{go_bin_dir}:{go_env.get('PATH', '')}"
+
+        # Check if already installed in ~/go/bin
+        go_binary = go_bin_dir / binary
+        if go_binary.exists():
+            debug_log(f"Found {binary} at {go_binary}")
+            # Also ensure go toolchain is in PATH for scip-go
+            go_toolchain = (
+                Path.home() / "go" / "pkg" / "mod" / "golang.org" / "toolchain@v0.0.1-go1.25.11.linux-amd64" / "bin"
+            )
+            if go_toolchain.exists():
+                go_env["PATH"] = f"{go_toolchain}:{go_env['PATH']}"
+            return _run_subprocess([str(go_binary), *args], cwd, env=go_env)
+
+        debug_log("Tool not found, installing via go install (will download to ~/go/bin)...")
+        install_result = _run_subprocess(
+            ["go", "install", f"{go_package}@latest"],
+            cwd,
+            env=go_env,
+        )
+        if install_result.returncode != 0:
+            raise RuntimeError(f"Failed to install {binary} via go install: {install_result.stderr}")
+        debug_log(f"{binary} installed, retrying...")
+        return _run_subprocess([str(go_binary), *args], cwd, env=go_env)
 
     try:
         result = _run_subprocess([binary, *args], cwd, env=run_env)
         if result.returncode == 0:
             return result
         if "not found" in result.stderr.lower():
-            return run_npx()
+            return run_go_install() if go_package else run_npx()
         return result
     except FileNotFoundError:
-        return run_npx()
+        return run_go_install() if go_package else run_npx()
 
 
 def _scip_version(binary):
@@ -460,6 +490,15 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
                 ["index", ".", "--output", index_scip],
                 env=env,
                 npx_version=SCIP_PYTHON_VERSION,
+            )
+        elif lang == Language.GOLANG:
+            result = _run_with_fallback(
+                "scip-go",
+                None,
+                str(root),
+                ["--output", index_scip],
+                env=env,
+                go_package="github.com/scip-code/scip-go/cmd/scip-go",
             )
         else:
             raise RuntimeError(f"Unsupported language '{lang}'")
