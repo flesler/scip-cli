@@ -4,24 +4,24 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scip_cli.indexing import (
-    _install_via_go_install,
-    _install_via_npx,
-    _install_via_rustup,
-    _run_indexer_command,
-    run_indexer_with_fallback,
+from scip_cli.indexing import run_indexer_with_fallback
+from scip_cli.indexing.runners import (
+    install_via_go_install,
+    install_via_npx,
+    install_via_rustup,
+    run_indexer_command,
 )
 
 
 class TestRunIndexerCommand:
-    """Tests for _run_indexer_command."""
+    """Tests for run_indexer_command."""
 
     def test_success(self):
         """Binary found and succeeds."""
         mock_result = MagicMock()
         mock_result.returncode = 0
-        with patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result) as mock_run:
-            success, result = _run_indexer_command("scip-typescript", ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result) as mock_run:
+            success, result = run_indexer_command("scip-typescript", ["index"], "/tmp", {})
             assert success is True
             assert result is mock_result
             mock_run.assert_called_once_with(["scip-typescript", "index"], "/tmp", env={})
@@ -31,8 +31,8 @@ class TestRunIndexerCommand:
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stderr = "scip-typescript: not found"
-        with patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result):
-            success, result = _run_indexer_command("scip-typescript", ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result):
+            success, result = run_indexer_command("scip-typescript", ["index"], "/tmp", {})
             assert success is False
             assert result is mock_result
 
@@ -41,27 +41,27 @@ class TestRunIndexerCommand:
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stderr = "some other error"
-        with patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result):
-            success, result = _run_indexer_command("scip-typescript", ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result):
+            success, result = run_indexer_command("scip-typescript", ["index"], "/tmp", {})
             assert success is True  # Command ran, just failed
             assert result is mock_result
 
     def test_file_not_found(self):
         """Binary not on PATH."""
-        with patch("scip_cli.indexing.runners._run_subprocess", side_effect=FileNotFoundError):
-            success, result = _run_indexer_command("scip-typescript", ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", side_effect=FileNotFoundError):
+            success, result = run_indexer_command("scip-typescript", ["index"], "/tmp", {})
             assert success is False
             assert result is None
 
 
 class TestInstallViaNpx:
-    """Tests for _install_via_npx."""
+    """Tests for install_via_npx."""
 
     def test_with_version(self):
         """npx with version pinning."""
         mock_result = MagicMock()
-        with patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result) as mock_run:
-            result = _install_via_npx("@sourcegraph/scip-typescript", "0.4.0", ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result) as mock_run:
+            result = install_via_npx("@sourcegraph/scip-typescript", "0.4.0", ["index"], "/tmp", {})
             assert result is mock_result
             mock_run.assert_called_once_with(
                 ["npx", "-y", "@sourcegraph/scip-typescript@~0.4.0", "index"],
@@ -72,8 +72,8 @@ class TestInstallViaNpx:
     def test_without_version(self):
         """npx without version pinning."""
         mock_result = MagicMock()
-        with patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result) as mock_run:
-            result = _install_via_npx("@sourcegraph/scip-python", None, ["index"], "/tmp", {})
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result) as mock_run:
+            result = install_via_npx("@sourcegraph/scip-python", None, ["index"], "/tmp", {})
             assert result is mock_result
             mock_run.assert_called_once_with(
                 ["npx", "-y", "@sourcegraph/scip-python", "index"],
@@ -83,7 +83,7 @@ class TestInstallViaNpx:
 
 
 class TestInstallViaGoInstall:
-    """Tests for _install_via_go_install."""
+    """Tests for install_via_go_install."""
 
     def test_already_installed_in_go_bin(self):
         """Binary already in ~/go/bin."""
@@ -91,10 +91,10 @@ class TestInstallViaGoInstall:
         mock_result.returncode = 0
 
         with (
-            patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_result) as mock_run,
+            patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result) as mock_run,
             patch("pathlib.Path.exists", return_value=True),
         ):
-            result = _install_via_go_install(
+            result = install_via_go_install(
                 "github.com/scip-code/scip-go/cmd/scip-go",
                 "scip-go",
                 ["--output", "index.scip"],
@@ -115,11 +115,11 @@ class TestInstallViaGoInstall:
         mock_run_result.returncode = 0
 
         with (
-            patch("scip_cli.indexing.runners._run_subprocess") as mock_run,
+            patch("scip_cli.indexing.runners.run_subprocess") as mock_run,
             patch("pathlib.Path.exists", return_value=False),
         ):
             mock_run.side_effect = [mock_install_result, mock_run_result]
-            result = _install_via_go_install(
+            result = install_via_go_install(
                 "github.com/scip-code/scip-go/cmd/scip-go",
                 "scip-go",
                 ["--output", "index.scip"],
@@ -141,11 +141,11 @@ class TestInstallViaGoInstall:
         mock_run_result.returncode = 0
 
         with (
-            patch("scip_cli.indexing.runners._run_subprocess") as mock_run,
+            patch("scip_cli.indexing.runners.run_subprocess") as mock_run,
             patch("pathlib.Path.exists", return_value=False),
         ):
             mock_run.side_effect = [mock_install_result, mock_run_result]
-            result = _install_via_go_install(
+            result = install_via_go_install(
                 "github.com/scip-code/scip-go/cmd/scip-go",
                 "scip-go",
                 ["--output", "index.scip"],
@@ -164,11 +164,11 @@ class TestInstallViaGoInstall:
         mock_install_result.stderr = "go: command not found"
 
         with (
-            patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_install_result),
+            patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_install_result),
             patch("pathlib.Path.exists", return_value=False),
             pytest.raises(RuntimeError, match="Failed to install scip-go"),
         ):
-            _install_via_go_install(
+            install_via_go_install(
                 "github.com/scip-code/scip-go/cmd/scip-go",
                 "scip-go",
                 ["--output", "index.scip"],
@@ -178,7 +178,7 @@ class TestInstallViaGoInstall:
 
 
 class TestInstallViaRustup:
-    """Tests for _install_via_rustup."""
+    """Tests for install_via_rustup."""
 
     def test_success(self):
         """rustup component add succeeds."""
@@ -187,9 +187,9 @@ class TestInstallViaRustup:
         mock_run_result = MagicMock()
         mock_run_result.returncode = 0
 
-        with patch("scip_cli.indexing.runners._run_subprocess") as mock_run:
+        with patch("scip_cli.indexing.runners.run_subprocess") as mock_run:
             mock_run.side_effect = [mock_install_result, mock_run_result]
-            result = _install_via_rustup(
+            result = install_via_rustup(
                 "rust-analyzer",
                 "rust-analyzer",
                 ["scip", "--output", "index.scip"],
@@ -212,10 +212,10 @@ class TestInstallViaRustup:
         mock_install_result.stderr = "rustup: command not found"
 
         with (
-            patch("scip_cli.indexing.runners._run_subprocess", return_value=mock_install_result),
+            patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_install_result),
             pytest.raises(RuntimeError, match="Failed to install rust-analyzer"),
         ):
-            _install_via_rustup(
+            install_via_rustup(
                 "rust-analyzer",
                 "rust-analyzer",
                 ["scip", "--output", "index.scip"],
@@ -231,7 +231,7 @@ class TestRunIndexerWithFallback:
         """Binary on PATH, no fallback needed."""
         mock_result = MagicMock()
         mock_result.returncode = 0
-        with patch("scip_cli.indexing.runners._run_indexer_command", return_value=(True, mock_result)):
+        with patch("scip_cli.indexing.runners.run_indexer_command", return_value=(True, mock_result)):
             result = run_indexer_with_fallback("scip-typescript", ["index"], "/tmp", env={})
             assert result is mock_result
 
@@ -239,8 +239,8 @@ class TestRunIndexerWithFallback:
         """Binary not found, falls back to npx."""
         mock_result = MagicMock()
         with (
-            patch("scip_cli.indexing.runners._run_indexer_command", return_value=(False, None)),
-            patch("scip_cli.indexing.runners._install_via_npx", return_value=mock_result) as mock_npx,
+            patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
+            patch("scip_cli.indexing.runners.install_via_npx", return_value=mock_result) as mock_npx,
         ):
             result = run_indexer_with_fallback(
                 "scip-typescript",
@@ -257,8 +257,8 @@ class TestRunIndexerWithFallback:
         """Binary not found, falls back to go install."""
         mock_result = MagicMock()
         with (
-            patch("scip_cli.indexing.runners._run_indexer_command", return_value=(False, None)),
-            patch("scip_cli.indexing.runners._install_via_go_install", return_value=mock_result) as mock_go,
+            patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
+            patch("scip_cli.indexing.runners.install_via_go_install", return_value=mock_result) as mock_go,
         ):
             result = run_indexer_with_fallback(
                 "scip-go",
@@ -274,8 +274,8 @@ class TestRunIndexerWithFallback:
         """Binary not found, falls back to rustup."""
         mock_result = MagicMock()
         with (
-            patch("scip_cli.indexing.runners._run_indexer_command", return_value=(False, None)),
-            patch("scip_cli.indexing.runners._install_via_rustup", return_value=mock_result) as mock_rustup,
+            patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
+            patch("scip_cli.indexing.runners.install_via_rustup", return_value=mock_result) as mock_rustup,
         ):
             result = run_indexer_with_fallback(
                 "rust-analyzer",
@@ -290,7 +290,7 @@ class TestRunIndexerWithFallback:
     def test_no_fallback_available(self):
         """Binary not found, no fallback specified."""
         mock_error = MagicMock()
-        with patch("scip_cli.indexing.runners._run_indexer_command", return_value=(False, mock_error)):
+        with patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, mock_error)):
             result = run_indexer_with_fallback("scip-typescript", ["index"], "/tmp", env={})
             assert result is mock_error
 
@@ -298,9 +298,9 @@ class TestRunIndexerWithFallback:
         """Multiple fallbacks specified, go_package takes priority."""
         mock_result = MagicMock()
         with (
-            patch("scip_cli.indexing.runners._run_indexer_command", return_value=(False, None)),
-            patch("scip_cli.indexing.runners._install_via_go_install", return_value=mock_result) as mock_go,
-            patch("scip_cli.indexing.runners._install_via_npx") as mock_npx,
+            patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
+            patch("scip_cli.indexing.runners.install_via_go_install", return_value=mock_result) as mock_go,
+            patch("scip_cli.indexing.runners.install_via_npx") as mock_npx,
         ):
             result = run_indexer_with_fallback(
                 "scip-go",

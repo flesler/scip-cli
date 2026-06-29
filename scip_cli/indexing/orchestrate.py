@@ -18,7 +18,7 @@ from .constants import (
 )
 
 
-def _index_workers():
+def index_workers():
     """Parallel workers for per-project indexer runs (merge stays serial)."""
     env_val = os.environ.get("SCIP_CLI_INDEX_WORKERS")
     if env_val is not None:
@@ -45,7 +45,7 @@ def ts_index_batch_size() -> int | None:
     return DEFAULT_TS_INDEX_BATCH_SIZE
 
 
-def _batch_projects(projects: list[Path], batch_size: int | None) -> list[list[Path]]:
+def batch_projects(projects: list[Path], batch_size: int | None) -> list[list[Path]]:
     if not projects:
         return []
     if batch_size is None:
@@ -53,24 +53,24 @@ def _batch_projects(projects: list[Path], batch_size: int | None) -> list[list[P
     return [projects[i : i + batch_size] for i in range(0, len(projects), batch_size)]
 
 
-def _ts_batch_limit_display(batch_size: int | None, total: int) -> str:
+def ts_batch_limit_display(batch_size: int | None, total: int) -> str:
     if batch_size is None or batch_size >= total:
         return "all tsconfigs per run"
     return f"up to {batch_size} tsconfigs per run"
 
 
-def _project_label(project: Path) -> str:
+def project_label(project: Path) -> str:
     return "." if project == Path(".") else str(project)
 
 
-def _project_batch_label(projects: list[Path]) -> str:
+def project_batch_label(projects: list[Path]) -> str:
     if len(projects) == 1:
-        return _project_label(projects[0])
-    first = _project_label(projects[0])
+        return project_label(projects[0])
+    first = project_label(projects[0])
     return f"{first} +{len(projects) - 1} more"
 
 
-def _finalize_part_dbs(part_dbs: list[Path], output_db: Path) -> None:
+def finalize_part_dbs(part_dbs: list[Path], output_db: Path) -> None:
     if len(part_dbs) == 1:
         if part_dbs[0] != output_db:
             shutil.move(str(part_dbs[0]), str(output_db))
@@ -78,7 +78,7 @@ def _finalize_part_dbs(part_dbs: list[Path], output_db: Path) -> None:
         merge_sqlite_indexes(part_dbs, output_db)
 
 
-def _index_discovered_projects(
+def index_discovered_projects(
     root: Path,
     cache_dir: Path,
     projects: list[Path],
@@ -90,7 +90,7 @@ def _index_discovered_projects(
 ) -> tuple[Path, int, int, int]:
     """Index one SCIP unit per project path; merge when multiple part DBs."""
     output_db = index_db_path(cache_dir, replace=replace)
-    workers = _index_workers()
+    workers = index_workers()
     total = len(projects)
     use_parallel = total > 1 and workers > 1
     show_progress = total > PROGRESS_LOG_MIN_PROJECTS
@@ -134,7 +134,7 @@ def _index_discovered_projects(
             part_dbs = [db for _, db in sorted(indexed_parts, key=lambda item: item[0])]
         else:
             for index, project in enumerate(projects, start=1):
-                label = _project_label(project)
+                label = project_label(project)
                 if show_progress:
                     print(f"Indexing {index}/{total}: {label}", file=sys.stderr)
                 direct_output = output_db if total == 1 else None
@@ -154,5 +154,5 @@ def _index_discovered_projects(
         if not part_dbs:
             raise RuntimeError("Failed to index project")
 
-        _finalize_part_dbs(part_dbs, output_db)
+        finalize_part_dbs(part_dbs, output_db)
         return output_db, len(part_dbs), skipped, total

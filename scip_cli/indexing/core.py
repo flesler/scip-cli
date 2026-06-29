@@ -18,9 +18,9 @@ from ..cache import (
 from ..config import load_project_config
 from ..discover import discover_golang_modules, discover_python_projects, discover_rust_crates
 from .constants import DEFAULT_MAX_HEAP_MB
-from .languages import _index_golang_module, _index_python_project, _index_rust_crate
-from .orchestrate import _index_discovered_projects
-from .typescript import _index_typescript, typescript_projects
+from .languages import index_golang_module, index_python_project, index_rust_crate
+from .orchestrate import index_discovered_projects
+from .typescript import index_typescript, typescript_projects
 
 
 def format_db_size(db_path: Path) -> str:
@@ -90,7 +90,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
 
     if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
-        output_db, _indexed, skipped, total = _index_typescript(root, cache_dir, projects, env, replace=replace)
+        output_db, _indexed, skipped, total = index_typescript(root, cache_dir, projects, env, replace=replace)
         if log:
             log_index_complete(
                 output_db,
@@ -102,14 +102,14 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
 
     if lang == Language.PYTHON:
         projects = discover_python_projects(root)
-        output_db, _indexed, skipped, total = _index_discovered_projects(
+        output_db, _indexed, skipped, total = index_discovered_projects(
             root,
             cache_dir,
             projects,
             env,
             replace=replace,
             progress_noun="Python packages",
-            index_one=_index_python_project,
+            index_one=index_python_project,
         )
         if log:
             log_index_complete(
@@ -122,14 +122,14 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
 
     if lang == Language.GOLANG:
         modules = discover_golang_modules(root)
-        output_db, _indexed, skipped, total = _index_discovered_projects(
+        output_db, _indexed, skipped, total = index_discovered_projects(
             root,
             cache_dir,
             modules,
             env,
             replace=replace,
             progress_noun="Go modules",
-            index_one=_index_golang_module,
+            index_one=index_golang_module,
         )
         if log:
             log_index_complete(
@@ -142,14 +142,14 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
 
     if lang == Language.RUST:
         crates = discover_rust_crates(root)
-        output_db, _indexed, skipped, total = _index_discovered_projects(
+        output_db, _indexed, skipped, total = index_discovered_projects(
             root,
             cache_dir,
             crates,
             env,
             replace=replace,
             progress_noun="Rust crates",
-            index_one=_index_rust_crate,
+            index_one=index_rust_crate,
         )
         if log:
             log_index_complete(

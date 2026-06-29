@@ -3,11 +3,8 @@
 import sqlite3
 from pathlib import Path
 
-from scip_cli.indexing import (
-    _document_path_prefix,
-    _postprocess_index,
-    _prefix_document_paths,
-)
+from scip_cli.indexing.convert import prefix_document_paths, project_path_prefix
+from scip_cli.indexing.postprocess import postprocess_index
 from scip_cli.symbols import is_variable_symbol, sql_exclude_variable_symbols
 
 
@@ -89,7 +86,7 @@ class TestOmitVariableSymbols:
     def test_postprocess_omits_variables_on_copy(self, tmp_path):
         db_path = tmp_path / "index.db"
         _seed_db(db_path)
-        _postprocess_index(db_path)
+        postprocess_index(db_path)
 
         conn = sqlite3.connect(db_path)
         symbols = {row[0] for row in conn.execute("SELECT symbol FROM global_symbols").fetchall()}
@@ -128,11 +125,11 @@ class TestIndexLogging:
 
 
 class TestDocumentPathPrefix:
-    def test_document_path_prefix_root(self):
-        assert _document_path_prefix(Path(".")) is None
+    def test_project_path_prefix_root(self):
+        assert project_path_prefix(Path(".")) is None
 
-    def test_document_path_prefix_nested(self):
-        assert _document_path_prefix(Path("packages/api")) == "packages/api"
+    def test_project_path_prefix_nested(self):
+        assert project_path_prefix(Path("packages/api")) == "packages/api"
 
     def test_prefix_document_paths(self, tmp_path):
         db = tmp_path / "index.db"
@@ -142,7 +139,7 @@ class TestDocumentPathPrefix:
         conn.commit()
         conn.close()
 
-        _prefix_document_paths(db, "services/api")
+        prefix_document_paths(db, "services/api")
 
         conn = sqlite3.connect(db)
         assert conn.execute("SELECT relative_path FROM documents").fetchone()[0] == "services/api/main.go"
@@ -153,7 +150,7 @@ class TestPostprocessSchema:
     def test_postprocess_preserves_mentions_primary_key(self, tmp_path):
         db_path = tmp_path / "index.db"
         _seed_db(db_path)
-        _postprocess_index(db_path)
+        postprocess_index(db_path)
 
         conn = sqlite3.connect(db_path)
         pk_cols = {row[1] for row in conn.execute("PRAGMA table_info(mentions)").fetchall() if row[5]}

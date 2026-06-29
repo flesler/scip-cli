@@ -96,7 +96,7 @@ def _recreate_postprocess_indexes(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_mentions_symbol_id_role ON mentions(symbol_id, role)")
 
 
-def _postprocess_index(db_path):
+def postprocess_index(db_path):
     """Shrink index: drop unused columns and omit prunable symbol rows (copy-filter, no DELETE)."""
     from ..sql import configure_bulk_write_connection
 

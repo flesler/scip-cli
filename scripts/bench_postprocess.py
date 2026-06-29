@@ -30,12 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scip_cli.indexing import (  # noqa: E402
-    _convert_scip_to_db,
-    _postprocess_index,
-    _resolve_scip_binary,
-    _run_subprocess,
-)
+from scip_cli.indexing.convert import convert_scip_to_db, resolve_scip_binary  # noqa: E402
+from scip_cli.indexing.postprocess import postprocess_index  # noqa: E402
+from scip_cli.indexing.runners import run_subprocess  # noqa: E402
 
 DEFAULT_FIXTURE = Path("/tmp/scip-bench-fixture/index.scip")
 DEFAULT_RAW_DB = Path("/tmp/scip-bench-raw.db")
@@ -62,8 +59,8 @@ def _time_convert(scip: Path, work: Path) -> float:
     if raw.exists():
         raw.unlink()
     t0 = time.perf_counter()
-    result = _run_subprocess(
-        [_resolve_scip_binary(), "expt-convert", str(scip), "--output", raw.name],
+    result = run_subprocess(
+        [resolve_scip_binary(), "expt-convert", str(scip), "--output", raw.name],
         cwd=str(work),
     )
     elapsed = time.perf_counter() - t0
@@ -75,7 +72,7 @@ def _time_convert(scip: Path, work: Path) -> float:
 def _time_postprocess(raw: Path, out: Path) -> float:
     shutil.copy2(raw, out)
     t0 = time.perf_counter()
-    _postprocess_index(out)
+    postprocess_index(out)
     return time.perf_counter() - t0
 
 
@@ -83,7 +80,7 @@ def _time_full_pipeline(scip: Path, out: Path) -> float:
     if out.exists():
         out.unlink()
     t0 = time.perf_counter()
-    _convert_scip_to_db(scip, out)
+    convert_scip_to_db(scip, out)
     return time.perf_counter() - t0
 
 

@@ -52,7 +52,7 @@ def test_index_project_python_merges_nested_packages(python_monorepo, tmp_path, 
         conn.close()
 
     monkeypatch.setattr("scip_cli.indexing.languages.run_indexer_with_fallback", fake_run)
-    monkeypatch.setattr("scip_cli.indexing.languages._convert_scip_to_db", fake_convert)
+    monkeypatch.setattr("scip_cli.indexing.languages.convert_scip_to_db", fake_convert)
     monkeypatch.setattr(
         "scip_cli.indexing.orchestrate.merge_sqlite_indexes",
         lambda parts, out: _merge_fixture(parts, out),

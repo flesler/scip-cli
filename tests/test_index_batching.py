@@ -7,17 +7,16 @@ import pytest
 from scip_cli.indexing import (
     DEFAULT_TS_INDEX_BATCH_SIZE,
     MAX_TS_INDEX_BATCH_SIZE,
-    _batch_projects,
-    _project_batch_label,
     ts_index_batch_size,
 )
+from scip_cli.indexing.orchestrate import batch_projects, project_batch_label
 from scip_cli.merge import MAX_MERGE_BATCH_SIZE, merge_batch_size
 
 
 class TestTsIndexBatching:
     def test_batch_projects_chunks(self):
         projects = [Path(f"p{i}") for i in range(23)]
-        batches = _batch_projects(projects, 10)
+        batches = batch_projects(projects, 10)
         assert len(batches) == 3
         assert len(batches[0]) == 10
         assert len(batches[1]) == 10
@@ -26,15 +25,15 @@ class TestTsIndexBatching:
     def test_default_batches_all_projects(self, monkeypatch):
         monkeypatch.delenv("SCIP_CLI_TS_INDEX_BATCH_SIZE", raising=False)
         projects = [Path(f"p{i}") for i in range(23)]
-        batches = _batch_projects(projects, ts_index_batch_size())
+        batches = batch_projects(projects, ts_index_batch_size())
         assert len(batches) == 1
         assert len(batches[0]) == 23
 
     def test_project_batch_label_single(self):
-        assert _project_batch_label([Path("lib/a")]) == "lib/a"
+        assert project_batch_label([Path("lib/a")]) == "lib/a"
 
     def test_project_batch_label_multi(self):
-        label = _project_batch_label([Path("lib/a"), Path("lib/b")])
+        label = project_batch_label([Path("lib/a"), Path("lib/b")])
         assert label == "lib/a +1 more"
 
     def test_default_batch_size_is_unlimited(self, monkeypatch):
