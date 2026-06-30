@@ -68,6 +68,35 @@
 
 ---
 
+## Incremental Feature Development Experiment (June 30, 2026)
+
+We tested all four languages with a controlled task: add `--freq` flag to sort symbols by frequency.
+
+### 🐍 **Python**
+- **Time**: ~3 minutes | **Problems**: 0 | **Tests**: 3 pytest tests
+- **AI Friendliness**: **10/10** - Trivial implementation, zero friction
+- **Verdict**: Baseline for all other languages
+
+### 🥇 **Go**
+- **Time**: ~8 minutes | **Problems**: 2 (tooling issues) | **Tests**: 3 unit tests
+- **AI Friendliness**: **8/10** - Fast iteration, type system helpful
+- **Key Insight**: Sed over-matching revealed need for better bulk-edit tools
+- **Verdict**: Best balance for feature additions after Python
+
+### 🥈 **Rust**
+- **Time**: ~25-36 minutes | **Problems**: 1 (clippy lint) | **Tests**: 4 unit tests
+- **AI Friendliness**: **7/10** - Higher initial time but zero borrow checker issues!
+- **Surprising Finding**: Original migration had 21% borrow checker problems, this task had **zero**. Task type matters.
+- **Verdict**: Once patterns established, incremental features are manageable
+
+### 🥉 **Zig**
+- **Time**: ~18-19 minutes | **Problems**: 4 (API/memory/file corruption) | **Tests**: Manual only
+- **AI Friendliness**: **5/10** - Faster than Rust but more challenging
+- **Key Issues**: API instability in 0.17.0-dev, memory management complexity, file corruption from sed
+- **Verdict**: Feasible but high cognitive load despite fast compilation
+
+---
+
 ## Final Recommendation for This Project
 
 **Go is the clear winner** for continuing development of scip-cli:

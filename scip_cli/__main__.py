@@ -89,6 +89,11 @@ def main() -> None:
     add_limit_argument(symbols_parser, default=10, help_suffix="symbols")
     add_path_argument(symbols_parser)
     symbols_parser.add_argument("file", help="File path or pattern")
+    symbols_parser.add_argument(
+        "--freq",
+        action="store_true",
+        help="Sort symbols by frequency (most common first)",
+    )
 
     # rdeps
     rdeps_parser = subparsers.add_parser("rdeps", help="Find reverse dependencies of a file")

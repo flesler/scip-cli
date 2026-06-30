@@ -295,6 +295,56 @@ Rust is justified if scip-cli will be used in production environments where bugs
 **Verdict: ❌ Not recommended unless you have specific low-level requirements**
 Zig is too unstable for productive AI-assisted workflows. Only consider if you need fine-grained control over memory layout, binary size must be minimal, and you can budget 3x development time for API compatibility fixes.
 
+## Incremental Feature Development Experiment
+
+To validate the migration findings, we conducted a controlled experiment: add a `--freq` flag to the symbols command across all four languages. This tests AI-assisted development on incremental feature additions rather than full migrations.
+
+### Experiment Results
+
+| Language | Time | Problems | Tests Added | AI Friendliness |
+|----------|------|----------|-------------|-----------------|
+| Python | ~3 min | 0 | 3 pytest tests | 10/10 |
+| Go | ~8 min | 2 (tooling issues) | 3 unit tests | 8/10 |
+| Rust | ~25-36 min | 1 (clippy lint) | 4 unit tests | 7/10 |
+| Zig | ~18-19 min | 4 (API/memory/file corruption) | Manual verification only | 5/10 |
+
+### Key Experimental Findings
+
+**1. Tooling Speed Dominates Iteration Efficiency**
+Python's instant feedback and Go's seconds-fast compilation enable rapid iteration. Rust's moderate compilation time is offset by excellent error messages. Zig has fast compilation but cryptic errors.
+
+**2. Memory Management Complexity Correlates with Development Time**
+Languages requiring explicit memory management took significantly longer:
+- No manual memory mgmt (Python, Go): 3-8 min
+- Ownership model (Rust): 25-36 min but **zero borrow checker issues**
+- Manual allocation (Zig): 18-19 min with multiple iterations on ownership
+
+**3. Task Type Dramatically Affects Rust Performance**
+The original migration showed Rust with 21% borrow checker problems, but this incremental task had **zero** ownership issues. This suggests:
+- Incremental features often work with owned data (no borrowing needed)
+- Established patterns in codebase guide AI effectively
+- CLI argument parsing naturally produces owned Strings
+
+**4. API Stability Critical for AI Productivity**
+Zig's API instability consumed disproportionate time despite being faster than Rust. Agent spent time figuring out correct initialization patterns instead of implementing features.
+
+**5. Test Addition Ease Varies Wildly**
+Python and Go added tests easily with pure functions. Rust integration tests failed due to fixture complexity (pivoted to unit tests). Zig has no automated test framework (manual verification only).
+
+### Updated Rankings for Incremental Development
+
+**For rapid prototyping / feature additions:**
+1. 🥇 Python (10/10) - Zero friction, instant feedback
+2. 🥈 Go (8/10) - Close to Python, slightly slower due to compilation
+3. 🥉 Rust (7/10) - Higher initial investment but correctness pays off
+4. Zig (5/10) - Feasible but challenging due to API instability
+
+**For production code quality:**
+1. Rust > Go > Zig > Python (safety guarantees matter long-term)
+
+**For team collaboration:**
+1. Go > Python > Rust > Zig (simple patterns, minimal learning curve)
+
 ## Final Verdict
 
 For AI-assisted migration of CLI tools from Python:
