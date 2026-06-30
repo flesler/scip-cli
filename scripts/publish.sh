@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BUMP="${1:-}"
+GH_SCRIPTS="${GH_SCRIPTS:-${HOME}/.claude/skills/gh/scripts}"
+SYNC_RELEASE="${GH_SCRIPTS}/sync-github-release.sh"
 
 usage() {
     echo "Usage: $0 [patch|minor|major]"
@@ -67,7 +69,7 @@ PY
     echo "New version: $NEW_VERSION"
 
     git add scip_cli/__init__.py
-    git commit -m "Release $NEW_VERSION."
+    git commit -m "v${NEW_VERSION}"
 fi
 
 # Build (after version bump so dist/ has correct version)
@@ -85,8 +87,20 @@ fi
 
 # Create and push tag
 echo "Creating git tag v$VERSION..."
-git tag -a "v$VERSION" -m "Release $VERSION"
+git tag -a "v$VERSION" -m "v$VERSION"
 git push origin HEAD "v$VERSION"
+
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+if [[ -z "$REPO" ]]; then
+    REPO="flesler/scip-cli"
+fi
+
+"$SYNC_RELEASE" "$REPO" "$VERSION" --install "$(cat <<EOF
+\`\`\`bash
+pip install scip-cli=={{VERSION}}
+\`\`\`
+EOF
+)" --execute
 
 # Upload to PyPI
 echo "Uploading to PyPI..."
@@ -94,6 +108,7 @@ python -m twine upload dist/* --username __token__ --password "$(grep PYPI_TOKEN
 
 echo "Published v$VERSION successfully!"
 echo "View at: https://pypi.org/project/scip-cli/$VERSION/"
+echo "Release: https://github.com/$REPO/releases/tag/v$VERSION"
 
 echo "Smoke testing PyPI..."
 pip install "scip-cli==$VERSION"

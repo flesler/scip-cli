@@ -17,6 +17,17 @@ AI agents waste tokens on grep and file scanning. scip-cli gives them precise, t
 - **`analyze`**: Find dead exports, import cycles, stale types, coupling hotspots — actionable health dashboards at project, file, or symbol scope
 - **Auto-indexing**: Indexes on first query, caches in SQLite, zero config
 
+## Ports
+
+CLI/output parity ports of this project (Python is the reference):
+
+| Language | Repository |
+|----------|------------|
+| Python (reference) | [flesler/scip-cli](https://github.com/flesler/scip-cli) |
+| Go | [flesler/scip-cli-go](https://github.com/flesler/scip-cli-go) |
+| Rust | [flesler/scip-cli-rust](https://github.com/flesler/scip-cli-rust) |
+| Zig | [flesler/scip-cli-zig](https://github.com/flesler/scip-cli-zig) |
+
 ## For AI Agents
 
 Install as a reusable skill so your agent always knows how to navigate the codebase:
