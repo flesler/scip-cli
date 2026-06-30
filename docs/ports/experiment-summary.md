@@ -204,23 +204,36 @@ Each agent worked sequentially (Python → Go → Rust → Zig) to avoid API thr
 
 Running full project gates (`scripts/test.sh`) reveals iteration loop costs:
 
-| Language | Gate Time | Key Observations |
-|----------|-----------|------------------|
-| **Python** | ~2.3s (tests only) | Pyright has warnings on lambda types, tests pass instantly |
-| **Go** | ~22s (full suite) | Comprehensive: vet, build, test all packages, moderate speed |
-| **Rust** | ~4.5s (all checks) | Very strict: fmt, clippy with `-D warnings`, build, test. Clippy caught test code style issues |
-| **Zig** | ~0.08s (fastest!) | Lightning fast but caught formatting issues immediately |
+| Language | Gate Time | What's Being Checked |
+|----------|-----------|---------------------|
+| **Python** | ~1.3s | Ruff lint + format check + Pyright type check + pytest (298 tests) |
+| **Go** | ~5.4s | gofmt + go build + go vet + golangci-lint (comprehensive) + unit tests (24 packages) |
+| **Rust** | ~6.4s | cargo fmt + clippy (strict lib/bin, relaxed tests) + full test suite (57+ tests) |
+| **Zig** | ~0.09s | zig fmt check + zig build test (compiler does type checking, NO separate lint) |
 
-### Gate Loop Implications
+### What This Means for AI Iteration
 
-For iterative development where AI must constantly re-run gates:
+The gate times reveal important differences in feedback loops:
 
-- **Zig**: Near-instant feedback (80ms) enables rapid iteration despite more problems
-- **Python**: Fast tests (2.3s) but type checker warnings may block commits
-- **Rust**: Moderate speed (4.5s) but **very strict linting** - test code must be clippy-clean
-- **Go**: Slowest gate loop (22s) but most comprehensive coverage
+- **Zig**: 90ms total = near-instant iteration, but compiler catches everything at build time (no separate lint/type steps)
+- **Python**: 1.3s = fast feedback, but pyright warnings can block commits even when tests pass
+- **Go**: 5.4s = comprehensive checking with golangci-lint (many linters), moderate speed
+- **Rust**: 6.4s = slowest but most thorough (compile-time safety + extensive clippy lints)
 
-**Key Insight**: Zig's 80ms gate time means AI can iterate ~275x faster than Go's 22s, partially compensating for higher friction per change.
+**Key Insight**: Zig appears fastest partly because it has fewer separate checking steps - the compiler does type checking during build, so there's no equivalent to pyright/golangci-lint/clippy as separate steps. This is actually an advantage for AI iteration speed.
+
+### Fairness Considerations
+
+All gates check:
+- ✅ Formatting
+- ✅ Type safety (compiler or type checker)
+- ✅ Tests
+
+But differ in:
+- **Linting depth**: Go (golangci-lint = many linters) > Rust (clippy) > Python (ruff) > Zig (none, compiler only)
+- **Test coverage**: Python (298 tests) > Rust (57+) > Go (24 packages) > Zig (manual/basic)
+
+For AI development velocity, **faster gates enable more iterations**, which partially compensates for higher per-change friction.
 
 ### Rust Clippy Research Findings
 
