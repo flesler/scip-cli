@@ -61,8 +61,6 @@ markers = [
 
 [tool.basedpyright]
 pythonVersion = "3.10"
-venvPath = "."
-venv = ".venv"
 include = ["scip_cli"]
 exclude = ["tests"]
 
