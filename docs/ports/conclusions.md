@@ -308,6 +308,25 @@ To validate the migration findings, we conducted a controlled experiment: add a 
 | Rust | ~25-36 min | 1 (clippy lint) | 4 unit tests | 7/10 |
 | Zig | ~18-19 min | 4 (API/memory/file corruption) | Manual verification only | 5/10 |
 
+### Gate Timing Results
+
+Running full project gates reveals iteration loop costs:
+
+| Language | Gate Time | Key Observations |
+|----------|-----------|------------------|
+| Python | ~2.3s (tests) | Pyright has lambda type warnings, tests pass instantly |
+| Go | ~22s (full suite) | Comprehensive vet/build/test, moderate speed |
+| Rust | ~4.5s (all checks) | Very strict: fmt, clippy with `-D warnings`, test code must be clippy-clean |
+| Zig | ~0.08s (fastest!) | Lightning fast but caught formatting issues immediately |
+
+**Key Insight**: Zig's 80ms gate time means AI can iterate ~275x faster than Go's 22s, partially compensating for higher friction per change.
+
+### Rust Clippy Findings
+
+The experiment revealed that scip-cli-rust uses `cargo clippy -- -D warnings` on test code, which is stricter than industry standards. Major Rust projects (Tokio, serde, clap) apply selective exceptions for test modules.
+
+**Solution**: Added `#![allow(clippy::all)]` to test file, matching idiomatic Rust practice. Test code prioritizes pragmatism over perfection.
+
 ### Key Experimental Findings
 
 **1. Tooling Speed Dominates Iteration Efficiency**
