@@ -56,6 +56,12 @@ def main(args):
     with index_build_lock(cache_dir):
         cleanup_in_progress_index(cache_dir)
         try:
+            # Pass --with-external flag to indexer via environment
+            if getattr(args, "with_external", False):
+                import os
+
+                os.environ["SCIP_CLI_KEEP_EXTERNAL"] = "1"
+
             _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
         except RuntimeError as e:
             cleanup_in_progress_index(cache_dir)

@@ -39,8 +39,8 @@ def _deps_from_symbol(db, symbol_id, limit):
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
         JOIN global_symbols gs ON m.symbol_id = gs.id
-        LEFT JOIN defn_enclosing_ranges def_der ON def_der.symbol_id = gs.id
-        LEFT JOIN documents def_d ON def_der.document_id = def_d.id
+        JOIN defn_enclosing_ranges def_der ON def_der.symbol_id = gs.id
+        JOIN documents def_d ON def_der.document_id = def_d.id
         WHERE c.document_id = ?
           AND c.start_line <= ?
           AND c.end_line >= ?
@@ -75,8 +75,8 @@ def _deps_from_file(db, file_path, limit):
         FROM mentions m
         JOIN chunks c ON m.chunk_id = c.id
         JOIN global_symbols gs ON m.symbol_id = gs.id
-        LEFT JOIN defn_enclosing_ranges def_der ON def_der.symbol_id = gs.id
-        LEFT JOIN documents def_d ON def_der.document_id = def_d.id
+        JOIN defn_enclosing_ranges def_der ON def_der.symbol_id = gs.id
+        JOIN documents def_d ON def_der.document_id = def_d.id
         WHERE c.document_id = ?
           AND m.role != 1
           AND gs.id NOT IN (

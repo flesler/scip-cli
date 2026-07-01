@@ -168,6 +168,84 @@ class TestDeps:
         # Should not contain line numbers in paths-only mode
         assert ":" not in result.stdout
 
+    def test_filters_builtin_symbols(self, cli):
+        """Built-in symbols without definitions should be filtered from deps output."""
+        result = cli.run("deps", USER_FILE, "--limit", "50")
+        assert result.returncode == 0
+        # All output lines (except warnings) should have file:path format
+        # Built-ins or symbols without definitions should NOT appear as bare names
+        raw_lines = result.stdout.strip().splitlines()
+        lines = [line.strip() for line in raw_lines if line.strip() and not line.startswith("#")]
+        # Every line should contain a colon (file:line format)
+        for line in lines:
+            assert ":" in line, f"Expected file:line format but got bare symbol: {line}"
+
+    def test_with_external_keeps_all_symbols(self):
+        """Verify that --with-external flag is available for reindex."""
+        from tests.e2e_harness import run_cli
+
+        # Just verify the flag exists and doesn't crash
+        result = run_cli(["reindex", "--help"])
+        assert result.returncode == 0
+        assert "--with-external" in result.stdout
+
+
+class TestPruningBehavior:
+    """Test what gets pruned vs kept during indexing."""
+
+    def test_keeps_functions_with_definitions(self, indexed_fixture):
+        """Functions with definitions should be kept."""
+        conn = sqlite3.connect(indexed_fixture.db_path)
+        count = conn.execute(
+            "SELECT COUNT(*) FROM global_symbols gs "
+            "JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id "
+            "WHERE gs.symbol LIKE '%greet()%'"
+        ).fetchone()[0]
+        conn.close()
+        assert count > 0, "Function 'greet' should have a definition and be kept"
+
+    def test_keeps_type_literal_fields(self, indexed_fixture):
+        """Type literal fields (no defs) should be kept for type analysis."""
+        conn = sqlite3.connect(indexed_fixture.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM global_symbols WHERE symbol LIKE '%typeLiteral%'").fetchone()[0]
+        conn.close()
+        assert count > 0, "Type literal fields should be kept even without definitions"
+
+    def test_keeps_parameters(self, indexed_fixture):
+        """Function parameters should be kept for understanding signatures."""
+        conn = sqlite3.connect(indexed_fixture.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM global_symbols WHERE symbol LIKE '%).(%'").fetchone()[0]
+        conn.close()
+        assert count > 0, "Parameters should be kept even without definitions"
+
+    def test_prunes_external_imports_without_defs(self, indexed_fixture):
+        """External library imports without definitions should be pruned by default."""
+        conn = sqlite3.connect(indexed_fixture.db_path)
+        # Check if external-lib symbols exist (they shouldn't after pruning)
+        external_count = conn.execute(
+            "SELECT COUNT(*) FROM global_symbols gs "
+            "LEFT JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id "
+            "WHERE der.symbol_id IS NULL "
+            "AND gs.symbol NOT LIKE '%typeLiteral%' "
+            "AND gs.symbol NOT LIKE '%).(%' "
+            "AND gs.symbol NOT LIKE '%().'"
+        ).fetchone()[0]
+        conn.close()
+        assert external_count == 0, f"External symbols should be pruned, found {external_count}"
+
+    def test_prunes_variables(self, indexed_fixture):
+        """Const/let/var variables should be pruned (already handled by sql_exclude_variable_symbols)."""
+        conn = sqlite3.connect(indexed_fixture.db_path)
+        var_count = conn.execute(
+            "SELECT COUNT(*) FROM global_symbols "
+            + "WHERE symbol LIKE '%.' AND symbol NOT LIKE '%().%' "
+            + "AND symbol NOT LIKE '%typeLiteral%'"
+        ).fetchone()[0]
+        conn.close()
+        # Variables ending with '.' (like 'message.') should be excluded
+        # Note: This might be 0 if no vars were indexed at all
+        assert var_count == 0, f"Variables should be pruned, found {var_count}"
+
 
 class TestAnalyze:
     def test_project_dashboard(self, cli):

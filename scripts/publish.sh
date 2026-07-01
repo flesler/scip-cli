@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+# Detect if stdout is piped (not a terminal)
+if [ ! -t 1 ]; then
+    echo "Error: publish.sh must be run unfiltered (stdout is piped)" >&2
+    echo "Run directly without | tail, | head, etc." >&2
+    exit 1
+fi
+
 cd "$(dirname "$0")/.."
 
 BUMP="${1:-}"
@@ -115,3 +122,5 @@ pip install "scip-cli==$VERSION"
 scip-cli --version
 pip install -e ".[dev]"
 scip-cli --version
+
+echo "All done!"

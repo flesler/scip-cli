@@ -150,6 +150,12 @@ def main() -> None:
         metavar="PATH",
         help="Index only tsconfig projects under PATH (repeatable; persisted until full reindex)",
     )
+    reindex_parser.add_argument(
+        "--with-external",
+        action="store_true",
+        default=False,
+        help="Keep external library symbols without definitions (increases index size ~5x)",
+    )
 
     args = parser.parse_args()
 
