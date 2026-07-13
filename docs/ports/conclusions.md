@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-**Go is the clear winner for AI-assisted CLI tool migration from Python**, completing the migration in 5.7 hours with minimal conceptual overhead and excellent tooling support. Rust ranks second at ~6+ hours with stronger safety guarantees but steeper learning curve due to borrow checker complexity. Zig ranks last, requiring 8 hours (75% spent fighting API instability) despite producing a working binary, making it unsuitable for AI workflows unless you have specific low-level requirements and can budget 3x development time. Go's fast compilation, predictable patterns, and mature ecosystem make it the most practical choice when runtime performance isn't critical.
+**Go is the clear winner for AI-assisted CLI tool migration from Python**, finishing in ~7h of active Cursor wall-clock with minimal conceptual overhead and excellent tooling support. Rust took the longest (~15h) with stronger safety guarantees but steeper ownership friction. Zig landed in the middle on time (~13h) but ranks last for AI workflows: most of its pain was API instability in 0.17.0-dev, not language power. Go's fast compilation, predictable patterns, and mature ecosystem make it the most practical choice when runtime performance isn't critical.
+
+**Timing note:** Earlier drafts cited ~5.7h / ~6+h / ~8h (~20h combined) from agent self-estimates of friction. Those undercounted. Figures below are **active Cursor session wall-clock** from transcript `<timestamp>` tags + agent-tools mtime, clustered with a >90 min gap (short follow-ups / `--freq` / docs polish excluded). Calendar span was ~2–3 days per port; active time is much less.
 
 ## Side-by-Side Comparison
 
@@ -10,9 +12,9 @@
 
 | Metric | Go | Rust | Zig |
 |--------|-----|------|-----|
-| Total migration time | 5.7 hours | 6+ hours | 8 hours |
+| Active migration wall-clock | ~7 hours | ~15 hours | ~13 hours |
 | Number of problems | 49 documented | 24 documented | 60+ documented |
-| Time lost to friction | ~5.7 hours (100%) | ~0.5 hours (documented) + investigation | ~6 hours (75% of total) |
+| Agent-estimated friction (old) | ~5.7h (undercount) | sparse (~0.5h explicit) | ~8h total claim |
 | Compilation speed | Seconds (excellent) | Not explicitly complained, iterative workflow suggests moderate | 2-5 seconds (good) |
 | Lines of code | Not specified | Not specified | 5007 lines (94% of Python's 5322) |
 | Biggest blocker | Package naming confusion (~45 min) | Temporaries die while borrowed (8+ call sites) | API instability in 0.17.0-dev (~4 hours) |
@@ -36,17 +38,17 @@
 ### Overall Ranking for AI-Assisted Coding
 
 1. **🥇 Gold: Go**
-   - Why it won: Lowest total friction time (5.7h), fastest feedback loop, predictable patterns that AI can learn and apply consistently
+   - Why it won: Fastest wall-clock (~7h), fastest useful feedback loop, predictable patterns that AI can learn and apply consistently
    - Best for: Rapid prototyping, CLI tools, team onboarding, projects where development speed matters more than runtime performance
    - AI friendliness score: **8/10** - Excellent error messages, simple concepts, but verbosity and type strictness slow initial progress
 
 2. **🥈 Silver: Rust**
    - Strengths: Strong safety guarantees prevent bugs that would surface in production, excellent tooling (cargo, clippy, rustfmt), compiler provides actionable guidance
-   - Weaknesses: Borrow checker creates significant conceptual barrier for AI trained on Python, ownership semantics don't map directly to high-level abstractions
+   - Weaknesses: Longest wall-clock (~15h); borrow checker creates a significant conceptual barrier for AI trained on Python; ownership semantics don't map directly to high-level abstractions
    - AI friendliness score: **7/10** - Great tooling and safety, but requires understanding of concepts foreign to Python developers
 
 3. **🥉 Bronze: Zig**
-   - Major challenges: Severe API instability in 0.17.0-dev consumed 75% of migration time, massive C interop requirement for basic file I/O, no mature ecosystem
+   - Major challenges: ~13h wall-clock, but severe API instability in 0.17.0-dev dominated the pain (agent estimates put most friction there), massive C interop for basic file I/O, no mature ecosystem
    - When to consider: Binary size must be minimal, need fine-grained control over memory/layout, willing to read std source code instead of relying on docs
    - AI friendliness score: **4/10** - Fast compilation and clear errors are offset by API volatility that makes LLM training data obsolete
 
@@ -287,7 +289,7 @@ Rust is justified if scip-cli will be used in production environments where bugs
 - Deterministic behavior (no GC pauses, predictable performance)
 
 **Cons:**
-- **Severe API instability** consumed 75% of migration time (~6 hours)
+- **Severe API instability** dominated friction (agent estimates put most of the pain there; do not treat "~6 of 8 hours" as wall-clock)
 - Massive C interop requirement for basic operations (file I/O, env vars, directory ops)
 - Immature ecosystem (no package manager, no third-party libraries)
 - LLM training data is obsolete for current API
@@ -369,14 +371,14 @@ Python and Go added tests easily with pure functions. Rust integration tests fai
 For AI-assisted migration of CLI tools from Python:
 
 🥇 **Gold: Go** - Best balance of AI-friendliness, development speed, and practical outcomes
-- Lowest total friction time (5.7 hours vs estimated higher for others)
+- Fastest active wall-clock (~7h vs ~13h Zig, ~15h Rust)
 - Mature ecosystem with minimal setup friction
 - Clear error messages that AI can understand and fix
 - Trade-off: More verbose but predictable; type strictness slows initial progress but prevents runtime bugs
 
 🥈 **Silver: Rust** - Strong choice when safety and performance matter
 - Excellent tooling and compiler guidance
-- Higher initial friction (borrow checker) but pays off in correctness
+- Longest wall-clock (~15h) and higher ownership friction, but pays off in correctness
 - Good for projects where bugs are costly in production
 - Trade-off: Steeper learning curve but better long-term maintainability; safety guarantees justify the investment
 
@@ -388,7 +390,7 @@ For AI-assisted migration of CLI tools from Python:
 
 ## Lessons Learned
 
-1. **API stability trumps language elegance** - Zig's breaking changes consumed 75% of migration time (~6 hours), dwarfing all other friction sources. A stable API surface is the single most important factor for AI productivity, because LLM training data becomes obsolete otherwise.
+1. **API stability trumps language elegance** - Zig's breaking changes dominated its friction (agent estimates put most of the pain there), dwarfing other issue categories. A stable API surface is the single most important factor for AI productivity, because LLM training data becomes obsolete otherwise.
 
 2. **Fast feedback loops enable AI iteration** - Go's seconds-fast compilation allowed the AI to try multiple approaches quickly. Languages with slow compilation force AI to be more cautious, reducing exploration and potentially missing better solutions.
 
@@ -408,16 +410,15 @@ For AI-assisted migration of CLI tools from Python:
 
 This analysis is based on:
 - Real migration of a working Python CLI tool (~5K lines) to three target languages
-- Documented problems with time estimates from actual migrations:
-  - Go: 49 documented problems, ~5.7 hours friction time
-  - Rust: 24 documented problems, ~0.5 hours explicit time losses (plus investigation time)
-  - Zig: 60+ documented problems, ~8 hours total (75% on API fixes)
-- Agent transcript analysis showing AI struggle patterns (extracted via efficient jq commands)
+- **Active Cursor wall-clock** (primary timing): transcript `<timestamp>` tags + agent-tools/transcript file mtimes, clustered into sessions with a >90 minute gap; short follow-ups, docs polish, and the later `--freq` experiment excluded
+  - Go: ~7h (two long sessions on Jun 28)
+  - Zig: ~13h (five sessions Jun 28–30; ~15h if counting untimestamped Jun 30 ship finish)
+  - Rust: ~15h (six sessions Jun 28–30)
+  - Combined: **~35h** active migration time (~2–3 calendar days each)
+- Documented problems (categories / counts) from migration-problems.md; **earlier hour figures (~5.7 / ~6+ / ~8, ~20h combined) were agent self-estimates of friction and undercounted wall-clock**, especially Rust
 - Cross-language parity testing ensuring equivalent functionality across all implementations
 - Focus on AI coding experience specifically, not general language quality assessments
 
-The conclusions are evidence-based, drawn from approximately **20 hours of combined migration effort** across the three languages, with detailed problem categorization and time tracking.
-
 ---
 
-*Document generated from analysis of migration artifacts across Go, Rust, and Zig ports of scip-cli. All time estimates are conservative and based on documented friction points in migration-problems.md files and agent transcripts.*
+*Document generated from analysis of migration artifacts across Go, Rust, and Zig ports of scip-cli. Wall-clock times from Cursor transcript/tool FS; problem categories from migration-problems.md.*

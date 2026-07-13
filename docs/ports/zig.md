@@ -2,7 +2,8 @@
 
 ## Migration Overview
 
-- **Total estimated migration time from problems doc**: ~8 hours (25% actual migration, 75% API compatibility fixes)
+- **Active Cursor wall-clock**: ~13 hours (five sessions Jun 28–30; ~15h if counting untimestamped Jun 30 ship finish)
+- **Earlier agent estimate**: ~8 hours (claimed 25% actual migration / 75% API compatibility fixes) — undercounted wall-clock; category split is still useful as relative friction, not absolute hours
 - **Number of distinct problems encountered**: 60+ documented issues in migration-problems.md
 - **Key success metrics**: Build succeeds, all commands functional, output matches Python version exactly, zero memory leaks after fixes
 
@@ -236,12 +237,8 @@ Key quotes showing AI struggles extracted from agent transcripts:
 
 ## Quantitative Summary
 
-- **Estimated total time lost to friction**: ~6 hours out of 8 total hours (75%)
-  - API instability/version mismatch: ~4 hours (50%)
-  - Memory management bugs: ~1.5 hours (19%)
-  - Type system confusion: ~0.75 hours (9%)
-  - Build/tooling issues: ~0.5 hours (6%)
-  - Other strictness issues: ~0.25 hours (3%)
+- **Active Cursor wall-clock**: ~13 hours (five sessions Jun 28–30). Earlier "~8 hours / 75% API" figures were agent estimates of friction composition, not measured wall-clock.
+  - Relative friction mix (agent estimate): API instability/version mismatch largest share, then memory management, types, build/tooling
 
 - **Most common issue type**: API instability & version mismatch (stdlib removals/reshaping)
 
@@ -283,4 +280,4 @@ Key quotes showing AI struggles extracted from agent transcripts:
 
 ---
 
-*Analysis based on migration of scip-cli from Python to Zig 0.17.0-dev, documenting 60+ distinct problems encountered during ~8 hour migration effort.*
+*Analysis based on migration of scip-cli from Python to Zig 0.17.0-dev, documenting 60+ distinct problems. Active Cursor wall-clock ~13h (earlier ~8h claim undercounted).*

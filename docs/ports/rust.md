@@ -1,7 +1,9 @@
 # Rust AI Coding Analysis
 
 ## Migration Overview
-- **Total estimated migration time**: Not explicitly stated in problems document, but 24 distinct problems encountered across multiple categories
+- **Active Cursor wall-clock**: ~15 hours (six sessions Jun 28–30; transcript timestamps + agent-tools mtime, >90 min gap clustering; short follow-ups / `--freq` excluded)
+- **Earlier docs**: often cited "~6+ hours" from incomplete agent estimates — badly undercounted
+- **Problems**: 24 distinct issues across multiple categories
 - **Number of distinct problems**: 24 documented issues in `migration-problems.md`
 - **Key success metrics**: Complete port achieved with cross-language parity tests passing, all commands functional, `cargo test` clean
 
@@ -225,7 +227,7 @@ Python's high-level abstractions (Unicode strings, garbage collection, f-strings
 
 Based on `migration-problems.md` and transcript analysis:
 
-- **Estimated total time lost to friction**: Approximately **20-30 minutes** of documented time losses (problems #16: ~2min, #17: ~2min, #18: ~5min for pre-commit, plus ~15 undocumented issues at ~1-2 min each = ~20-30 min total). However, this only captures explicit mentions. The 24 problems themselves represent hours of investigation and fixing.
+- **Estimated total time lost to friction**: Approximately **20-30 minutes** of documented time losses (problems #16: ~2min, #17: ~2min, #18: ~5min for pre-commit, plus ~15 undocumented issues at ~1-2 min each = ~20-30 min total). However, this only captures explicit mentions. Measured active Cursor wall-clock for the full migration was **~15h**.
 
 - **Most common issue type**: **Ownership & borrow checker issues** (5 out of 24 problems: #7, #8, #9, #10, #11). These represent 21% of all documented problems.
 

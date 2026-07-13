@@ -10,7 +10,7 @@
 ---
 
 ### 🥇 **Go (Winner for AI Coding)**
-- **Migration Time**: 5.7 hours
+- **Migration Time**: ~7h active Cursor wall-clock (agent estimate was ~5.7h friction; undercounted)
 - **Problems**: 49 documented issues
 - **Key Strengths**: 
   - Fast compilation (seconds) enables rapid iteration
@@ -30,7 +30,7 @@
 ---
 
 ### 🥈 **Rust (Strong Second Place)**
-- **Migration Time**: 6+ hours
+- **Migration Time**: ~15h active Cursor wall-clock (earlier docs said ~6+h; agent estimates badly undercounted)
 - **Problems**: 24 documented issues
 - **Key Strengths**:
   - Memory safety prevents bugs caught during migration (UTF-8 slicing, SQL injection, tar slip vulnerabilities)
@@ -49,7 +49,7 @@
 ---
 
 ### 🥉 **Zig (Not Recommended for AI Workflows)**
-- **Migration Time**: 8 hours (75% spent fighting API instability)
+- **Migration Time**: ~13h active Cursor wall-clock (agent estimate was ~8h; undercounted). API instability dominated friction category estimates.
 - **Problems**: 60+ documented issues
 - **Key Strengths**:
   - Fast compilation (2-5 seconds)
@@ -101,7 +101,7 @@ We tested all four languages with a controlled task: add `--freq` flag to sort s
 
 **Go is the clear winner** for continuing development of scip-cli:
 
-✅ Lowest total friction time (5.7h vs 6+h Rust, 8h Zig)  
+✅ Lowest active wall-clock (~7h vs ~13h Zig, ~15h Rust)  
 ✅ Mature ecosystem with minimal setup friction  
 ✅ Clear error messages AI can understand and fix independently  
 ✅ Full parity achieved with Python version  

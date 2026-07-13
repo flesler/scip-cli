@@ -1,7 +1,8 @@
 # Go AI Coding Analysis
 
 ## Migration Overview
-- **Total estimated migration time**: ~5 hours 40 minutes (340 minutes) of documented friction time across 49+ distinct problems
+- **Active Cursor wall-clock**: ~7 hours (two long sessions on Jun 28; transcript timestamps + agent-tools mtime, >90 min gap clustering)
+- **Earlier agent friction estimate**: ~5 hours 40 minutes (340 minutes) across 49+ distinct problems — undercounted wall-clock
 - **Number of distinct problems encountered**: 49 major issues documented, plus numerous smaller fixes
 - **Key success metrics**:
   - Full Python-to-Go parity achieved on sample-project fixture
@@ -164,7 +165,7 @@ Go's rigidity caused frequent corrections in predictable ways:
 
 ## Quantitative Summary
 
-- **Estimated total time lost to friction**: 5 hours 40 minutes (340 minutes) across 49 documented problems
+- **Estimated total time lost to friction**: 5 hours 40 minutes (340 minutes) across 49 documented problems (agent self-estimate; measured wall-clock was ~7h)
 - **Most common issue type**: Type system mismatches (~85 minutes, 25% of total friction time)
 - **Biggest single blocker**: Package naming conflict (`internal/sql` directory with `sqlhelp` package name) — ~45 minutes across sessions
 - **Number of type-related errors**: 12+ distinct type mismatch incidents documented
@@ -199,7 +200,7 @@ Go is **moderately suitable** for AI-assisted coding when:
 - ⚠️ Package naming conventions are clearly documented upfront
 - ❌ Complex generic programming or metaprogramming is required (Go has limited support)
 
-For AI agents specifically, Go's predictability and fast feedback loop partially offset its verbosity and strictness. However, the high friction time (5.7 hours for a medium-sized project) suggests that languages with better type inference and clearer API documentation may yield higher AI productivity.
+For AI agents specifically, Go's predictability and fast feedback loop partially offset its verbosity and strictness. Still, ~7h wall-clock (and ~5.7h of agent-estimated friction) for a medium-sized project shows type/API friction is real — languages with better type inference and clearer API documentation may yield higher AI productivity.
 
 ---
 
