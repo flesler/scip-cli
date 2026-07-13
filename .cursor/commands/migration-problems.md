@@ -65,8 +65,8 @@ Prefer **one sharp entry** over a dump of every compile error.
 | Parity mismatches that are just divergent implementations | Unless caused by a real language constraint |
 | Generic “AI made a mistake” | Only if the language *systematically* induces that mistake (e.g. trained on old Zig stdlib) |
 
-**Litmus test:** Removing scip-cli from the story — does the entry still make sense?  
-- ✅ “Zig ReleaseFast builds dominate the edit–compile loop”  
+**Litmus test:** Removing scip-cli from the story — does the entry still make sense?
+- ✅ “Zig ReleaseFast builds dominate the edit–compile loop”
 - ❌ “Search must dedupe Prisma typeLiterals by file:line”
 
 ---
