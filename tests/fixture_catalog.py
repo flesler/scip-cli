@@ -42,3 +42,7 @@ TYPE_BASE_STREAM = "BaseStream"
 TYPE_LABEL_FUNC = "LabelFunc"
 TYPE_BUTTON_PROPS = "ButtonProps"
 TYPE_OPTS = "Opts"
+
+MUTATION_AGGREGATE_FILE = "src/models/MutationAggregate.ts"
+TYPE_ERROR_CODE = "ErrorCode"
+FIELD_ERROR_CODE = "errorCode"

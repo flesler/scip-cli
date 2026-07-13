@@ -10,11 +10,14 @@ from tests.fixture_catalog import (
     CLASS_HANDLER,
     CLASS_WIDGET,
     CONSUMER_FILE,
+    FIELD_ERROR_CODE,
     FIELD_VERBOSE,
     FN_GREET,
     HELPER_FILE,
     LIB_HANDLER_FILE,
     METHOD_RUN,
+    MUTATION_AGGREGATE_FILE,
+    TYPE_ERROR_CODE,
     TYPE_OPTIONS,
     USER_FILE,
     WIDGET_FILE,
@@ -55,6 +58,15 @@ class TestSearch:
         assert result.returncode == 0
         assert "run" in result.stdout
         assert FN_GREET in result.stdout
+
+    def test_search_dedupes_collapsed_type_literal_fields(self, cli):
+        """Many SCIP typeLiterals can share one fallback file:line — show once."""
+        result = cli.run("search", TYPE_ERROR_CODE, "--limit", "10")
+        assert result.returncode == 0
+        lines = [ln for ln in result.stdout.strip().splitlines() if ln.strip()]
+        assert len(lines) == len(set(lines)), f"duplicate search lines:\n{result.stdout}"
+        assert any(TYPE_ERROR_CODE in ln and "property" not in ln for ln in lines)
+        assert any(MUTATION_AGGREGATE_FILE in ln and FIELD_ERROR_CODE in ln for ln in lines)
 
 
 class TestSymbols:

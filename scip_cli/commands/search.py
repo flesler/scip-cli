@@ -58,18 +58,9 @@ def kind_to_display(kind):
     return kind.value if isinstance(kind, SymbolKind) else str(kind)
 
 
-def _search_rows_with_kind(db, sql, params, kind, limit):
-    """Fetch search rows matching kind, stopping once limit is exceeded."""
-    rows = []
-    scan_limit = max(limit * 10, 1000)
-    cursor = db.execute(f"{sql} LIMIT ?", (*params, scan_limit))
-    for row in cursor:
-        if infer_kind(row[1]) != kind:
-            continue
-        rows.append(row)
-        if len(rows) > limit:
-            break
-    return limit_and_warn(rows, limit, "results")
+def _search_rank_sql() -> str:
+    """Prefer real types/functions over nested typeLiteral fields; then shorter symbols."""
+    return " ORDER BY CASE WHEN gs.symbol LIKE '%#typeLiteral%' THEN 1 ELSE 0 END, length(gs.symbol)"
 
 
 def _resolve_file_path(db, symbol_str, doc_path=None):
@@ -111,10 +102,16 @@ def _qualified_pattern(pattern: str) -> bool:
     return "." in pattern and "/" not in pattern and "*" not in pattern
 
 
+def _result_key(result: tuple[str, int | str, str, str]) -> tuple[str, int | str, str]:
+    """Display identity: same file/line/name collapses SCIP duplicates."""
+    file_path, line, _kind, name = result
+    return (file_path, line, name)
+
+
 def _search_results_from_symbols(db, project_root, symbols, limit):
     """Turn resolve_symbol rows into search result tuples."""
-    symbols = limit_and_warn(symbols, limit, "results")
     results: list[tuple[str, int | str, str, str]] = []
+    seen: set[tuple[str, int | str, str]] = set()
     for symbol_id, symbol_str, _display_name in symbols:
         loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
         if loc:
@@ -125,8 +122,48 @@ def _search_results_from_symbols(db, project_root, symbols, limit):
             line = "?"
         kind = infer_kind(symbol_str)
         short = extract_leaf_name(symbol_str)
-        results.append((file_path, line, kind_to_display(kind), short))
-    return results
+        result = (file_path, line, kind_to_display(kind), short)
+        key = _result_key(result)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(result)
+        if len(results) > limit:
+            break
+    return limit_and_warn(results, limit, "results")
+
+
+def _row_to_result(db, project_root, symbol_id, symbol_str, start_line, doc_path):
+    kind = infer_kind(symbol_str)
+    loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
+    if loc:
+        file_path, resolved_start, _end = loc
+        line: int | str = resolved_start + 1
+    else:
+        file_path = _resolve_file_path(db, symbol_str, doc_path)
+        line = start_line + 1 if start_line is not None else "?"
+    symbol_name = extract_leaf_name(symbol_str)
+    return (file_path, line, kind_to_display(kind), symbol_name)
+
+
+def _collect_unique_from_rows(db, project_root, cursor, limit, kind=None):
+    """Resolve rows to display lines, skipping noisy/duplicate identities."""
+    results: list[tuple[str, int | str, str, str]] = []
+    seen: set[tuple[str, int | str, str]] = set()
+    for symbol_id, symbol_str, _display_name, start_line, doc_path in cursor:
+        if is_noisy_symbol(symbol_str):
+            continue
+        if kind is not None and infer_kind(symbol_str) != kind:
+            continue
+        result = _row_to_result(db, project_root, symbol_id, symbol_str, start_line, doc_path)
+        key = _result_key(result)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(result)
+        if len(results) > limit:
+            break
+    return limit_and_warn(results, limit, "results")
 
 
 def main(args):
@@ -179,34 +216,31 @@ def main(args):
             pattern_params.append(f"%{escaped}%")
 
         where_clause = " OR ".join(pattern_clauses)
+        rank_sql = _search_rank_sql()
+        # Prisma-style indexes can have dozens of typeLiterals per leaf; scan past them.
+        scan_limit = max(limit * 50, 1000)
 
-        if args.kind:
-            rows = _search_rows_with_kind(
-                db,
-                f"""
-                SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
-                FROM global_symbols gs
-                {join_docs}
-                WHERE ({where_clause}){path_clause}{kind_clause}
-            """,
-                (*pattern_params, *path_params),
-                args.kind,
-                limit,
-            )
-        else:
-            fetch_limit = max(limit + 1, limit * 5 + 1)
-            rows = db.execute(
-                f"""
-                SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
-                FROM global_symbols gs
-                {join_docs}
-                WHERE ({where_clause}){path_clause}
-                LIMIT ?
-            """,
-                (*pattern_params, *path_params, fetch_limit),
-            ).fetchall()
+        cursor = db.execute(
+            f"""
+            SELECT gs.id, gs.symbol, gs.display_name, der.start_line, d.relative_path
+            FROM global_symbols gs
+            {join_docs}
+            WHERE ({where_clause}){path_clause}{kind_clause}
+            {rank_sql}
+            LIMIT ?
+        """,
+            (*pattern_params, *path_params, scan_limit),
+        )
 
-        if not rows:
+        results = _collect_unique_from_rows(
+            db,
+            project_root,
+            cursor,
+            limit,
+            kind=args.kind,
+        )
+
+        if not results:
             pattern_str = " or ".join(f"'{p}'" for p in patterns)
             if args.kind:
                 print(
@@ -217,32 +251,9 @@ def main(args):
                 print(f"No symbols found matching {pattern_str}", file=sys.stderr)
             sys.exit(1)
 
-        results = []
-        for symbol_id, symbol_str, _display_name, start_line, doc_path in rows:
-            if is_noisy_symbol(symbol_str):
-                continue
-
-            kind = infer_kind(symbol_str)
-            loc = resolve_def_location(db, project_root, symbol_id, symbol_str)
-            if loc:
-                file_path, resolved_start, _end = loc
-                line: int | str = resolved_start + 1
-            else:
-                file_path = _resolve_file_path(db, symbol_str, doc_path)
-                line = start_line + 1 if start_line is not None else "?"
-            symbol_name = extract_leaf_name(symbol_str)
-            results.append((file_path, line, kind_to_display(kind), symbol_name))
-
-        if not results:
-            pattern_str = " or ".join(f"'{p}'" for p in patterns)
-            print(f"No symbols found matching {pattern_str}", file=sys.stderr)
-            sys.exit(1)
-
-        results = limit_and_warn(results, limit, "results")
-
         if prefill:
-            seen = {(r[0], r[1]) for r in prefill}
-            results = prefill + [r for r in results if (r[0], r[1]) not in seen]
+            seen = {_result_key(r) for r in prefill}
+            results = prefill + [r for r in results if _result_key(r) not in seen]
             results = results[:limit]
 
         _print_search_results(results, args)
