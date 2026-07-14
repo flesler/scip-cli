@@ -61,7 +61,7 @@ markers = [
 
 [tool.basedpyright]
 pythonVersion = "3.10"
-include = ["scip_cli"]
+include = ["scip_cli", "scripts"]
 exclude = ["tests"]
 
 # Gradual typing: basedpyright's unknown* rules fire hundreds of times on CLI/SQL glue

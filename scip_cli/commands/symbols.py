@@ -39,7 +39,6 @@ def main(args):
         db.close()
 
 
-# pyright: ignore[reportMissingTypeArgument, reportUnknownLambdaType]
 def _sort_by_frequency(symbols):
     """Sort symbols by frequency of their leaf name (most common first).
 
@@ -56,8 +55,11 @@ def _sort_by_frequency(symbols):
         name_counts[short] += 1
         symbol_data.append((symbol_id, symbol_str, display_name, start_line, end_line, short))
 
+    def sort_key(item: tuple[int, str, str, int, int, str]) -> tuple[int, str]:
+        return (-name_counts[item[5]], item[5])
+
     # Sort by frequency (descending), then by name (ascending) for ties
-    symbol_data.sort(key=lambda x: (-name_counts[x[5]], x[5]))
+    symbol_data.sort(key=sort_key)
 
     # Return original tuple format (without the extra short name)
     return [(s[0], s[1], s[2], s[3], s[4]) for s in symbol_data]

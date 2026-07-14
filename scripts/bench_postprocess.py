@@ -124,6 +124,8 @@ def run_postprocess_only(raw: Path, runs: int) -> None:
 
     times: list[float] = []
     post_db: Path | None = None
+    raw_mb: float | None = None
+    post_mb: float | None = None
     for i in range(runs):
         with tempfile.TemporaryDirectory(prefix="scip-bench-") as tmp:
             out = Path(tmp) / "post.db"
@@ -140,7 +142,7 @@ def run_postprocess_only(raw: Path, runs: int) -> None:
     avg = sum(times) / len(times)
     print(
         f"postprocess (ours)     avg={avg * 1000:7.0f}ms  "
-        f"min={min(times) * 1000:7.0f}ms  max={max(times) * 1000:7.0f}ms"
+        + f"min={min(times) * 1000:7.0f}ms  max={max(times) * 1000:7.0f}ms"
     )
     if post_db is not None:
         print(f"\nSize: raw {raw_mb:.1f} MB -> post {post_mb:.1f} MB")
