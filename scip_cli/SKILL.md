@@ -28,6 +28,7 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 - **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code`/`refs` return all matches up to `--limit`; `members` and `analyze` pick the first match with a stderr warning. Use dotted qualifiers or `--path` to narrow.
 - **Stale index** — the cache is a snapshot; run `scip-cli reindex` after substantive code changes (no automatic invalidation).
 - **Query `--path` vs `reindex --path` / `--tsconfig`** — query `--path` filters results only. `reindex --path` is a **TypeScript-only** directory prefix on discovered projects. `reindex --tsconfig 'pkg/tsconfig.*.json'` indexes those files directly (globs ok; one heap per file). Both persist scope and **replace** the cache; run full `reindex` (no `--path`/`--tsconfig`) to restore.
+- **allowJs** — when a tsconfig (after `extends`) has `allowJs: true`, matching `.js`/`.jsx` under that config's `include`/`files` are indexed too. Unset/`false` skips JS. JS-only repos with no `tsconfig.json` still use `--infer-tsconfig`.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). Repos with more than 10 tsconfig projects log per-project progress to stderr. JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use query `--path packages/api` to scope lookups.
 - **Prerequisites**: Node.js (for TypeScript/Python via `npx`), Go toolchain (for Go via `go install`), or Rust toolchain (for Rust via `rustup`). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`; `scip-go` downloads via `go install` to `~/go/bin`; `rust-analyzer` installs via `rustup component add`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
@@ -153,3 +154,11 @@ Directory detection uses the filesystem when present, otherwise an indexed path 
 **Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.
 
 **Easy pickings:** **Cycles** and **dead exports** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index, not `vulture`.
+
+### reindex
+
+```bash
+reindex [--path DIR ...] [--tsconfig FILE_OR_GLOB ...] [--with-external]
+```
+
+`--path` and `--tsconfig` cannot be combined (**TypeScript only**). `--tsconfig` takes `tsconfig*.json` files (repeatable; globs expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Scope is saved as `index-scope.json` and reused until a full `reindex` with neither flag.
