@@ -151,6 +151,16 @@ def main() -> None:
         help="Index only tsconfig projects under PATH (repeatable; persisted until full reindex)",
     )
     reindex_parser.add_argument(
+        "--tsconfig",
+        action="append",
+        metavar="GLOB",
+        help=(
+            "Index these tsconfig*.json files instead of auto-discovery "
+            "(repeatable, globs ok; persisted until full reindex). "
+            "Cannot be combined with --path."
+        ),
+    )
+    reindex_parser.add_argument(
         "--with-external",
         action="store_true",
         default=False,

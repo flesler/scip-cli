@@ -11,7 +11,7 @@ SCOPE_FILENAME = "index-scope.json"
 
 @dataclass(frozen=True)
 class IndexScope:
-    """Directory prefixes limiting which tsconfig projects are indexed."""
+    """Directory prefixes or explicit tsconfig*.json paths limiting the index."""
 
     paths: tuple[str, ...]
 

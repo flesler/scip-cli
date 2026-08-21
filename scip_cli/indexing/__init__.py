@@ -9,7 +9,7 @@ from .constants import (
     MAX_TS_INDEX_BATCH_SIZE,
 )
 from .core import format_db_size, get_db, index_project, indexer_env, log_index_complete
-from .orchestrate import ts_index_batch_size
+from .orchestrate import effective_ts_batch_size, ts_index_batch_size
 from .runners import run_indexer_with_fallback
 from .typescript import typescript_projects
 
@@ -24,6 +24,7 @@ __all__ = [
     "log_index_complete",
     "merge_sqlite_indexes",
     "run_indexer_with_fallback",
+    "effective_ts_batch_size",
     "ts_index_batch_size",
     "typescript_projects",
 ]

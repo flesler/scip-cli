@@ -7,6 +7,7 @@ import pytest
 from scip_cli.indexing import (
     DEFAULT_TS_INDEX_BATCH_SIZE,
     MAX_TS_INDEX_BATCH_SIZE,
+    effective_ts_batch_size,
     ts_index_batch_size,
 )
 from scip_cli.indexing.orchestrate import batch_projects, project_batch_label
@@ -46,6 +47,21 @@ class TestTsIndexBatching:
         monkeypatch.setenv("SCIP_CLI_TS_INDEX_BATCH_SIZE", str(MAX_TS_INDEX_BATCH_SIZE + 1))
         with pytest.raises(RuntimeError, match="exceeds max"):
             ts_index_batch_size()
+
+    def test_explicit_tsconfig_files_default_to_batch_one(self, monkeypatch):
+        monkeypatch.delenv("SCIP_CLI_TS_INDEX_BATCH_SIZE", raising=False)
+        projects = [
+            Path("pkg/tsconfig.app.json"),
+            Path("pkg/tsconfig.spec.json"),
+        ]
+        assert effective_ts_batch_size(projects) == 1
+        batches = batch_projects(projects, effective_ts_batch_size(projects))
+        assert len(batches) == 2
+
+    def test_directory_projects_keep_unlimited_default(self, monkeypatch):
+        monkeypatch.delenv("SCIP_CLI_TS_INDEX_BATCH_SIZE", raising=False)
+        projects = [Path("packages/api"), Path("packages/web")]
+        assert effective_ts_batch_size(projects) is None
 
 
 class TestMergeBatchSize:

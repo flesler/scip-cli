@@ -11,6 +11,7 @@ from pathlib import Path
 
 from ..cache import index_db_path
 from ..merge import merge_sqlite_indexes
+from ..tsconfig import is_tsconfig_project_path
 from .constants import (
     DEFAULT_TS_INDEX_BATCH_SIZE,
     MAX_TS_INDEX_BATCH_SIZE,
@@ -27,6 +28,21 @@ def index_workers():
         except ValueError:
             raise RuntimeError(f"Invalid SCIP_CLI_INDEX_WORKERS: expected an integer, got {env_val!r}") from None
     return min(8, os.cpu_count() or 4)
+
+
+def effective_ts_batch_size(projects: list[Path]) -> int | None:
+    """Batch size for this project list.
+
+    Explicit tsconfig files default to 1 (one scip-typescript process per file,
+    each with its own heap) unless SCIP_CLI_TS_INDEX_BATCH_SIZE is set.
+    Directory projects keep the historical default (all in one run).
+    """
+    env_size = ts_index_batch_size()
+    if env_size is not None:
+        return env_size
+    if projects and all(is_tsconfig_project_path(project) for project in projects):
+        return 1
+    return None
 
 
 def ts_index_batch_size() -> int | None:

@@ -13,6 +13,7 @@ from ..indexing import index_project, log_index_complete
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
 from ..scope import save_index_scope
+from ..tsconfig import expand_tsconfig_patterns
 
 
 def main(args):
@@ -22,11 +23,32 @@ def main(args):
         sys.exit(1)
 
     path_args = getattr(args, "path", None) or []
-    if path_args and lang != Language.TYPESCRIPT:
-        print("Error: reindex --path is only supported for TypeScript projects", file=sys.stderr)
+    tsconfig_args = getattr(args, "tsconfig", None) or []
+    if path_args and tsconfig_args:
+        print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
+        sys.exit(1)
+    if (path_args or tsconfig_args) and lang != Language.TYPESCRIPT:
+        flag = "--tsconfig" if tsconfig_args else "--path"
+        print(f"Error: reindex {flag} is only supported for TypeScript projects", file=sys.stderr)
         sys.exit(1)
 
-    if path_args:
+    if tsconfig_args:
+        try:
+            tsconfig_paths = expand_tsconfig_patterns(tsconfig_args, root)
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        scope_paths = [path.as_posix() for path in tsconfig_paths]
+        save_index_scope(root, scope_paths)
+        print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
+        print(
+            (
+                "Warning: scoped reindex replaces the cache with only these tsconfig files; "
+                "run reindex with no --path/--tsconfig to restore the full index"
+            ),
+            file=sys.stderr,
+        )
+    elif path_args:
         scope_paths: list[str] = []
         for path in path_args:
             normalized = normalize_path_scope(path, root)
@@ -39,7 +61,7 @@ def main(args):
         print(
             (
                 "Warning: scoped reindex replaces the cache with only these projects; "
-                "run reindex with no --path to restore the full index"
+                "run reindex with no --path/--tsconfig to restore the full index"
             ),
             file=sys.stderr,
         )

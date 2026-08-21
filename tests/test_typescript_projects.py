@@ -52,3 +52,13 @@ class TestTypescriptProjects:
         )
         with pytest.raises(RuntimeError, match="onlyIndexRoots"):
             _typescript_projects(tmp_path)
+
+    def test_tsconfig_file_scope_skips_discovery(self, tmp_path):
+        from scip_cli.scope import save_index_scope
+
+        _write(tmp_path / "package.json", "{}")
+        _write(tmp_path / "pkg" / "tsconfig.json", '{"include": ["**/*.ts"]}')
+        _write(tmp_path / "pkg" / "tsconfig.app.json", '{"include": ["src/**/*.ts"]}')
+        save_index_scope(tmp_path, ["pkg/tsconfig.app.json"])
+
+        assert _typescript_projects(tmp_path) == [Path("pkg/tsconfig.app.json")]

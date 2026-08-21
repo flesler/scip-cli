@@ -11,23 +11,23 @@ All commands are sub-commands of `scip-cli`. Run from the project root.
 
 ## Quick Decision Guide
 
-|Question|Use|What you get|
-|---|---|---|
-|"Where is X defined and what does it do?"|`code X`|Definition snippet (capped at 80 lines by default). Use `members Class` for large classes|
-|"Where is X used/called?"|`refs X`|Up to `--limit` file:line refs (default 10). Use `--limit` to raise cap|
-|"What's in this file?"|`symbols file`|Up to `--limit` symbols (default 10). Bare filename works (`helper.ts`)|
-|"Find symbols by name"|`search name`|Functions, types, interfaces, classes|
-|"What files depend on this file?"|`rdeps file`|Importers — bare name works|
-|"What does this symbol/file depend on?"|`deps target`|Outbound dependencies — symbols referenced within a function or file|
-|"What methods does this class have?"|`members ClassName`|All methods/fields with line ranges|
-|"Health / risk / stale code?"|`analyze`|Multi-section SQL dashboard — omit target (project), pass file, or symbol|
+| Question                                  | Use                 | What you get                                                                              |
+| ----------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| "Where is X defined and what does it do?" | `code X`            | Definition snippet (capped at 80 lines by default). Use `members Class` for large classes |
+| "Where is X used/called?"                 | `refs X`            | Up to `--limit` file:line refs (default 10). Use `--limit` to raise cap                   |
+| "What's in this file?"                    | `symbols file`      | Up to `--limit` symbols (default 10). Bare filename works (`helper.ts`)                   |
+| "Find symbols by name"                    | `search name`       | Functions, types, interfaces, classes                                                     |
+| "What files depend on this file?"         | `rdeps file`        | Importers — bare name works                                                               |
+| "What does this symbol/file depend on?"   | `deps target`       | Outbound dependencies — symbols referenced within a function or file                      |
+| "What methods does this class have?"      | `members ClassName` | All methods/fields with line ranges                                                       |
+| "Health / risk / stale code?"             | `analyze`           | Multi-section SQL dashboard — omit target (project), pass file, or symbol                 |
 
 ## Gotchas
 
 - **Bare names** resolve functions, types (aliases + interfaces), and classes. Use dotted qualifiers to disambiguate members: `code Widget.run`, `refs Foo.setBar`, `search MyClass.myMethod`, `members pkg.MyClass`. Type/object fields use the same form: `search Options.verbose`, `code Options.verbose`. Consts/let/var are not kept in the index (too many rows, single-line defs) — use `rg` or read the file. Class methods need `members ClassName`, not bare `code methodName`.
 - **Ambiguous types** (e.g. `Opts` in multiple hooks) — `code`/`refs` return all matches up to `--limit`; `members` and `analyze` pick the first match with a stderr warning. Use dotted qualifiers or `--path` to narrow.
 - **Stale index** — the cache is a snapshot; run `scip-cli reindex` after substantive code changes (no automatic invalidation).
-- **Query `--path` vs `reindex --path`** — query `--path` filters results only. `reindex --path` is **TypeScript-only**: persists scope and **replaces** the cached index with only those tsconfig projects; run full `reindex` (no `--path`) to restore.
+- **Query `--path` vs `reindex --path` / `--tsconfig`** — query `--path` filters results only. `reindex --path` is a **TypeScript-only** directory prefix on discovered projects. `reindex --tsconfig 'pkg/tsconfig.*.json'` indexes those files directly (globs ok; one heap per file). Both persist scope and **replace** the cache; run full `reindex` (no `--path`/`--tsconfig`) to restore.
 - **First run** in a project may auto-index (one-time wait; large monorepos with many `tsconfig.json` files take longer). Projects index in parallel by default (`SCIP_CLI_INDEX_WORKERS`; merge is serial). Repos with more than 10 tsconfig projects log per-project progress to stderr. JS-only projects (no `tsconfig.json`) are supported automatically.
 - **Monorepos** are indexed by walking for `tsconfig*.json` under the repo (skips `node_modules`, `.git`, etc.). Nested parent/child projects are deduped. Add extra roots or limit indexing with `.scip-cli.json` (see README). Use query `--path packages/api` to scope lookups.
 - **Prerequisites**: Node.js (for TypeScript/Python via `npx`), Go toolchain (for Go via `go install`), or Rust toolchain (for Rust via `rustup`). The `scip` converter auto-downloads on first use if missing; `scip-typescript` / `scip-python` download via `npx`; `scip-go` downloads via `go install` to `~/go/bin`; `rust-analyzer` installs via `rustup component add`. Optional `.scip-cli.json` for extra index roots or heap tuning. `brew install scip` installs an unrelated optimization solver — scip-cli ignores it and downloads the real binary.
@@ -60,18 +60,18 @@ Default `--limit` is 10 **reference lines** per symbol query (not mention chunks
 
 Commands emit one record per line on stdout; warnings and progress go to stderr. Use `--paths-only` / `--names-only` when piping into another `scip-cli` command.
 
-|Goal|Pipeline|
-|---|---|
-|Blast radius of a file|`scip-cli rdeps file.ts \|xargs -I{} scip-cli symbols {}`|
-|Pre-change / health briefing|`scip-cli analyze` or `scip-cli analyze path/to/file.ts` or `scip-cli analyze SymbolName`|
-|Files that import a symbol|`scip-cli refs Foo --paths-only`|
-|Symbols in referencing files|`scip-cli refs Foo --paths-only \|xargs -I{} scip-cli symbols {}` (barrel files may have no symbols; prefer `search Foo --paths-only` for definition files)|
-|Find classes, list members|`scip-cli search Handler --kind class --names-only \|xargs -I{} scip-cli members {}`|
-|Members → definitions|`scip-cli members Widget --names-only \|xargs -I{} scip-cli code Widget.{}`|
-|Find functions, show callers|`scip-cli search Publish --kind function --names-only \|xargs -I{} scip-cli refs {} --paths-only`|
-|Files touching a topic|`scip-cli search Dynamo --paths-only`|
-|Count importers|`scip-cli rdeps file.ts \|wc -l`|
-|Outbound dependency files|`scip-cli deps file.ts --paths-only`|
+| Goal                         | Pipeline                                                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blast radius of a file       | `scip-cli rdeps file.ts \|xargs -I{} scip-cli symbols {}`                                                                                                   |
+| Pre-change / health briefing | `scip-cli analyze` or `scip-cli analyze path/to/file.ts` or `scip-cli analyze SymbolName`                                                                   |
+| Files that import a symbol   | `scip-cli refs Foo --paths-only`                                                                                                                            |
+| Symbols in referencing files | `scip-cli refs Foo --paths-only \|xargs -I{} scip-cli symbols {}` (barrel files may have no symbols; prefer `search Foo --paths-only` for definition files) |
+| Find classes, list members   | `scip-cli search Handler --kind class --names-only \|xargs -I{} scip-cli members {}`                                                                        |
+| Members → definitions        | `scip-cli members Widget --names-only \|xargs -I{} scip-cli code Widget.{}`                                                                                 |
+| Find functions, show callers | `scip-cli search Publish --kind function --names-only \|xargs -I{} scip-cli refs {} --paths-only`                                                           |
+| Files touching a topic       | `scip-cli search Dynamo --paths-only`                                                                                                                       |
+| Count importers              | `scip-cli rdeps file.ts \|wc -l`                                                                                                                            |
+| Outbound dependency files    | `scip-cli deps file.ts --paths-only`                                                                                                                        |
 
 `rdeps` already prints bare paths. `deps --paths-only` deduplicates to unique files. `refs` defaults to `path:line`; add `--paths-only` to dedupe files. `search` / `members` need `--names-only` or `--paths-only` instead of `awk`.
 
@@ -135,12 +135,12 @@ Returns `startLine:endLine kind name` for each member. Members are found via SCI
 analyze [--limit N] [--path PATH] [--include-tests] [target]
 ```
 
-|Target|Output|
-|---|---|
-|*(omit)*|Project-wide dashboards only|
-|**directory** (`scip_cli`, `src/pkg/`)|Scoped project dashboards + per-file sections for each indexed file under the dir|
-|**file**|Scoped project dashboards for that file + per-file sections + top symbols by external consumers|
-|**symbol**|Symbol pressure, consumers, dependencies, affected|
+| Target                                 | Output                                                                                          |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| _(omit)_                               | Project-wide dashboards only                                                                    |
+| **directory** (`scip_cli`, `src/pkg/`) | Scoped project dashboards + per-file sections for each indexed file under the dir               |
+| **file**                               | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
+| **symbol**                             | Symbol pressure, consumers, dependencies, affected                                              |
 
 Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced, dead exports, stale types; `[medium]` same-file-only, change surface (file); `[low]` test-only consumers (noisy on Python), coupling, bottlenecks, hotspots.
 
@@ -152,4 +152,4 @@ Directory detection uses the filesystem when present, otherwise an indexed path 
 
 **Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.
 
-**Easy pickings:** **Cycles** and **dead exports** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from *other* files in the index, not `vulture`.
+**Easy pickings:** **Cycles** and **dead exports** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index, not `vulture`.

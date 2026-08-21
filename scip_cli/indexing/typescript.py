@@ -11,15 +11,16 @@ from ..cache import index_db_path
 from ..config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from ..discover import discover_typescript_projects
 from ..scope import load_index_scope, projects_matching_scope
+from ..tsconfig import scope_tsconfig_paths
 from .constants import PROGRESS_LOG_MIN_PROJECTS
 from .convert import convert_scip_to_db
 from .orchestrate import (
     batch_projects,
+    effective_ts_batch_size,
     finalize_part_dbs,
     index_workers,
     project_batch_label,
     ts_batch_limit_display,
-    ts_index_batch_size,
 )
 from .runners import run_indexer_with_fallback
 
@@ -30,6 +31,9 @@ def typescript_projects(root: Path) -> list[Path]:
     scope = load_index_scope(root)
 
     if scope is not None:
+        tsconfig_files = scope_tsconfig_paths(scope.paths)
+        if tsconfig_files is not None:
+            return tsconfig_files
         discovered = list(discover_typescript_projects(root))
         filtered = projects_matching_scope(discovered, scope.paths)
         if not filtered:
@@ -91,7 +95,8 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False):
     cache_dir = Path(cache_dir)
     output_db = index_db_path(cache_dir, replace=replace)
     workers = index_workers()
-    batches = batch_projects(projects, ts_index_batch_size())
+    batch_size = effective_ts_batch_size(projects)
+    batches = batch_projects(projects, batch_size)
     use_parallel = len(batches) > 1 and workers > 1
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -102,7 +107,6 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False):
         show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
         if show_progress and use_parallel:
-            batch_size = ts_index_batch_size()
             batch_desc = ts_batch_limit_display(batch_size, total)
             print(
                 f"Indexing {total} TypeScript projects ({workers} workers, {batch_desc}; merge is serial)...",
