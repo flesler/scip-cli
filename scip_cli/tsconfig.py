@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .discover import _SKIP_DIR_NAMES
+from .discover import _SKIP_DIR_NAMES, _read_json
 
 _GLOB_CHARS = frozenset("*?[")
 
@@ -91,3 +91,136 @@ def expand_tsconfig_patterns(patterns: list[str], project_root: Path) -> list[Pa
                 found.append(relative)
 
     return sorted(found, key=str)
+
+
+def _extends_files(data: dict[str, object], current: Path) -> list[Path]:
+    raw = data.get("extends")
+    if isinstance(raw, str):
+        items = [raw]
+    elif isinstance(raw, list):
+        items = [item for item in raw if isinstance(item, str)]
+    else:
+        return []
+    found: list[Path] = []
+    for item in items:
+        if not item.startswith(".") and not item.startswith("/"):
+            continue
+        candidate = (current.parent / item).resolve()
+        if candidate.is_file():
+            found.append(candidate)
+        elif candidate.with_suffix(".json").is_file():
+            found.append(candidate.with_suffix(".json"))
+    return found
+
+
+def walk_tsconfig_chain(path: Path) -> list[tuple[Path, dict[str, object]]]:
+    """Leaf-first chain of parsed tsconfig files following `extends`."""
+    chain: list[tuple[Path, dict[str, object]]] = []
+    seen: set[Path] = set()
+    current = path.resolve()
+    while current.is_file() and current not in seen:
+        seen.add(current)
+        data = _read_json(current)
+        if not data:
+            break
+        chain.append((current, data))
+        extended = _extends_files(data, current)
+        if not extended:
+            break
+        current = extended[0]
+    return chain
+
+
+def resolved_allow_js(path: Path) -> bool:
+    """compilerOptions.allowJs after `extends` (child wins). Default false."""
+    for _file, data in walk_tsconfig_chain(path):
+        options = data.get("compilerOptions")
+        if isinstance(options, dict) and "allowJs" in options:
+            return bool(options["allowJs"])
+    return False
+
+
+def resolved_include_or_files(path: Path) -> tuple[list[str] | None, list[str] | None]:
+    """First `include` or `files` found walking leaf → base. The other is None."""
+    for _file, data in walk_tsconfig_chain(path):
+        include = data.get("include")
+        if isinstance(include, list) and all(isinstance(item, str) for item in include):
+            return include, None
+        files = data.get("files")
+        if isinstance(files, list) and all(isinstance(item, str) for item in files):
+            return None, files
+    return None, None
+
+
+def ts_pattern_to_js(pattern: str) -> str | None:
+    """Map a .ts/.tsx glob or path to .js/.jsx. Leaves .d.ts and extensionless globs alone."""
+    if pattern.endswith(".d.ts"):
+        return None
+    if pattern.endswith(".tsx"):
+        return pattern[: -len(".tsx")] + ".jsx"
+    if pattern.endswith(".ts"):
+        return pattern[: -len(".ts")] + ".js"
+    return None
+
+
+def extra_js_patterns(patterns: list[str]) -> list[str]:
+    """JS/JSX counterparts not already listed."""
+    existing = set(patterns)
+    extra: list[str] = []
+    for pattern in patterns:
+        mapped = ts_pattern_to_js(pattern)
+        if mapped and mapped not in existing and mapped not in extra:
+            extra.append(mapped)
+    return extra
+
+
+def absolutize_patterns(patterns: list[str], base_dir: Path) -> list[str]:
+    """Make include/files patterns absolute so a temp tsconfig in another dir still matches."""
+    out: list[str] = []
+    for pattern in patterns:
+        candidate = Path(pattern)
+        if candidate.is_absolute():
+            out.append(pattern)
+        else:
+            out.append((base_dir / pattern).as_posix())
+    return out
+
+
+def allow_js_overlay(tsconfig_path: Path) -> dict[str, object] | None:
+    """Temp tsconfig body that adds JS includes when allowJs is true.
+
+    Returns None when JS is already covered or allowJs is false. `include`/`files`
+    are absolute so the overlay can live outside the project directory.
+    """
+    path = tsconfig_path.resolve()
+    if not path.is_file() or not resolved_allow_js(path):
+        return None
+    include, files = resolved_include_or_files(path)
+    base_dir = path.parent
+    if include is not None:
+        extra = extra_js_patterns(include)
+        if not extra:
+            return None
+        return {
+            "extends": path.as_posix(),
+            "include": absolutize_patterns([*include, *extra], base_dir),
+        }
+    if files is not None:
+        extra = extra_js_patterns(files)
+        if not extra:
+            return None
+        return {
+            "extends": path.as_posix(),
+            "files": absolutize_patterns([*files, *extra], base_dir),
+        }
+    return None
+
+
+def tsconfig_for_project(root: Path, project: Path) -> Path | None:
+    """Absolute tsconfig file for a discovered directory or an explicit tsconfig path."""
+    root = Path(root).resolve()
+    candidate = project if project.is_absolute() else root / project
+    if is_tsconfig_project_path(candidate):
+        return candidate.resolve() if candidate.is_file() else None
+    tsconfig = candidate / "tsconfig.json"
+    return tsconfig.resolve() if tsconfig.is_file() else None

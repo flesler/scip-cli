@@ -1,5 +1,6 @@
 """Tests for --tsconfig path expansion."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -71,3 +72,66 @@ class TestScopeTsconfigPaths:
     def test_mixed_rejected(self):
         with pytest.raises(RuntimeError, match="mixes"):
             scope_tsconfig_paths(("packages/api", "pkg/tsconfig.app.json"))
+
+
+class TestAllowJsOverlay:
+    def test_extends_allow_js_adds_js_include(self, tmp_path):
+        from scip_cli.tsconfig import allow_js_overlay, resolved_allow_js
+
+        _write(
+            tmp_path / "tsconfig.base.json",
+            json.dumps({"compilerOptions": {"allowJs": True}}),
+        )
+        child = tmp_path / "pkg" / "tsconfig.app.json"
+        _write(
+            child,
+            json.dumps(
+                {
+                    "extends": "../tsconfig.base.json",
+                    "include": ["src/**/*.ts", "src/**/*.tsx"],
+                }
+            ),
+        )
+        assert resolved_allow_js(child) is True
+        overlay = allow_js_overlay(child)
+        assert overlay is not None
+        include = overlay["include"]
+        assert any(item.endswith("src/**/*.js") for item in include)
+        assert any(item.endswith("src/**/*.jsx") for item in include)
+        assert overlay["extends"] == child.resolve().as_posix()
+
+    def test_allow_js_false_skips_overlay(self, tmp_path):
+        from scip_cli.tsconfig import allow_js_overlay
+
+        child = tmp_path / "tsconfig.app.json"
+        _write(
+            child,
+            json.dumps(
+                {
+                    "compilerOptions": {"allowJs": False},
+                    "include": ["src/**/*.ts"],
+                }
+            ),
+        )
+        assert allow_js_overlay(child) is None
+
+    def test_js_already_in_include_skips_overlay(self, tmp_path):
+        from scip_cli.tsconfig import allow_js_overlay
+
+        child = tmp_path / "tsconfig.app.json"
+        _write(
+            child,
+            json.dumps(
+                {
+                    "compilerOptions": {"allowJs": True},
+                    "include": ["src/**/*.ts", "src/**/*.js"],
+                }
+            ),
+        )
+        overlay = allow_js_overlay(child)
+        assert overlay is None
+
+    def test_d_ts_not_mapped_to_js(self, tmp_path):
+        from scip_cli.tsconfig import extra_js_patterns
+
+        assert extra_js_patterns(["src/index.d.ts", "src/**/*.ts"]) == ["src/**/*.js"]

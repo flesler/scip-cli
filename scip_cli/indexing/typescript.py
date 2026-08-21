@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,7 +12,7 @@ from ..cache import index_db_path
 from ..config import CONFIG_FILENAME, load_project_config, resolve_index_roots
 from ..discover import discover_typescript_projects
 from ..scope import load_index_scope, projects_matching_scope
-from ..tsconfig import scope_tsconfig_paths
+from ..tsconfig import allow_js_overlay, scope_tsconfig_paths, tsconfig_for_project
 from .constants import PROGRESS_LOG_MIN_PROJECTS
 from .convert import convert_scip_to_db
 from .orchestrate import (
@@ -64,6 +65,32 @@ def _typescript_index_args(root, output_scip, projects):
     return args
 
 
+def _overlay_filename(project: Path, index: int) -> str:
+    stem = project.as_posix().replace("/", "__").replace("\\", "__")
+    return f"allowjs-{index}-{stem}.json"
+
+
+def materialize_allow_js_projects(root: Path, projects: list[Path], work_dir: Path) -> list[Path]:
+    """Rewrite projects to temp tsconfigs that include JS when allowJs is set."""
+    root = Path(root).resolve()
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    materialized: list[Path] = []
+    for index, project in enumerate(projects):
+        tsconfig = tsconfig_for_project(root, project)
+        if tsconfig is None:
+            materialized.append(project)
+            continue
+        overlay = allow_js_overlay(tsconfig)
+        if overlay is None:
+            materialized.append(project)
+            continue
+        dest = work_dir / _overlay_filename(project, index)
+        dest.write_text(json.dumps(overlay, indent=2) + "\n", encoding="utf-8")
+        materialized.append(dest)
+    return materialized
+
+
 def index_ts_projects(root, projects, work_dir, env, *, output_db: Path | None = None):
     """Index one or more TypeScript projects into work_dir/index.db (or output_db when set)."""
     root = Path(root)
@@ -72,7 +99,8 @@ def index_ts_projects(root, projects, work_dir, env, *, output_db: Path | None =
     label = project_batch_label(projects)
     part_scip = work_dir / "index.scip"
     db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
-    index_args = _typescript_index_args(root, part_scip, projects)
+    index_projects = materialize_allow_js_projects(root, projects, work_dir)
+    index_args = _typescript_index_args(root, part_scip, index_projects)
     result = run_indexer_with_fallback(
         "scip-typescript",
         index_args,

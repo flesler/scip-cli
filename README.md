@@ -246,6 +246,7 @@ scip-cli reindex --tsconfig tsconfig.app.json --tsconfig tsconfig.spec.json
 
 `--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only.** The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`/`--tsconfig`.
 
+When a tsconfig (after `extends`) has `allowJs: true`, matching `.js`/`.jsx` files under that config's `include`/`files` are indexed too (same roots as `.ts`/`.tsx`). `allowJs: false` or unset leaves JavaScript out. JS-only repos with no `tsconfig.json` still use `--infer-tsconfig`.
 
 Run `scip-cli reindex` after changing scope, `.scip-cli.json` index settings, or when you want a fresh index.
 
