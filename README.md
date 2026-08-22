@@ -260,13 +260,14 @@ Use `analyze` on the repo itself before broad refactors or agent review — it s
 scip-cli analyze --limit 25
 scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 scip-cli analyze --check cycles --limit 25    # one named section
+scip-cli analyze --check dead_files --limit 25
 ```
 
 Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 
 | Tier       | Project sections                                     | Action                                                               |
 | ---------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
-| **high**   | Cycles, unreferenced, dead exports, stale types      | Nuke or fix cycles; delete unused; `_` prefix                        |
+| **high**   | Cycles, unreferenced, dead exports, dead files, stale types | Nuke or fix cycles; delete unused; `_` prefix                  |
 | **medium** | Same-file only, change surface (file target)         | Module-private by usage                                              |
 | **low**    | Test-only consumers, coupling, bottlenecks, hotspots | Noisy on Python (index omits many same-file calls); verify with `rg` |
 

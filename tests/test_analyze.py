@@ -114,10 +114,10 @@ class TestProjectAnalyze:
         assert total_rows <= 3
         assert len(sections) < 9
 
-    def test_run_all_returns_nine_sections(self):
+    def test_run_all_returns_ten_sections(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500)
-        assert len(sections) == 9
+        assert len(sections) == 10
         titles = [title for title, _lines, _preface in sections]
         assert sum(1 for t in titles if "[low]" in t) == 4
         assert sum(1 for t in titles if "[medium]" in t) == 1
@@ -142,7 +142,7 @@ class TestProjectAnalyze:
 
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500, priorities={Priority.HIGH})
-        assert len(sections) == 4
+        assert len(sections) == 5
         titles = [title for title, _lines, _preface in sections]
         assert all("[high]" in title for title in titles)
 
@@ -164,6 +164,31 @@ class TestProjectAnalyze:
         )
         assert len(sections) == 1
         assert "Cycles" in sections[0][0]
+
+    def test_dead_files_empty_rdeps(self):
+        b = AnalyzeDbBuilder()
+        used = b.define("src/used.ts", "usedFn")
+        b.reference("src/entry.ts", used)
+        b.define("src/orphan.ts", "orphanFn")
+        b.define("tests/orphan.spec.ts", "testHelper")
+        db = b.finish()
+        lines = project_checks.dead_files(db, limit=20)
+        assert "src/orphan.ts" in lines
+        assert "src/entry.ts" in lines
+        assert "src/used.ts" not in lines
+        assert not any("orphan.spec.ts" in line for line in lines)
+        with_tests = project_checks.dead_files(db, limit=20, include_tests=True)
+        assert any("orphan.spec.ts" in line for line in with_tests)
+
+    def test_dead_files_preface_when_hits(self):
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=20, check_keys={"dead_files"})
+        assert len(sections) == 1
+        _title, lines, preface = sections[0]
+        assert "Dead files" in _title
+        if lines != ["(none)"]:
+            assert preface is not None
+            assert "rdeps" in preface
 
 
 class TestFileAnalyze:

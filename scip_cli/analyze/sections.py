@@ -58,6 +58,7 @@ CHECK_KEYS = frozenset(
         "coupling",
         "cycles",
         "dead_exports",
+        "dead_files",
         "dead_in_file",
         "def_context",
         "dependencies",
@@ -113,6 +114,7 @@ FALSE_POSITIVE_PREFACES: dict[str, str] = {
         "SCIP may miss dynamic loading (loadFiles, GraphQL) and default-export object members "
         "— verify with rdeps/rg before deleting."
     ),
+    "dead_files": "No inbound refs in the index (empty rdeps) — confirm before deleting.",
     "unreferenced": (
         "No mentions in the index — symbols may still run via dynamic import or side-effect registration."
     ),

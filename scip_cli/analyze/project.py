@@ -13,6 +13,7 @@ from .common import (
     cycle_path_noise,
     fetch_all,
     file_pair_noise,
+    is_generated_analyze_path,
     is_test_path,
     short_name,
     stale_type_noise,
@@ -379,6 +380,44 @@ def dead_exports(
     return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
 
 
+def dead_files(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    """Files with no inbound mentions from other documents (empty rdeps)."""
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="d")
+    rows = fetch_all(
+        db,
+        f"""
+        SELECT d.relative_path
+        FROM documents d
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM defn_enclosing_ranges der
+            JOIN mentions m ON m.symbol_id = der.symbol_id AND m.role != 1
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE der.document_id = d.id AND c.document_id != d.id
+        ){scope_clause}
+        ORDER BY d.relative_path
+        LIMIT ?
+        """,
+        (*scope_params, limit * 5),
+    )
+    lines: list[str] = []
+    for (path,) in rows:
+        if not include_tests and is_test_path(path):
+            continue
+        if is_generated_analyze_path(path):
+            continue
+        lines.append(path)
+        if len(lines) >= limit:
+            break
+    return lines
+
+
 def top_coupling(
     db,
     limit: int = DEFAULT_LIMIT,
@@ -433,6 +472,7 @@ def run_all(
             f"Dead exports (no in-file or external use){suffix}",
             dead_exports,
         ),
+        Check("dead_files", Priority.HIGH, f"Dead files (no importers){suffix}", dead_files),
         Check("stale_types", Priority.HIGH, f"Stale types (no external consumers){suffix}", stale_types),
         Check("same_file_only", Priority.MEDIUM, f"Same-file only (in-file use, not exported){suffix}", same_file_only),
         Check(

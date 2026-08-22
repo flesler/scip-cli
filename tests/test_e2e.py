@@ -279,6 +279,11 @@ class TestAnalyze:
         assert "Hotspots" not in result.stdout
         assert "Dead exports" not in result.stdout
 
+    def test_check_dead_files(self, cli):
+        result = cli.run("analyze", "--check", "dead_files", "--limit", "5")
+        assert result.returncode == 0
+        assert "Dead files" in result.stdout
+
     def test_check_unknown_exits(self, cli):
         result = cli.run("analyze", "--check", "not_a_check")
         assert result.returncode == 1

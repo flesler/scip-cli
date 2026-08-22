@@ -143,7 +143,7 @@ analyze [--limit N] [--path PATH] [--include-tests] [--priority LEVEL] [--check 
 | **file**                               | Scoped project dashboards for that file + per-file sections + top symbols by external consumers |
 | **symbol**                             | Symbol pressure, consumers, dependencies, affected                                              |
 
-Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced, dead exports, stale types; `[medium]` same-file-only, change surface (file); `[low]` test-only consumers (noisy on Python), coupling, bottlenecks, hotspots.
+Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced, dead exports, dead files, stale types; `[medium]` same-file-only, change surface (file); `[low]` test-only consumers (noisy on Python), coupling, bottlenecks, hotspots.
 
 `--limit` caps **result rows across the whole run** (default 20); remaining checks are skipped once the cap is reached. `(none)` sections and section headers do not count.
 
@@ -155,7 +155,7 @@ Directory detection uses the filesystem when present, otherwise an indexed path 
 
 **Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.
 
-**Easy pickings:** **Cycles** and **dead exports** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index, not `vulture`.
+**Easy pickings:** **Cycles**, **dead exports**, and **dead files** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index (empty `rdeps` for files), not `vulture`.
 
 ### reindex
 
