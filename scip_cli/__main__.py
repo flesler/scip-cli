@@ -141,6 +141,12 @@ def main() -> None:
         metavar="LEVEL",
         help="Comma-separated check tiers: high, medium, low (or 1/2/3). Default: all. E.g. high or high,medium",
     )
+    analyze_parser.add_argument(
+        "--check",
+        action="append",
+        metavar="NAME",
+        help="Run only these checks (repeatable or comma-separated). ANDs with --priority",
+    )
 
     # reindex
     reindex_parser = subparsers.add_parser("reindex", help="Force re-indexing of the current project")

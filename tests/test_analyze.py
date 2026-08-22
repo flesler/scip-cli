@@ -146,6 +146,25 @@ class TestProjectAnalyze:
         titles = [title for title, _lines, _preface in sections]
         assert all("[high]" in title for title in titles)
 
+    def test_run_all_check_keys_only(self):
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=500, check_keys={"cycles"})
+        assert len(sections) == 1
+        assert "Cycles" in sections[0][0]
+
+    def test_run_all_check_and_priority_and(self):
+        from scip_cli.analyze.sections import Priority
+
+        db = mini_codebase_db()
+        sections = project_checks.run_all(
+            db,
+            limit=500,
+            priorities={Priority.HIGH},
+            check_keys={"cycles", "hotspots"},
+        )
+        assert len(sections) == 1
+        assert "Cycles" in sections[0][0]
+
 
 class TestFileAnalyze:
     def test_change_surface_lists_exports(self):
@@ -253,6 +272,19 @@ class TestAnalyzeSections:
         assert parse_priorities(None) is None
         assert parse_priorities("high") == {Priority.HIGH}
         assert parse_priorities("1,medium") == {Priority.HIGH, Priority.MEDIUM}
+
+    def test_parse_checks(self):
+        import pytest
+
+        from scip_cli.analyze.sections import parse_checks
+
+        assert parse_checks(None) is None
+        assert parse_checks([]) is None
+        assert parse_checks(["cycles"]) == {"cycles"}
+        assert parse_checks(["cycles,hotspots"]) == {"cycles", "hotspots"}
+        assert parse_checks(["cycles", "hotspots"]) == {"cycles", "hotspots"}
+        with pytest.raises(RuntimeError, match="unknown analyze check"):
+            parse_checks(["not_a_check"])
 
 
 class TestAnalyzeCommand:

@@ -132,7 +132,7 @@ scip-cli <command> [arguments]
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `deps <symbol|file>` - Find outbound dependencies (what a symbol or file calls) (`--path`, `--paths-only`)
 - `members <symbol>` - List members of a class/interface (`--path`)
-- `analyze [target]` - SQL health dashboards (`--limit`, `--priority`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
+- `analyze [target]` - SQL health dashboards (`--limit`, `--priority`, `--check`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
 - `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
 - `skill [path]` - Install or dump the SKILL.md
 
@@ -259,6 +259,7 @@ Use `analyze` on the repo itself before broad refactors or agent review — it s
 ```bash
 scip-cli analyze --limit 25
 scip-cli analyze --priority high --limit 25   # dead exports & cycles only
+scip-cli analyze --check cycles --limit 25    # one named section
 ```
 
 Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.

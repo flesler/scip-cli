@@ -169,6 +169,7 @@ def run_all(
     limit: int = DEFAULT_LIMIT,
     priorities=None,
     budget=None,
+    check_keys=None,
 ) -> list[tuple[str, list[str], str | None]]:
     checks = [
         Check("consumer_files", Priority.HIGH, "Consumer files (direct)", _bind_symbol(consumer_files, symbol_id)),
@@ -182,4 +183,4 @@ def run_all(
         ),
         Check("def_context", Priority.LOW, "Definition context", _bind_symbol0(def_context, symbol_id)),
     ]
-    return run_checks(checks, db, limit, priorities, budget=budget)
+    return run_checks(checks, db, limit, priorities, budget=budget, check_keys=check_keys)

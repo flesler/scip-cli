@@ -48,6 +48,53 @@ def parse_priorities(value: str | None) -> set[Priority] | None:
     return out
 
 
+# Project, file, and symbol Check.key values. --check rejects anything else.
+CHECK_KEYS = frozenset(
+    {
+        "affected",
+        "bottlenecks",
+        "change_surface",
+        "consumer_files",
+        "coupling",
+        "cycles",
+        "dead_exports",
+        "dead_in_file",
+        "def_context",
+        "dependencies",
+        "file_consumers",
+        "hotspots",
+        "imports_summary",
+        "same_file_only",
+        "stale_types",
+        "symbol_pressure",
+        "test_only",
+        "top_coupling",
+        "top_symbols",
+        "unreferenced",
+        "unused_imports",
+    }
+)
+
+
+def parse_checks(values: list[str] | None) -> set[str] | None:
+    """Parse --check (repeatable; commas allowed). None means all checks."""
+    if not values:
+        return None
+    out: set[str] = set()
+    for value in values:
+        for part in value.replace(" ", "").split(","):
+            if not part:
+                continue
+            key = part.lower()
+            if key not in CHECK_KEYS:
+                allowed = ", ".join(sorted(CHECK_KEYS))
+                raise RuntimeError(f"unknown analyze check {part!r} (use {allowed})")
+            out.add(key)
+    if not out:
+        return None
+    return out
+
+
 @dataclass(frozen=True)
 class Check:
     key: str
@@ -104,9 +151,12 @@ def run_checks(
     include_tests: bool = False,
     scope: str | None = None,
     budget: RowBudget | None = None,
+    check_keys: set[str] | None = None,
 ) -> list[tuple[str, list[str], str | None]]:
     """Run checks in priority order (high → low), optionally filtered."""
     selected = [check for check in checks if priorities is None or check.priority in priorities]
+    if check_keys is not None:
+        selected = [check for check in selected if check.key in check_keys]
     selected.sort(key=lambda check: (_ORDER.index(check.priority), check.key))
     budget_obj: RowBudget = budget or RowBudget(remaining=limit)
     sections: list[tuple[str, list[str], str | None]] = []

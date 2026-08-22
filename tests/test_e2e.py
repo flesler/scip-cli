@@ -272,6 +272,18 @@ class TestAnalyze:
         assert "[high]" in result.stdout
         assert "[low]" not in result.stdout
 
+    def test_check_runs_named_section_only(self, cli):
+        result = cli.run("analyze", "--check", "cycles", "--limit", "5")
+        assert result.returncode == 0
+        assert "Cycles" in result.stdout
+        assert "Hotspots" not in result.stdout
+        assert "Dead exports" not in result.stdout
+
+    def test_check_unknown_exits(self, cli):
+        result = cli.run("analyze", "--check", "not_a_check")
+        assert result.returncode == 1
+        assert "unknown analyze check" in result.stderr
+
 
 class TestIndex:
     def test_fixture_index_queryable(self, indexed_fixture):

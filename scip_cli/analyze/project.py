@@ -421,6 +421,7 @@ def run_all(
     scope: str | None = None,
     priorities=None,
     budget=None,
+    check_keys=None,
 ) -> list[tuple[str, list[str], str | None]]:
     suffix = _scope_suffix(scope)
     checks = [
@@ -452,4 +453,5 @@ def run_all(
         include_tests=include_tests,
         scope=scope,
         budget=budget,
+        check_keys=check_keys,
     )

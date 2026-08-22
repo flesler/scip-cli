@@ -133,7 +133,7 @@ Returns `startLine:endLine kind name` for each member. Members are found via SCI
 ### analyze
 
 ```bash
-analyze [--limit N] [--path PATH] [--include-tests] [target]
+analyze [--limit N] [--path PATH] [--include-tests] [--priority LEVEL] [--check NAME] [target]
 ```
 
 | Target                                 | Output                                                                                          |
@@ -148,6 +148,8 @@ Sections are ordered **high → medium → low**. `[high]` cycles, unreferenced,
 `--limit` caps **result rows across the whole run** (default 20); remaining checks are skipped once the cap is reached. `(none)` sections and section headers do not count.
 
 `--priority high` or `--priority high,medium` (also `1`/`2`/`3`) skips lower tiers.
+
+`--check NAME` (repeatable or comma-separated) runs only those sections and ANDs with `--priority`. Unknown names error. A name that exists for another target (e.g. `unused_imports` on a project-wide run) yields no matching sections.
 
 Directory detection uses the filesystem when present, otherwise an indexed path prefix. `--path` narrows ambiguous file/symbol resolution only (not directory scope — pass the dir as `target`).
 
