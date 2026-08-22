@@ -17,6 +17,7 @@ __all__ = [
     "DEFAULT_MAX_HEAP_MB",
     "DEFAULT_TS_INDEX_BATCH_SIZE",
     "MAX_TS_INDEX_BATCH_SIZE",
+    "effective_ts_batch_size",
     "format_db_size",
     "get_db",
     "index_project",
@@ -24,7 +25,6 @@ __all__ = [
     "log_index_complete",
     "merge_sqlite_indexes",
     "run_indexer_with_fallback",
-    "effective_ts_batch_size",
     "ts_index_batch_size",
     "typescript_projects",
 ]

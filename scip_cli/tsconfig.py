@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .discover import _SKIP_DIR_NAMES, _read_json
+from .discover import SKIP_DIR_NAMES, read_json
 
 _GLOB_CHARS = frozenset("*?[")
 
@@ -35,7 +35,7 @@ def scope_tsconfig_paths(paths: tuple[str, ...]) -> list[Path] | None:
 
 
 def _skipped_relative(relative: Path) -> bool:
-    return any(part in _SKIP_DIR_NAMES or part.startswith(".") for part in relative.parts)
+    return any(part in SKIP_DIR_NAMES or part.startswith(".") for part in relative.parts)
 
 
 def _relative_to_root(path: Path, root: Path, original: str) -> Path:
@@ -120,7 +120,7 @@ def walk_tsconfig_chain(path: Path) -> list[tuple[Path, dict[str, object]]]:
     current = path.resolve()
     while current.is_file() and current not in seen:
         seen.add(current)
-        data = _read_json(current)
+        data = read_json(current)
         if not data:
             break
         chain.append((current, data))

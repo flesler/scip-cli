@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 
-_SKIP_DIR_NAMES = frozenset(
+SKIP_DIR_NAMES = frozenset(
     {
         "node_modules",
         ".git",
@@ -25,7 +25,7 @@ _SKIP_DIR_NAMES = frozenset(
 )
 
 
-def _read_json(path: Path) -> dict[str, object] | None:
+def read_json(path: Path) -> dict[str, object] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -34,7 +34,7 @@ def _read_json(path: Path) -> dict[str, object] | None:
 
 def _tsconfig_project_root(path: Path) -> bool:
     """Return True when a tsconfig likely describes an indexable project."""
-    data = _read_json(path)
+    data = read_json(path)
     if not data:
         return False
     name = path.name
@@ -50,7 +50,7 @@ def _tsconfig_project_root(path: Path) -> bool:
 
 
 def _tsconfig_covers_subdirectories(tsconfig_path: Path) -> bool:
-    data = _read_json(tsconfig_path)
+    data = read_json(tsconfig_path)
     if not data:
         return False
     include = data.get("include")
@@ -67,7 +67,7 @@ def _walk_tsconfig_projects(root: Path) -> list[Path]:
     projects: list[Path] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith(".")]
+        dirnames[:] = [name for name in dirnames if name not in SKIP_DIR_NAMES and not name.startswith(".")]
         for name in sorted(filenames):
             if not name.startswith("tsconfig") or not name.endswith(".json"):
                 continue
@@ -131,7 +131,7 @@ def _walk_marker_files(root: Path, marker_names: frozenset[str]) -> list[Path]:
     found: list[Path] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith(".")]
+        dirnames[:] = [name for name in dirnames if name not in SKIP_DIR_NAMES and not name.startswith(".")]
         if not any(name in marker_names for name in filenames):
             continue
         project_dir = Path(dirpath).resolve()
