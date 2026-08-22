@@ -189,6 +189,7 @@ class TestProjectAnalyze:
         if lines != ["(none)"]:
             assert preface is not None
             assert "rdeps" in preface
+            assert "export const" in preface
 
 
 class TestFileAnalyze:

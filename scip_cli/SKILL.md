@@ -155,7 +155,7 @@ Directory detection uses the filesystem when present, otherwise an indexed path 
 
 **Dogfood loop:** `reindex` → `analyze --limit 25` → `analyze scip_cli` or `analyze scip_cli/queries.py` on suspects. Skips test paths in project-wide and directory runs (`tests/`, `*.test.*`, `*.spec.*`); `--include-tests` to include them. File-target analyze always includes that file.
 
-**Easy pickings:** **Cycles**, **dead exports**, and **dead files** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index (empty `rdeps` for files), not `vulture`.
+**Easy pickings:** **Cycles**, **dead exports**, and **dead files** (production paths) — cross-file cleanup. **Stale types** — types with no external refs in the index. Ignore `analyze/*` section helpers in dead exports. “Dead” = no refs from _other_ files in the index (empty `rdeps` for files), not `vulture`. Sections with hits print a short false-positive caveat; `export const` arrows often look like dead files because SCIP indexes the module only.
 
 ### reindex
 

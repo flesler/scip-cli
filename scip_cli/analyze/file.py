@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, short_name
 from .live import LiveIndex, file_has_scip_importers, has_same_file_reference_usage
-from .sections import Check, Priority, run_checks
+from .sections import FALSE_POSITIVE_PREFACES, Check, Priority, run_checks
 from .symbol import symbol_pressure
 
 
@@ -302,6 +302,7 @@ def _file_checks(relative_path: str, *, include_top_symbols: bool) -> list[Check
             Priority.HIGH,
             f"Unreferenced in file {title}",
             _bind_path(unreferenced_in_file, relative_path),
+            false_positive_preface=FALSE_POSITIVE_PREFACES["unreferenced_in_file"],
         ),
         Check(
             "dead_in_file",

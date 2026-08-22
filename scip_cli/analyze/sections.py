@@ -108,25 +108,38 @@ class Check:
         return f"[{self.priority.value}] {self.title}"
 
 
-# Shown only when the section has hits (not "(none)").
+# Shown only when the section has hits (not "(none)"). Situation hints, not exhaustive.
 FALSE_POSITIVE_PREFACES: dict[str, str] = {
     "dead_exports": (
-        "SCIP may miss dynamic loading (loadFiles, GraphQL) and default-export object members "
-        "— verify with rdeps/rg before deleting."
+        "SCIP may miss dynamic loading (loadFiles, GraphQL), default-export object members, "
+        "and some export const arrows — verify with rdeps/rg before deleting."
     ),
-    "dead_files": "No inbound refs in the index (empty rdeps) — confirm before deleting.",
+    "dead_files": (
+        "Empty rdeps in the index. SCIP often records export const / arrow files as module-only, "
+        "so named imports (routes, barrels) may not count; same for dynamic require. Confirm with rg."
+    ),
     "unreferenced": (
-        "No mentions in the index — symbols may still run via dynamic import or side-effect registration."
+        "No mentions in the index — may still run via dynamic import, side-effect registration, "
+        "or a call SCIP did not record."
     ),
-    "same_file_only": ("Referenced only in the defining file — often handlers or private helpers, not dead exports."),
-    "stale_types": ("No cross-file refs in the index — may still be used in-file or as a type-only shape."),
+    "same_file_only": (
+        "Referenced only in the defining file — often handlers or private helpers, "
+        "or an external call SCIP missed; not necessarily a dead export."
+    ),
+    "stale_types": (
+        "No cross-file refs in the index — may still be used in-file, as a type-only import SCIP dropped, "
+        "or as a structural shape."
+    ),
     "cycles": "Remaining cycles may be barrel re-exports; confirm before refactoring.",
     "dead_in_file": (
-        "SCIP may miss dynamic loading and default-export indirection — verify with rdeps/rg before deleting."
+        "SCIP may miss dynamic loading, default-export indirection, and some export const arrows "
+        "— verify with rdeps/rg before deleting."
     ),
     "unreferenced_in_file": (
         "No mentions in the index — may still be used in-file via handlers or dynamic registration."
     ),
+    "unused_imports": ("Import may still be a type-only use or a name SCIP did not bind — confirm before removing."),
+    "test_only": "Index may miss same-file production calls, so this can look test-only when it is not.",
 }
 
 

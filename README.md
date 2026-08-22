@@ -265,11 +265,11 @@ scip-cli analyze --check dead_files --limit 25
 
 Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 
-| Tier       | Project sections                                     | Action                                                               |
-| ---------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
-| **high**   | Cycles, unreferenced, dead exports, dead files, stale types | Nuke or fix cycles; delete unused; `_` prefix                  |
-| **medium** | Same-file only, change surface (file target)         | Module-private by usage                                              |
-| **low**    | Test-only consumers, coupling, bottlenecks, hotspots | Noisy on Python (index omits many same-file calls); verify with `rg` |
+| Tier       | Project sections                                            | Action                                                               |
+| ---------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| **high**   | Cycles, unreferenced, dead exports, dead files, stale types | Nuke or fix cycles; delete unused; `_` prefix                        |
+| **medium** | Same-file only, change surface (file target)                | Module-private by usage                                              |
+| **low**    | Test-only consumers, coupling, bottlenecks, hotspots        | Noisy on Python (index omits many same-file calls); verify with `rg` |
 
 Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
 
