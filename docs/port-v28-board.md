@@ -15,18 +15,19 @@
 
 ## Lanes
 
-| Lane | Path | Status | Notes |
+| Lane | Path | Status | SHA |
 |---|---|---|---|
-| P0 Python | `~/Code/scip-cli` | in progress | commit → v2.8.0 → push → release |
-| G1-go | `/tmp/scip-cli-go` | pending | direct-to-main |
-| G1-rust | `/tmp/scip-cli-rust` | pending | direct-to-main |
-| G1-zig | `/tmp/scip-cli-zig` | pending | direct-to-main |
+| P0 Python | `~/Code/scip-cli` | **done** | `5d00007` v2.8.0 PyPI + GH release |
+| G1-go | `/tmp/scip-cli-go` | **done** | `342f4fb` main, no GH release |
+| G1-rust | `/tmp/scip-cli-rust` | **done** | `8620ddb` main, no GH release |
+| G1-zig | `/tmp/scip-cli-zig` | **done** | `6b8bedf` main, no GH release |
 
-## Verify log
+## Verify log (parent re-ran)
 
 | Check | Python | Go | Rust | Zig |
 |---|---|---|---|---|
-| scripts/test.sh | | | | |
-| exclude dogfood | | | | |
-| analyze --check | n/a | | | |
-| readonly /iterate review | | | | |
+| scripts/test.sh | pass | pass | pass (83 tests) | pass |
+| PyPI / GH release | v2.8.0 shipped | skipped | skipped | skipped |
+| exclude dogfood | pass | pass (agent) | pass (agent) | pass (agent) |
+| analyze --check | n/a | pass | pass | pass |
+| readonly /iterate review | n/a | pass | Bugbot clean | 1 fix kept |
