@@ -18,16 +18,15 @@
 | Lane | Path | Status | SHA |
 |---|---|---|---|
 | P0 Python | `~/Code/scip-cli` | **done** | `5d00007` v2.8.0 PyPI + GH release |
-| G1-go | `/tmp/scip-cli-go` | **done** | `342f4fb` main, no GH release |
-| G1-rust | `/tmp/scip-cli-rust` | **done** | `8620ddb` main, no GH release |
-| G1-zig | `/tmp/scip-cli-zig` | **done** | `6b8bedf` main, no GH release |
+| G1-go | `/tmp/scip-cli-go` | **parity done** | `6fa4d19` main |
+| G1-rust | `/tmp/scip-cli-rust` | **parity done** | `9b9bdde` main |
+| G1-zig | `/tmp/scip-cli-zig` | **parity done** | `4ab9536` main |
 
-## Verify log (parent re-ran)
+## Verify log (parent re-ran parity wave)
 
 | Check | Python | Go | Rust | Zig |
 |---|---|---|---|---|
-| scripts/test.sh | pass | pass | pass (83 tests) | pass |
+| publish gate | pass | pass | pass (86 tests) | pass |
+| cross-parity gate | n/a | `make test-cross` pass | 14 parity tests pass | `zig build test-cross` 6/6 |
 | PyPI / GH release | v2.8.0 shipped | skipped | skipped | skipped |
-| exclude dogfood | pass | pass (agent) | pass (agent) | pass (agent) |
-| analyze --check | n/a | pass | pass | pass |
-| readonly /iterate review | n/a | pass | Bugbot clean | 1 fix kept |
+| Python ref binary | `scip-cli==2.8.0` on PATH | yes | yes | yes (pinned in resolver) |
