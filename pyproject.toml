@@ -54,9 +54,10 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-q --tb=line --no-header"
+addopts = "-q --tb=line --no-header -m 'not benchmark'"
 markers = [
     "integration: uses the shared indexed TS fixture (requires npx / scip-typescript)",
+    "benchmark: scaled :memory: query timings (run via scripts/bench.sh only)",
 ]
 
 [tool.basedpyright]

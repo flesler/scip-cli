@@ -23,6 +23,8 @@ def scaled_bench_db(seed: int = 42) -> sqlite3.Connection:
     - ~10% dead exports (no external refs)
     - ~5% stale types (type symbols with 0 consumers)
     - Dense cross-file references (~100K mentions)
+    - 120 test-path dead exports + 80 module-only test docs (analyze pagination noise)
+    - 10 production symbols with test-only consumers (test_only check pagination)
     """
     rng = random.Random(seed)
     conn = sqlite3.connect(":memory:")
@@ -255,7 +257,126 @@ def scaled_bench_db(seed: int = 42) -> sqlite3.Connection:
 
     conn.commit()
 
-    # Mark ~10% of symbols as dead (no external refs) — already handled by random refs
-    # Mark ~5% of types as stale (0 consumers) — already handled by random refs
+    # Post-filter noise for analyze pagination benchmarks: rows match SQL but analyze_noise /
+    # dead_files heuristics drop them, so small --limit runs must page past them.
+    doc_id = conn.execute("SELECT COALESCE(MAX(id), 0) FROM documents").fetchone()[0] + 1
+    chunk_id = conn.execute("SELECT COALESCE(MAX(id), 0) FROM chunks").fetchone()[0] + 1
+    sym_id = conn.execute("SELECT COALESCE(MAX(id), 0) FROM global_symbols").fetchone()[0] + 1
+    der_id = conn.execute("SELECT COALESCE(MAX(id), 0) FROM defn_enclosing_ranges").fetchone()[0] + 1
+
+    for i in range(120):
+        path = f"tests/noise/dead{i:03d}.ts"
+        conn.execute(
+            "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+            (doc_id, path),
+        )
+        conn.execute(
+            "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, 0, 600)",
+            (chunk_id, doc_id),
+        )
+        symbol = f"scip-typescript npm test 1.0 {path}/`dead{i:03d}.ts`/noiseFunc()."
+        conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, "noiseFunc"),
+        )
+        conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, 0, 0, 500, 0)
+            """,
+            (der_id, doc_id, sym_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 1)",
+            (chunk_id, sym_id),
+        )
+        doc_id += 1
+        chunk_id += 1
+        sym_id += 1
+        der_id += 1
+
+    for i in range(80):
+        path = f"tests/module_only/mod{i:03d}.ts"
+        conn.execute(
+            "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+            (doc_id, path),
+        )
+        conn.execute(
+            "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, 0, 10)",
+            (chunk_id, doc_id),
+        )
+        module_symbol = f"scip-typescript npm test 1.0 {path}/`mod{i:03d}.ts`/"
+        conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, module_symbol, "mod"),
+        )
+        conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, 0, 0, 1, 0)
+            """,
+            (der_id, doc_id, sym_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 1)",
+            (chunk_id, sym_id),
+        )
+        doc_id += 1
+        chunk_id += 1
+        sym_id += 1
+        der_id += 1
+
+    test_consumer_path = "tests/unit/bench_consumer.ts"
+    conn.execute(
+        "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+        (doc_id, test_consumer_path),
+    )
+    conn.execute(
+        "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, 0, 50)",
+        (chunk_id, doc_id),
+    )
+    test_consumer_chunk = chunk_id
+    doc_id += 1
+    chunk_id += 1
+
+    for i in range(10):
+        path = f"src/module00/a_testonly{i:03d}.ts"
+        conn.execute(
+            "INSERT INTO documents (id, relative_path) VALUES (?, ?)",
+            (doc_id, path),
+        )
+        conn.execute(
+            "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, 0, 20)",
+            (chunk_id, doc_id),
+        )
+        symbol = f"scip-typescript npm test 1.0 {path}/`a_testonly{i:03d}.ts`/benchOnly{i}()."
+        conn.execute(
+            "INSERT INTO global_symbols (id, symbol, display_name) VALUES (?, ?, ?)",
+            (sym_id, symbol, f"benchOnly{i}"),
+        )
+        conn.execute(
+            """
+            INSERT INTO defn_enclosing_ranges
+            (id, document_id, symbol_id, start_line, start_char, end_line, end_char)
+            VALUES (?, ?, ?, 0, 0, 10, 0)
+            """,
+            (der_id, doc_id, sym_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 1)",
+            (chunk_id, sym_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 0)",
+            (test_consumer_chunk, sym_id),
+        )
+        doc_id += 1
+        chunk_id += 1
+        sym_id += 1
+        der_id += 1
+
+    conn.commit()
 
     return conn

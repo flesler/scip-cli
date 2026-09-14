@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, short_name
+from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, collect_until_limit, fetch_all, short_name
 from .live import file_has_scip_importers, has_same_file_reference_usage, live_for
 from .sections import FALSE_POSITIVE_PREFACES, Check, Priority, run_checks
 from .symbol import symbol_pressure
@@ -84,9 +84,7 @@ def file_consumers(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[s
 
 def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     live = live_for(db)
-    rows = fetch_all(
-        db,
-        """
+    sql = """
         SELECT gs.symbol, der.start_line, der.end_line, def_d.id
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -102,25 +100,25 @@ def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> 
               WHERE m.symbol_id = gs.id AND m.role != 1 AND c.document_id != def_d.id
           )
         ORDER BY der.start_line
-        LIMIT ?
-        """,
-        (relative_path, limit),
-    )
-    lines = []
-    for symbol, start, end, def_doc_id in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (relative_path, page_size, offset))
+
+    def accept(row):
+        symbol, start, end, def_doc_id = row
         if analyze_noise(relative_path, symbol, include_tests=True):
-            continue
+            return None
         if live.dead_export_noise(symbol, def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
-    return lines
+            return None
+        return f"{short_name(symbol)}  {start + 1}:{end + 1}"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     live = live_for(db)
-    rows = fetch_all(
-        db,
-        """
+    sql = """
         SELECT gs.symbol, der.start_line, der.end_line, def_d.id
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -137,27 +135,27 @@ def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -
               WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id != def_d.id
           )
         ORDER BY der.start_line
-        LIMIT ?
-        """,
-        (relative_path, limit),
-    )
-    lines = []
-    for symbol, start, end, def_doc_id in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (relative_path, page_size, offset))
+
+    def accept(row):
+        symbol, start, end, def_doc_id = row
         if analyze_noise(relative_path, symbol, include_tests=True):
-            continue
+            return None
         if live.same_file_export_noise(symbol, def_doc_id):
-            continue
+            return None
         if not file_has_scip_importers(db, relative_path, live=live, def_doc_id=def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
-    return lines
+            return None
+        return f"{short_name(symbol)}  {start + 1}:{end + 1}"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     live = live_for(db)
-    rows = fetch_all(
-        db,
-        """
+    sql = """
         SELECT gs.id, gs.symbol, der.start_line, der.end_line, def_d.id
         FROM global_symbols gs
         JOIN defn_enclosing_ranges der ON gs.id = der.symbol_id
@@ -172,20 +170,22 @@ def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str
                 AND c.document_id != def_d.id
           )
         ORDER BY der.start_line
-        LIMIT ?
-        """,
-        (relative_path, limit),
-    )
-    lines = []
-    for sym_id, symbol, start, end, def_doc_id in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (relative_path, page_size, offset))
+
+    def accept(row):
+        sym_id, symbol, start, end, def_doc_id = row
         if analyze_noise(relative_path, symbol, include_tests=True):
-            continue
+            return None
         if has_same_file_reference_usage(db, sym_id, def_doc_id):
-            continue
+            return None
         if live.dead_export_noise(symbol, def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  {start + 1}:{end + 1}")
-    return lines
+            return None
+        return f"{short_name(symbol)}  {start + 1}:{end + 1}"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def imports_summary(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:

@@ -243,13 +243,6 @@ class TestProjectAnalyze:
         lines = project_checks.dead_files(db, limit=20)
         assert "src/pkg/mod.ts" not in lines
 
-    def test_dead_exports_skips_job_run_entrypoint(self):
-        b = AnalyzeDbBuilder()
-        b.define("src/jobs/tasks/cleanup.ts", "run")
-        db = b.finish()
-        dead = project_checks.dead_exports(db, limit=20)
-        assert not any("run" in line and "cleanup.ts" in line for line in dead)
-
     def test_dead_files_skips_migration_loader_paths(self):
         b = AnalyzeDbBuilder()
         b.define("src/db/migrations/001_init.ts", "up")

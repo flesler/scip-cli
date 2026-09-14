@@ -3,18 +3,113 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Iterable
 
 from ..sql import debug_execute
 from ..symbols import extract_leaf_name, is_module_symbol
 
 DEFAULT_LIMIT = 20
-# Filters drop many SCIP false hits; overfetch so --limit still fills.
-ANALYZE_SQL_OVERFETCH = 25
+# Cap rows scanned when post-filtering SQL (filters drop many SCIP false hits).
+ANALYZE_MAX_SCAN_ROWS = 10_000
 
 
-def sql_overfetch(limit: int) -> int:
-    """SQL row cap: post-filters drop many SCIP false hits."""
-    return limit * ANALYZE_SQL_OVERFETCH
+def collect_until_limit(
+    limit: int,
+    fetch_page: Callable[[int, int], list[object]],
+    accept: Callable[[object], str | None],
+    *,
+    page_size: int | None = None,
+    max_scan: int = ANALYZE_MAX_SCAN_ROWS,
+) -> list[str]:
+    """Fetch SQL pages until `limit` rows pass `accept`, or data is exhausted.
+
+    Use only when a check post-filters SQL rows (analyze_noise, live heuristics, …).
+    Checks that format every SQL row as-is should use a single ``LIMIT ?`` instead.
+    """
+    batch = page_size or max(limit, 50)
+    lines: list[str] = []
+    offset = 0
+    scanned = 0
+    while len(lines) < limit:
+        rows = fetch_page(batch, offset)
+        if not rows:
+            break
+        for row in rows:
+            scanned += 1
+            if scanned > max_scan:
+                return lines
+            line = accept(row)
+            if line is None:
+                continue
+            lines.append(line)
+            if len(lines) >= limit:
+                return lines
+        if len(rows) < batch:
+            break
+        offset += len(rows)
+    return lines
+
+
+def collect_from_producer(
+    limit: int,
+    produce: Callable[[int], list[str]],
+    accept: Callable[[str], str | None],
+    *,
+    max_scan: int = ANALYZE_MAX_SCAN_ROWS,
+) -> list[str]:
+    """Fill ``limit`` rows from a capped producer that can return more candidates on retry.
+
+    Used when results are not SQL-paginated (e.g. graph cycle search). ``produce(cap)``
+    must return a deterministic prefix as ``cap`` grows; already-seen strings are skipped.
+    """
+    lines: list[str] = []
+    seen: set[str] = set()
+    scanned = 0
+    fetch_cap = limit
+    while len(lines) < limit and fetch_cap <= max_scan:
+        candidates = produce(fetch_cap)
+        if not candidates:
+            break
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            scanned += 1
+            if scanned > max_scan:
+                return lines
+            line = accept(candidate)
+            if line is None:
+                continue
+            lines.append(line)
+            if len(lines) >= limit:
+                return lines
+        if len(candidates) < fetch_cap:
+            break
+        fetch_cap += limit
+    return lines
+
+
+def collect_from_iterable(
+    limit: int,
+    candidates: Iterable[str],
+    accept: Callable[[str], str | None],
+    *,
+    max_scan: int = ANALYZE_MAX_SCAN_ROWS,
+) -> list[str]:
+    """Filter an in-memory candidate list until ``limit`` rows pass ``accept``."""
+    lines: list[str] = []
+    scanned = 0
+    for candidate in candidates:
+        scanned += 1
+        if scanned > max_scan:
+            break
+        line = accept(candidate)
+        if line is None:
+            continue
+        lines.append(line)
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 # Definition document for a symbol (our trimmed schema uses defn_enclosing_ranges).
@@ -72,40 +167,20 @@ def is_dynamic_loader_path(relative_path: str) -> bool:
     return "/migrations/" in p
 
 
-def is_cli_entrypoint(relative_path: str, symbol: str) -> bool:
-    """True for command main() entrypoints the index does not link to __main__.py."""
+def is_python_main_entrypoint(relative_path: str, symbol: str) -> bool:
+    """True for main() in __main__.py — argparse entrypoints SCIP does not link to callers."""
     if short_name(symbol) != "main":
         return False
-    path = relative_path.replace("\\", "/")
-    return path == "scip_cli/__main__.py" or "/commands/" in path
-
-
-def is_task_entrypoint(relative_path: str, symbol: str) -> bool:
-    """Job runners typically invoke run() by filename; SCIP records no caller."""
-    if short_name(symbol) != "run":
-        return False
-    path = relative_path.replace("\\", "/")
-    return "/jobs/" in path or "/tasks/" in path
-
-
-def is_generated_analyze_path(relative_path: str) -> bool:
-    p = relative_path.replace("\\", "/")
-    if "/types/prisma/" in p:
-        return True
-    return p.endswith("types/resolvers.ts")
+    return relative_path.replace("\\", "/").endswith("__main__.py")
 
 
 def analyze_noise(relative_path: str, symbol: str, *, include_tests: bool = False) -> bool:
     """True for rows that clutter analyze dashboards (test paths, module-private helpers)."""
     if not include_tests and is_test_path(relative_path):
         return True
-    if is_generated_analyze_path(relative_path):
-        return True
     if short_name(symbol).startswith("_"):
         return True
-    if is_cli_entrypoint(relative_path, symbol):
-        return True
-    if is_task_entrypoint(relative_path, symbol):
+    if is_python_main_entrypoint(relative_path, symbol):
         return True
     if is_dynamic_loader_path(relative_path):
         return True

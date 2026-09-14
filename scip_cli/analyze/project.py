@@ -10,14 +10,14 @@ from .common import (
     DEFAULT_LIMIT,
     SYM_DEF_JOIN,
     analyze_noise,
+    collect_from_producer,
+    collect_until_limit,
     cycle_path_noise,
     fetch_all,
     file_pair_noise,
     is_dynamic_loader_path,
-    is_generated_analyze_path,
     is_test_path,
     short_name,
-    sql_overfetch,
     stale_type_noise,
 )
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
@@ -49,9 +49,7 @@ def bottlenecks(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         WITH fan_in AS (
             SELECT gs.id AS symbol_id,
                    COUNT(DISTINCT ref_d.id) AS fan_in
@@ -84,16 +82,18 @@ def bottlenecks(
         JOIN fan_out fo ON fo.symbol_id = gs.id
         WHERE fi.fan_in >= 1 AND fo.fan_out >= 1{scope_clause}
         ORDER BY score DESC, fi.fan_in DESC
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = [
-        f"{short_name(symbol)}  score={score}  loc={loc}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
-        for symbol, path, fan_in, fan_out, loc, score in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests) and not is_module_symbol(symbol)
-    ]
-    return lines[:limit]
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        symbol, path, fan_in, fan_out, loc, score = row
+        if analyze_noise(path, symbol, include_tests=include_tests) or is_module_symbol(symbol):
+            return None
+        return f"{short_name(symbol)}  score={score}  loc={loc}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def hotspots(
@@ -104,9 +104,7 @@ def hotspots(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         SELECT gs.symbol, def_d.relative_path,
                COUNT(*) AS ref_count,
                COUNT(DISTINCT ref_d.id) AS file_count
@@ -118,16 +116,26 @@ def hotspots(
         WHERE m.role != 1{scope_clause}
         GROUP BY gs.id
         ORDER BY ref_count DESC
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = [
-        f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
-        for symbol, path, ref_count, file_count in rows
-        if not analyze_noise(path, symbol, include_tests=include_tests) and not is_module_symbol(symbol)
-    ]
-    return lines[:limit]
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        symbol, path, ref_count, file_count = row
+        if analyze_noise(path, symbol, include_tests=include_tests) or is_module_symbol(symbol):
+            return None
+        return f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
+
+    return collect_until_limit(limit, fetch_page, accept)
+
+
+def _accept_cycle_line(line: str, *, include_tests: bool, scope: str | None) -> str | None:
+    if cycle_path_noise(line, include_tests=include_tests):
+        return None
+    if scope and not _cycle_touches_scope(line, scope):
+        return None
+    return line
 
 
 def cycles(
@@ -137,110 +145,62 @@ def cycles(
     include_tests: bool = False,
     scope: str | None = None,
 ) -> list[str]:
-    cap = sql_overfetch(limit)
-    two_way = fetch_all(
-        db,
-        f"""
+    sql = f"""
         WITH edges AS ({FILE_EDGES_SQL})
         SELECT e1.from_file || ' <-> ' || e1.to_file
         FROM edges e1
         JOIN edges e2 ON e1.from_file = e2.to_file AND e1.to_file = e2.from_file
         WHERE e1.from_file < e1.to_file
         ORDER BY 1
-        LIMIT ?
-        """,
-        (cap,),
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (page_size, offset))
+
+    def accept_row(row):
+        return _accept_cycle_line(row[0], include_tests=include_tests, scope=scope)
+
+    lines = collect_until_limit(limit, fetch_page, accept_row)
+    if len(lines) >= limit:
+        return lines
+
+    edges = fetch_file_edges(db)
+
+    def accept_path(path: str) -> str | None:
+        return _accept_cycle_line(path, include_tests=include_tests, scope=scope)
+
+    def produce(cap: int) -> list[str]:
+        return find_longer_cycles(edges, max_depth=8, limit=cap)
+
+    longer = collect_from_producer(
+        limit - len(lines),
+        produce,
+        accept_path,
     )
-    lines = [row[0] for row in two_way if not cycle_path_noise(row[0], include_tests=include_tests)]
-    longer = find_longer_cycles(fetch_file_edges(db), max_depth=8, limit=cap)
-    for path in longer:
-        if path not in lines and not cycle_path_noise(path, include_tests=include_tests):
-            lines.append(path)
-    if scope:
-        lines = [line for line in lines if _cycle_touches_scope(line, scope)]
-    return lines[:limit]
+    return lines + longer
 
 
-def _format_dead_export_rows(
-    db,
-    rows,
-    live: LiveIndex,
-    *,
-    include_tests: bool,
-    limit: int,
-) -> list[str]:
-    lines = []
-    for symbol_id, symbol, path, loc, def_doc_id in rows:
-        if analyze_noise(path, symbol, include_tests=include_tests):
-            continue
-        if has_same_file_reference_usage(db, symbol_id, def_doc_id):
-            continue
-        if has_same_file_usage_mention(db, symbol_id, def_doc_id):
-            continue
-        if live.dead_export_noise(symbol, def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  loc={loc}  ({path})")
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def stale_types(
-    db,
-    limit: int = DEFAULT_LIMIT,
-    *,
-    include_tests: bool = False,
-    scope: str | None = None,
-) -> list[str]:
-    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
-        db,
-        f"""
-        SELECT gs.id, gs.symbol, def_d.relative_path, def_d.id,
-               COUNT(DISTINCT CASE WHEN ref_d.id != def_d.id THEN ref_d.id END) AS consumers
+def _dead_export_sql(scope_clause: str) -> str:
+    return f"""
+        SELECT gs.id, gs.symbol, def_d.relative_path,
+               sym_def.end_line - sym_def.start_line + 1 AS loc,
+               def_d.id
         FROM global_symbols gs
         {SYM_DEF_JOIN}
-        LEFT JOIN mentions m ON m.symbol_id = gs.id AND m.role != 1
-        LEFT JOIN chunks c ON m.chunk_id = c.id
-        LEFT JOIN documents ref_d ON c.document_id = ref_d.id
-        WHERE gs.symbol LIKE '%#'
-          AND gs.symbol NOT LIKE '%().'
-          AND gs.symbol NOT LIKE '%#typeLiteral%'{scope_clause}
-        GROUP BY gs.id
-        HAVING consumers = 0
-        ORDER BY consumers ASC, def_d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = []
-    live = live_for(db)
-    for sym_id, symbol, path, def_doc_id, consumers in rows:
-        if analyze_noise(path, symbol, include_tests=include_tests):
-            continue
-        if stale_type_noise(path, symbol, consumers):
-            continue
-        if consumers == 0 and has_same_file_reference_usage(db, sym_id, def_doc_id):
-            continue
-        if live.stale_type_live_noise(symbol, def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  consumers={consumers}  ({path})")
-        if len(lines) >= limit:
-            break
-    return lines
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM mentions m
+            JOIN chunks c ON m.chunk_id = c.id
+            WHERE m.symbol_id = gs.id
+              AND m.role != 1
+              AND c.document_id != def_d.id
+        ){scope_clause}
+        ORDER BY loc DESC, def_d.relative_path
+    """
 
 
-def unreferenced_symbols(
-    db,
-    limit: int = DEFAULT_LIMIT,
-    *,
-    include_tests: bool = False,
-    scope: str | None = None,
-) -> list[str]:
-    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
-        db,
-        f"""
+def _unreferenced_sql(scope_clause: str) -> str:
+    return f"""
         SELECT gs.id, gs.symbol, def_d.relative_path,
                sym_def.end_line - sym_def.start_line + 1 AS loc,
                def_d.id
@@ -256,11 +216,95 @@ def unreferenced_symbols(
             WHERE m.symbol_id = gs.id AND m.role != 1 AND c.document_id != def_d.id
         ){scope_clause}
         ORDER BY loc DESC, def_d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
+    """
+
+
+def _collect_dead_export_rows(
+    db,
+    sql: str,
+    scope_params: tuple[object, ...],
+    live: LiveIndex,
+    *,
+    include_tests: bool,
+    limit: int,
+) -> list[str]:
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        symbol_id, symbol, path, loc, def_doc_id = row
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            return None
+        if has_same_file_reference_usage(db, symbol_id, def_doc_id):
+            return None
+        if has_same_file_usage_mention(db, symbol_id, def_doc_id):
+            return None
+        if live.dead_export_noise(symbol, def_doc_id):
+            return None
+        return f"{short_name(symbol)}  loc={loc}  ({path})"
+
+    return collect_until_limit(limit, fetch_page, accept)
+
+
+def stale_types(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    sql = f"""
+        SELECT gs.id, gs.symbol, def_d.relative_path, def_d.id,
+               COUNT(DISTINCT CASE WHEN ref_d.id != def_d.id THEN ref_d.id END) AS consumers
+        FROM global_symbols gs
+        {SYM_DEF_JOIN}
+        LEFT JOIN mentions m ON m.symbol_id = gs.id AND m.role != 1
+        LEFT JOIN chunks c ON m.chunk_id = c.id
+        LEFT JOIN documents ref_d ON c.document_id = ref_d.id
+        WHERE gs.symbol LIKE '%#'
+          AND gs.symbol NOT LIKE '%().'
+          AND gs.symbol NOT LIKE '%#typeLiteral%'{scope_clause}
+        GROUP BY gs.id
+        HAVING consumers = 0
+        ORDER BY consumers ASC, def_d.relative_path
+    """
+    live = live_for(db)
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        sym_id, symbol, path, def_doc_id, consumers = row
+        if analyze_noise(path, symbol, include_tests=include_tests):
+            return None
+        if stale_type_noise(path, symbol, consumers):
+            return None
+        if consumers == 0 and has_same_file_reference_usage(db, sym_id, def_doc_id):
+            return None
+        if live.stale_type_live_noise(symbol, def_doc_id):
+            return None
+        return f"{short_name(symbol)}  consumers={consumers}  ({path})"
+
+    return collect_until_limit(limit, fetch_page, accept)
+
+
+def unreferenced_symbols(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
+    return _collect_dead_export_rows(
+        db,
+        _unreferenced_sql(scope_clause),
+        tuple(scope_params),
+        live_for(db),
+        include_tests=include_tests,
+        limit=limit,
     )
-    return _format_dead_export_rows(db, rows, live_for(db), include_tests=include_tests, limit=limit)
 
 
 def same_file_only(
@@ -272,9 +316,7 @@ def same_file_only(
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
     live = live_for(db)
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         SELECT gs.symbol, def_d.relative_path,
                sym_def.end_line - sym_def.start_line + 1 AS loc,
                def_d.id
@@ -291,22 +333,22 @@ def same_file_only(
             WHERE m.symbol_id = gs.id AND m.role = 0 AND c.document_id != def_d.id
         ){scope_clause}
         ORDER BY loc DESC, def_d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = []
-    for symbol, path, loc, def_doc_id in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        symbol, path, loc, def_doc_id = row
         if analyze_noise(path, symbol, include_tests=include_tests):
-            continue
+            return None
         if live.same_file_export_noise(symbol, def_doc_id):
-            continue
+            return None
         if not file_has_scip_importers(db, path, live=live, def_doc_id=def_doc_id):
-            continue
-        lines.append(f"{short_name(symbol)}  loc={loc}  ({path})")
-        if len(lines) >= limit:
-            break
-    return lines
+            return None
+        return f"{short_name(symbol)}  loc={loc}  ({path})"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def symbols_test_only_consumers(
@@ -319,9 +361,7 @@ def symbols_test_only_consumers(
     if include_tests:
         return []
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         SELECT gs.symbol, def_d.relative_path,
                GROUP_CONCAT(DISTINCT ref_d.relative_path) AS consumer_paths
         FROM global_symbols gs
@@ -338,18 +378,21 @@ def symbols_test_only_consumers(
         GROUP BY gs.id
         HAVING COUNT(DISTINCT ref_d.id) > 0
         ORDER BY def_d.relative_path, gs.symbol
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = []
-    for symbol, path, consumer_paths in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        symbol, path, consumer_paths = row
         if analyze_noise(path, symbol, include_tests=include_tests):
-            continue
+            return None
         paths = [part.strip() for part in (consumer_paths or "").split(",") if part.strip()]
         if paths and all(is_test_path(p) for p in paths):
-            lines.append(f"{short_name(symbol)}  test_consumers={len(paths)}  ({path})")
-    return lines[:limit]
+            return f"{short_name(symbol)}  test_consumers={len(paths)}  ({path})"
+        return None
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def dead_exports(
@@ -360,28 +403,14 @@ def dead_exports(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    rows = fetch_all(
+    return _collect_dead_export_rows(
         db,
-        f"""
-        SELECT gs.id, gs.symbol, def_d.relative_path,
-               sym_def.end_line - sym_def.start_line + 1 AS loc,
-               def_d.id
-        FROM global_symbols gs
-        {SYM_DEF_JOIN}
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM mentions m
-            JOIN chunks c ON m.chunk_id = c.id
-            WHERE m.symbol_id = gs.id
-              AND m.role != 1
-              AND c.document_id != def_d.id
-        ){scope_clause}
-        ORDER BY loc DESC, def_d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
+        _dead_export_sql(scope_clause),
+        tuple(scope_params),
+        live_for(db),
+        include_tests=include_tests,
+        limit=limit,
     )
-    return _format_dead_export_rows(db, rows, live_for(db), include_tests=include_tests, limit=limit)
 
 
 def dead_files(
@@ -393,9 +422,7 @@ def dead_files(
 ) -> list[str]:
     """Files with no inbound mentions from other documents (empty rdeps)."""
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="d")
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         SELECT d.relative_path, d.id
         FROM documents d
         WHERE NOT EXISTS (
@@ -406,24 +433,22 @@ def dead_files(
             WHERE der.document_id = d.id AND c.document_id != d.id
         ){scope_clause}
         ORDER BY d.relative_path
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines: list[str] = []
-    for path, doc_id in rows:
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        path, doc_id = row
         if not include_tests and is_test_path(path):
-            continue
-        if is_generated_analyze_path(path):
-            continue
+            return None
         if is_dynamic_loader_path(path):
-            continue
+            return None
         if is_low_signal_dead_file(db, doc_id):
-            continue
-        lines.append(path)
-        if len(lines) >= limit:
-            break
-    return lines
+            return None
+        return path
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def top_coupling(
@@ -434,9 +459,7 @@ def top_coupling(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql_any(db, scope, "def_d", "ref_d")
-    rows = fetch_all(
-        db,
-        f"""
+    sql = f"""
         SELECT def_d.relative_path AS file1,
                ref_d.relative_path AS file2,
                COUNT(DISTINCT gs.id) AS shared
@@ -448,16 +471,18 @@ def top_coupling(
         WHERE m.role != 1 AND def_d.id != ref_d.id{scope_clause}
         GROUP BY def_d.id, ref_d.id
         ORDER BY shared DESC
-        LIMIT ?
-        """,
-        (*scope_params, sql_overfetch(limit)),
-    )
-    lines = [
-        f"{file1}  <->  {file2}  shared={shared}"
-        for file1, file2, shared in rows
-        if not file_pair_noise(file1, file2, include_tests=include_tests)
-    ]
-    return lines[:limit]
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        file1, file2, shared = row
+        if file_pair_noise(file1, file2, include_tests=include_tests):
+            return None
+        return f"{file1}  <->  {file2}  shared={shared}"
+
+    return collect_until_limit(limit, fetch_page, accept)
 
 
 def run_all(

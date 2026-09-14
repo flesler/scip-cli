@@ -1,7 +1,9 @@
 """Benchmark key queries on scaled :memory: DB.
 
-Usage:
-    pytest tests/test_bench_queries.py -s -v
+Excluded from default pytest (``-m 'not benchmark'``). Run via::
+
+    scripts/bench.sh
+    pytest tests/test_bench_queries.py -s -m benchmark
 
 Output format (for scripts/bench.sh comparison):
     BENCH:query_name:elapsed_ms
@@ -21,6 +23,8 @@ from scip_cli.queries import (
     resolve_symbol,
 )
 from tests.bench_db import scaled_bench_db
+
+pytestmark = pytest.mark.benchmark
 
 
 @pytest.fixture(scope="module")
@@ -103,6 +107,18 @@ class TestQueryBenchmarks:
         """project.dead_exports — symbols with no external refs."""
         bench_query("analyze_dead_exports", project_checks.dead_exports, bench_db, limit=25)
 
+    def test_analyze_dead_exports_limit5(self, bench_db):
+        """dead_exports with small quota — exercises paginated fill, not one big LIMIT."""
+        bench_query("analyze_dead_exports_limit5", project_checks.dead_exports, bench_db, limit=5)
+
+    def test_analyze_dead_files(self, bench_db):
+        """project.dead_files — empty rdeps with post-filters."""
+        bench_query("analyze_dead_files", project_checks.dead_files, bench_db, limit=25)
+
+    def test_analyze_dead_files_limit5(self, bench_db):
+        """dead_files with small quota — paginated fill past filtered rows."""
+        bench_query("analyze_dead_files_limit5", project_checks.dead_files, bench_db, limit=5)
+
     def test_analyze_stale_types(self, bench_db):
         """project.stale_types — type symbols with 0 consumers."""
         bench_query("analyze_stale_types", project_checks.stale_types, bench_db, limit=25)
@@ -115,6 +131,15 @@ class TestQueryBenchmarks:
         """project.same_file_only — in-file use only."""
         bench_query("analyze_same_file_only", project_checks.same_file_only, bench_db, limit=25)
 
+    def test_analyze_test_only_limit5(self, bench_db):
+        """test_only with small quota — paginated fill for test-only consumers."""
+        bench_query(
+            "analyze_test_only_limit5",
+            project_checks.symbols_test_only_consumers,
+            bench_db,
+            limit=5,
+        )
+
     def test_analyze_top_coupling(self, bench_db):
         """project.top_coupling — file pairs with most shared symbols."""
         bench_query("analyze_top_coupling", project_checks.top_coupling, bench_db, limit=25)
@@ -122,3 +147,17 @@ class TestQueryBenchmarks:
     def test_analyze_run_all(self, bench_db):
         """project.run_all — all checks combined."""
         bench_query("analyze_run_all", project_checks.run_all, bench_db, limit=25)
+
+    def test_analyze_run_all_per_check_limit(self, bench_db):
+        """run_all with per-check cap — shared budget + LiveIndex pass."""
+        bench_query(
+            "analyze_run_all_per_check_limit",
+            project_checks.run_all,
+            bench_db,
+            limit=40,
+            per_check_limit=5,
+        )
+
+    def test_analyze_cycles_limit5(self, bench_db):
+        """cycles with small quota — SQL pages + graph producer fill."""
+        bench_query("analyze_cycles_limit5", project_checks.cycles, bench_db, limit=5)

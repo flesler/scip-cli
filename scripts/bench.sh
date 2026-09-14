@@ -13,7 +13,7 @@ BENCH_DIR="tmp/benchmarks"
 mkdir -p "$BENCH_DIR"
 
 run_bench() {
-    pytest tests/test_bench_queries.py -s 2>&1 | grep -o 'BENCH:[^ ]*' | tee "$1"
+    pytest tests/test_bench_queries.py -s -m benchmark 2>&1 | grep -o 'BENCH:[^ ]*' | tee "$1"
 }
 
 if [ "$1" = "--save" ]; then
