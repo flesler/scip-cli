@@ -68,7 +68,13 @@ def prefix_document_paths(db_path: Path, prefix: str) -> None:
         conn.close()
 
 
-def convert_scip_to_db(scip_path, db_path, *, document_path_prefix: Path | str | None = None):
+def convert_scip_to_db(
+    scip_path,
+    db_path,
+    *,
+    document_path_prefix: Path | str | None = None,
+    exclude_globs: tuple[str, ...] | None = None,
+):
     """Convert a SCIP protobuf file to a SQLite index at db_path."""
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -88,7 +94,7 @@ def convert_scip_to_db(scip_path, db_path, *, document_path_prefix: Path | str |
     if not db_path.exists():
         raise RuntimeError("Failed to convert index")
 
-    postprocess_index(db_path)
+    postprocess_index(db_path, exclude_globs=exclude_globs or ())
     prefix = project_path_prefix(document_path_prefix)
     if prefix is not None:
         prefix_document_paths(db_path, prefix)

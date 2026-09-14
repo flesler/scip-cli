@@ -46,3 +46,11 @@ TYPE_OPTS = "Opts"
 MUTATION_AGGREGATE_FILE = "src/models/MutationAggregate.ts"
 TYPE_ERROR_CODE = "ErrorCode"
 FIELD_ERROR_CODE = "errorCode"
+
+EXCLUDE_SPEC_FILE = "src/__tests__/fixtureOnly.spec.ts"
+FN_FIXTURE_ONLY_HELPER = "fixtureOnlyHelper"
+DEFAULT_TEST_EXCLUDE_GLOBS = (
+    "**/__tests__/**",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+)

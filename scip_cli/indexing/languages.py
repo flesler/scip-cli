@@ -13,7 +13,7 @@ def _project_cwd(root: Path, project: Path) -> Path:
     return root if project == Path(".") else root / project
 
 
-def index_python_project(root, project, work_dir, env, *, output_db=None):
+def index_python_project(root, project, work_dir, env, *, output_db=None, exclude_globs=()):
     """Index one Python package directory into work_dir/index.db (or output_db when set)."""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -31,13 +31,13 @@ def index_python_project(root, project, work_dir, env, *, output_db=None):
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
     try:
-        convert_scip_to_db(part_scip, db_path, document_path_prefix=project)
+        convert_scip_to_db(part_scip, db_path, document_path_prefix=project, exclude_globs=exclude_globs)
     finally:
         part_scip.unlink(missing_ok=True)
     return label, db_path, None
 
 
-def index_golang_module(root, module, work_dir, env, *, output_db=None):
+def index_golang_module(root, module, work_dir, env, *, output_db=None, exclude_globs=()):
     """Index one Go module directory into work_dir/index.db (or output_db when set)."""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -55,13 +55,13 @@ def index_golang_module(root, module, work_dir, env, *, output_db=None):
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
     try:
-        convert_scip_to_db(part_scip, db_path, document_path_prefix=module)
+        convert_scip_to_db(part_scip, db_path, document_path_prefix=module, exclude_globs=exclude_globs)
     finally:
         part_scip.unlink(missing_ok=True)
     return label, db_path, None
 
 
-def index_rust_crate(root, crate, work_dir, env, *, output_db=None):
+def index_rust_crate(root, crate, work_dir, env, *, output_db=None, exclude_globs=()):
     """Index one Rust crate directory into work_dir/index.db (or output_db when set)."""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -79,7 +79,7 @@ def index_rust_crate(root, crate, work_dir, env, *, output_db=None):
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
     try:
-        convert_scip_to_db(part_scip, db_path, document_path_prefix=crate)
+        convert_scip_to_db(part_scip, db_path, document_path_prefix=crate, exclude_globs=exclude_globs)
     finally:
         part_scip.unlink(missing_ok=True)
     return label, db_path, None

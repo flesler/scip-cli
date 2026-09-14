@@ -91,7 +91,15 @@ def materialize_allow_js_projects(root: Path, projects: list[Path], work_dir: Pa
     return materialized
 
 
-def index_ts_projects(root, projects, work_dir, env, *, output_db: Path | None = None):
+def index_ts_projects(
+    root,
+    projects,
+    work_dir,
+    env,
+    *,
+    output_db: Path | None = None,
+    exclude_globs: tuple[str, ...] = (),
+):
     """Index one or more TypeScript projects into work_dir/index.db (or output_db when set)."""
     root = Path(root)
     work_dir = Path(work_dir)
@@ -111,13 +119,13 @@ def index_ts_projects(root, projects, work_dir, env, *, output_db: Path | None =
     if result.returncode != 0:
         return label, None, result.stderr.strip() or "indexing failed"
     try:
-        convert_scip_to_db(part_scip, db_path)
+        convert_scip_to_db(part_scip, db_path, exclude_globs=exclude_globs)
     finally:
         part_scip.unlink(missing_ok=True)
     return label, db_path, None
 
 
-def index_typescript(root, cache_dir, projects, env, *, replace=False):
+def index_typescript(root, cache_dir, projects, env, *, replace=False, exclude_globs: tuple[str, ...] = ()):
     """Index one or more TypeScript projects and write the merged index.db."""
     root = Path(root)
     cache_dir = Path(cache_dir)
@@ -151,6 +159,7 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False):
                         batch,
                         tmpdir_path / f"part-{index}",
                         env,
+                        exclude_globs=exclude_globs,
                     ): (index, batch)
                     for index, batch in enumerate(batches, start=1)
                 }
@@ -181,6 +190,7 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False):
                     cache_dir if direct_output else tmpdir_path / f"part-{index}",
                     env,
                     output_db=direct_output,
+                    exclude_globs=exclude_globs,
                 )
                 indexed += len(batch)
                 if db_path is None:

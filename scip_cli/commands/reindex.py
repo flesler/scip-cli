@@ -9,6 +9,7 @@ from ..cache import (
     index_db_path,
     promote_next_index,
 )
+from ..exclude import save_persisted_exclude_globs
 from ..indexing import index_project, log_index_complete
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
@@ -24,6 +25,7 @@ def main(args):
 
     path_args = getattr(args, "path", None) or []
     tsconfig_args = getattr(args, "tsconfig", None) or []
+    exclude_args = getattr(args, "exclude", None) or []
     if path_args and tsconfig_args:
         print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
         sys.exit(1)
@@ -67,6 +69,12 @@ def main(args):
         )
     else:
         save_index_scope(root, None)
+
+    if exclude_args:
+        save_persisted_exclude_globs(root, exclude_args)
+        print(f"Index exclude: {', '.join(exclude_args)}", file=sys.stderr)
+    else:
+        save_persisted_exclude_globs(root, None)
 
     cache_dir = get_cache_dir(root)
     cache_dir.mkdir(parents=True, exist_ok=True)

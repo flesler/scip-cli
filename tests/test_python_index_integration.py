@@ -36,7 +36,7 @@ def test_index_project_python_merges_nested_packages(python_monorepo, tmp_path, 
         Path(output).write_bytes(b"\x00")
         return result
 
-    def fake_convert(scip_path, db_path, *, document_path_prefix=None):
+    def fake_convert(scip_path, db_path, *, document_path_prefix=None, exclude_globs=()):
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         import sqlite3

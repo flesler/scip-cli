@@ -35,11 +35,13 @@ class IndexedFixture:
     db_path: Path
 
 
-def index_fixture_project(root: Path) -> Path:
+def index_fixture_project(root: Path, *, exclude_globs: tuple[str, ...] = ()) -> Path:
     """Index the copied fixture with real scip-typescript + scip convert."""
     from scip_cli.cache import find_db
+    from scip_cli.exclude import save_persisted_exclude_globs
     from scip_cli.indexing import get_db
 
+    save_persisted_exclude_globs(root, list(exclude_globs) if exclude_globs else None)
     conn = get_db(root)
     conn.close()
     db_path = find_db(root)

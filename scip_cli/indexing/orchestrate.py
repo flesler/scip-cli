@@ -103,6 +103,7 @@ def index_discovered_projects(
     replace: bool,
     progress_noun: str,
     index_one,
+    exclude_globs: tuple[str, ...] = (),
 ) -> tuple[Path, int, int, int]:
     """Index one SCIP unit per project path; merge when multiple part DBs."""
     output_db = index_db_path(cache_dir, replace=replace)
@@ -132,6 +133,7 @@ def index_discovered_projects(
                         project,
                         tmpdir_path / f"part-{index}",
                         env,
+                        exclude_globs=exclude_globs,
                     ): (index, project)
                     for index, project in enumerate(projects, start=1)
                 }
@@ -160,6 +162,7 @@ def index_discovered_projects(
                     cache_dir if direct_output else tmpdir_path / f"part-{index}",
                     env,
                     output_db=direct_output,
+                    exclude_globs=exclude_globs,
                 )
                 if db_path is None:
                     skipped += 1

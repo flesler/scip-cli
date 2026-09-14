@@ -167,6 +167,15 @@ def main() -> None:
         ),
     )
     reindex_parser.add_argument(
+        "--exclude",
+        action="append",
+        metavar="GLOB",
+        help=(
+            "Omit indexed files matching GLOB from the SQLite index "
+            "(repeatable; merged with excludeGlobs in .scip-cli.json; persisted until full reindex)"
+        ),
+    )
+    reindex_parser.add_argument(
         "--with-external",
         action="store_true",
         default=False,

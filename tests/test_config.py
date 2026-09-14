@@ -14,6 +14,7 @@ class TestLoadProjectConfig:
         assert settings.max_heap_mb is None
         assert settings.index_roots == []
         assert settings.only_index_roots is False
+        assert settings.exclude_globs == []
 
     def test_rejects_non_positive_heap(self, tmp_path):
         (tmp_path / ".scip-cli.json").write_text('{"maxHeapMb": 0}', encoding="utf-8")

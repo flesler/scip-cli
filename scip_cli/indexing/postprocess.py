@@ -117,6 +117,147 @@ def _trim_defn_to_known_symbols(conn):
     _replace_table(conn, "defn_enclosing_ranges", "defn_enclosing_ranges_new")
 
 
+def _prune_excluded_documents(conn: sqlite3.Connection, exclude_globs: tuple[str, ...]) -> None:
+    """Drop documents matching exclude globs and cascade to chunks, mentions, defs, symbols."""
+    from ..exclude import path_matches_any_glob
+
+    if not exclude_globs:
+        return
+
+    rows = conn.execute("SELECT id, relative_path FROM documents").fetchall()
+    exclude_ids = {row[0] for row in rows if path_matches_any_glob(row[1], exclude_globs)}
+    if not exclude_ids:
+        return
+
+    conn.execute("""
+        CREATE TABLE documents_new (
+            id INTEGER PRIMARY KEY,
+            relative_path TEXT NOT NULL UNIQUE
+        )
+    """)
+    conn.execute(
+        "INSERT INTO documents_new (id, relative_path) SELECT id, relative_path FROM documents WHERE id NOT IN "
+        + f"({','.join('?' * len(exclude_ids))})",
+        tuple(exclude_ids),
+    )
+    _replace_table(conn, "documents", "documents_new")
+
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunks' LIMIT 1").fetchone():
+        conn.execute("""
+            CREATE TABLE chunks_new (
+                id INTEGER PRIMARY KEY,
+                document_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                start_line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                occurrences BLOB NOT NULL
+            )
+        """)
+        conn.execute(
+            "INSERT INTO chunks_new SELECT c.* FROM chunks c JOIN documents d ON c.document_id = d.id",
+        )
+        _replace_table(conn, "chunks", "chunks_new")
+
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentions' LIMIT 1").fetchone():
+        conn.execute("""
+            CREATE TABLE mentions_new (
+                chunk_id INTEGER NOT NULL,
+                symbol_id INTEGER NOT NULL,
+                role INTEGER NOT NULL,
+                PRIMARY KEY (chunk_id, symbol_id, role)
+            )
+        """)
+        conn.execute("""
+            INSERT INTO mentions_new (chunk_id, symbol_id, role)
+            SELECT m.chunk_id, m.symbol_id, m.role
+            FROM mentions m
+            JOIN chunks c ON c.id = m.chunk_id
+        """)
+        _replace_table(conn, "mentions", "mentions_new")
+
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='defn_enclosing_ranges' LIMIT 1"
+    ).fetchone():
+        conn.execute("""
+            CREATE TABLE defn_enclosing_ranges_new (
+                id INTEGER PRIMARY KEY,
+                document_id INTEGER NOT NULL,
+                symbol_id INTEGER NOT NULL,
+                start_line INTEGER NOT NULL,
+                start_char INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                end_char INTEGER NOT NULL
+            )
+        """)
+        conn.execute("""
+            INSERT INTO defn_enclosing_ranges_new (
+                id, document_id, symbol_id, start_line, start_char, end_line, end_char
+            )
+            SELECT d.id, d.document_id, d.symbol_id, d.start_line, d.start_char, d.end_line, d.end_char
+            FROM defn_enclosing_ranges d
+            JOIN documents doc ON doc.id = d.document_id
+        """)
+        _replace_table(conn, "defn_enclosing_ranges", "defn_enclosing_ranges_new")
+
+    conn.execute("""
+        CREATE TABLE global_symbols_new (
+            id INTEGER PRIMARY KEY,
+            symbol TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            kind INTEGER
+        )
+    """)
+    conn.execute("""
+        INSERT INTO global_symbols_new (id, symbol, display_name, kind)
+        SELECT g.id, g.symbol, g.display_name, g.kind
+        FROM global_symbols g
+        WHERE EXISTS (SELECT 1 FROM defn_enclosing_ranges d WHERE d.symbol_id = g.id)
+           OR EXISTS (SELECT 1 FROM mentions m WHERE m.symbol_id = g.id)
+    """)
+    _replace_table(conn, "global_symbols", "global_symbols_new")
+
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mentions' LIMIT 1").fetchone():
+        conn.execute("""
+            CREATE TABLE mentions_new (
+                chunk_id INTEGER NOT NULL,
+                symbol_id INTEGER NOT NULL,
+                role INTEGER NOT NULL,
+                PRIMARY KEY (chunk_id, symbol_id, role)
+            )
+        """)
+        conn.execute("""
+            INSERT INTO mentions_new (chunk_id, symbol_id, role)
+            SELECT m.chunk_id, m.symbol_id, m.role
+            FROM mentions m
+            JOIN global_symbols g ON g.id = m.symbol_id
+        """)
+        _replace_table(conn, "mentions", "mentions_new")
+
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='defn_enclosing_ranges' LIMIT 1"
+    ).fetchone():
+        conn.execute("""
+            CREATE TABLE defn_enclosing_ranges_new (
+                id INTEGER PRIMARY KEY,
+                document_id INTEGER NOT NULL,
+                symbol_id INTEGER NOT NULL,
+                start_line INTEGER NOT NULL,
+                start_char INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                end_char INTEGER NOT NULL
+            )
+        """)
+        conn.execute("""
+            INSERT INTO defn_enclosing_ranges_new (
+                id, document_id, symbol_id, start_line, start_char, end_line, end_char
+            )
+            SELECT d.id, d.document_id, d.symbol_id, d.start_line, d.start_char, d.end_line, d.end_char
+            FROM defn_enclosing_ranges d
+            JOIN global_symbols g ON g.id = d.symbol_id
+        """)
+        _replace_table(conn, "defn_enclosing_ranges", "defn_enclosing_ranges_new")
+
+
 def _recreate_postprocess_indexes(conn: sqlite3.Connection) -> None:
     """expt-convert indexes are dropped when tables are rebuilt."""
     conn.execute("CREATE INDEX IF NOT EXISTS idx_global_symbols_symbol ON global_symbols(symbol)")
@@ -124,13 +265,14 @@ def _recreate_postprocess_indexes(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_mentions_symbol_id_role ON mentions(symbol_id, role)")
 
 
-def postprocess_index(db_path, keep_external=None):
+def postprocess_index(db_path, keep_external=None, exclude_globs: tuple[str, ...] | None = None):
     """Shrink index: drop unused columns and prune external symbols by default.
 
     Args:
         db_path: Path to the SQLite database
         keep_external: If True, keep symbols without definitions (external libs).
                       If None, reads from SCIP_CLI_KEEP_EXTERNAL env var.
+        exclude_globs: Repo-relative globs; matching documents are removed entirely.
     """
     from ..sql import configure_bulk_write_connection
 
@@ -143,6 +285,8 @@ def postprocess_index(db_path, keep_external=None):
         configure_bulk_write_connection(conn)
         # Rebuild tables first; indexes are recreated once at the end (expt-convert indexes
         # are dropped with table swaps — avoid maintaining them during bulk inserts).
+        if exclude_globs:
+            _prune_excluded_documents(conn, exclude_globs)
         _trim_unused_columns(conn, keep_external=keep_external)
         _trim_mentions_to_known_symbols(conn)
         _trim_defn_to_known_symbols(conn)

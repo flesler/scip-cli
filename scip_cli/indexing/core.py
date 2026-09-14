@@ -17,6 +17,7 @@ from ..cache import (
 )
 from ..config import load_project_config
 from ..discover import discover_golang_modules, discover_python_projects, discover_rust_crates
+from ..exclude import resolve_exclude_globs
 from .constants import DEFAULT_MAX_HEAP_MB
 from .languages import index_golang_module, index_python_project, index_rust_crate
 from .orchestrate import index_discovered_projects
@@ -87,10 +88,13 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
     cache_dir.mkdir(parents=True, exist_ok=True)
     root = Path(root).resolve()
     env = indexer_env(root)
+    exclude_globs = resolve_exclude_globs(root)
 
     if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
-        output_db, _indexed, skipped, total = index_typescript(root, cache_dir, projects, env, replace=replace)
+        output_db, _indexed, skipped, total = index_typescript(
+            root, cache_dir, projects, env, replace=replace, exclude_globs=exclude_globs
+        )
         if log:
             log_index_complete(
                 output_db,
@@ -110,6 +114,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
             replace=replace,
             progress_noun="Python packages",
             index_one=index_python_project,
+            exclude_globs=exclude_globs,
         )
         if log:
             log_index_complete(
@@ -130,6 +135,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
             replace=replace,
             progress_noun="Go modules",
             index_one=index_golang_module,
+            exclude_globs=exclude_globs,
         )
         if log:
             log_index_complete(
@@ -150,6 +156,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
             replace=replace,
             progress_noun="Rust crates",
             index_one=index_rust_crate,
+            exclude_globs=exclude_globs,
         )
         if log:
             log_index_complete(

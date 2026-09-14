@@ -16,6 +16,7 @@ class ProjectSettings:
     max_heap_mb: int | None = None
     index_roots: list[str] = field(default_factory=list)
     only_index_roots: bool = False
+    exclude_globs: list[str] = field(default_factory=list)
 
 
 def load_project_config(project_root: Path) -> ProjectSettings:
@@ -44,10 +45,15 @@ def load_project_config(project_root: Path) -> ProjectSettings:
     if type(only_index_roots) is not bool:
         raise RuntimeError(f"Invalid {CONFIG_FILENAME}: onlyIndexRoots must be a boolean")
 
+    exclude_globs = data.get("excludeGlobs", [])
+    if not isinstance(exclude_globs, list) or not all(isinstance(p, str) for p in exclude_globs):
+        raise RuntimeError(f"Invalid {CONFIG_FILENAME}: excludeGlobs must be a string array")
+
     return ProjectSettings(
         max_heap_mb=max_heap_mb,
         index_roots=index_roots,
         only_index_roots=only_index_roots,
+        exclude_globs=exclude_globs,
     )
 
 
