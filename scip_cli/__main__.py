@@ -11,7 +11,13 @@ import sys
 from collections.abc import Callable
 
 from . import __version__
-from .cli_args import add_limit_argument, add_names_only_argument, add_path_argument, add_paths_only_argument
+from .cli_args import (
+    add_limit_argument,
+    add_names_only_argument,
+    add_path_argument,
+    add_paths_only_argument,
+    positive_int,
+)
 from .commands import analyze, code, deps, members, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
@@ -131,6 +137,13 @@ def main() -> None:
     )
     add_path_argument(analyze_parser)
     add_limit_argument(analyze_parser, default=20, help_suffix="result rows total")
+    analyze_parser.add_argument(
+        "--per-check-limit",
+        type=positive_int(),
+        default=None,
+        metavar="N",
+        help="Max rows per check (default: unlimited). --limit remains the global row budget",
+    )
     analyze_parser.add_argument(
         "--include-tests",
         action="store_true",

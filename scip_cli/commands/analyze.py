@@ -8,6 +8,7 @@ from ..analyze import file as file_checks
 from ..analyze import project as project_checks
 from ..analyze import symbol as symbol_checks
 from ..analyze.common import is_test_path, section
+from ..analyze.live import bind_live, reset_live
 from ..analyze.sections import RowBudget, parse_checks, parse_priorities
 from ..analyze.targets import MAX_DIR_FILES, list_dir_files, resolve_analyze_target
 from ..cli_args import path_scope_from_args
@@ -40,6 +41,7 @@ def _project_sections(
     priorities,
     budget: RowBudget,
     check_keys,
+    per_check_limit,
 ) -> list[tuple[str, list[str], str | None]]:
     return project_checks.run_all(
         db,
@@ -49,6 +51,7 @@ def _project_sections(
         priorities=priorities,
         budget=budget,
         check_keys=check_keys,
+        per_check_limit=per_check_limit,
     )
 
 
@@ -60,8 +63,17 @@ def _file_sections(
     priorities,
     budget: RowBudget,
     check_keys,
+    per_check_limit,
 ) -> list[tuple[str, list[str], str | None]]:
-    return file_checks.run_all(db, path, limit=limit, priorities=priorities, budget=budget, check_keys=check_keys)
+    return file_checks.run_all(
+        db,
+        path,
+        limit=limit,
+        priorities=priorities,
+        budget=budget,
+        check_keys=check_keys,
+        per_check_limit=per_check_limit,
+    )
 
 
 def _dir_sections(
@@ -73,6 +85,7 @@ def _dir_sections(
     priorities,
     budget: RowBudget,
     check_keys,
+    per_check_limit,
 ) -> list[tuple[str, list[str], str | None]]:
     sections = _project_sections(
         db,
@@ -82,6 +95,7 @@ def _dir_sections(
         priorities=priorities,
         budget=budget,
         check_keys=check_keys,
+        per_check_limit=per_check_limit,
     )
     files = list_dir_files(db, scope, include_tests=include_tests)
     total = len(files)
@@ -106,7 +120,13 @@ def _dir_sections(
             break
         sections.extend(
             file_checks.run_all_sections_only(
-                db, path, limit=limit, priorities=priorities, budget=budget, check_keys=check_keys
+                db,
+                path,
+                limit=limit,
+                priorities=priorities,
+                budget=budget,
+                check_keys=check_keys,
+                per_check_limit=per_check_limit,
             )
         )
     return sections
@@ -115,9 +135,11 @@ def _dir_sections(
 def main(args):
     """Run project, directory, file, or symbol analysis from one optional target."""
     db, project_root = setup()
+    live_token = bind_live(db)
     try:
         path_scope = path_scope_from_args(args, project_root)
         limit = args.limit
+        per_check_limit = getattr(args, "per_check_limit", None)
         budget = RowBudget(remaining=limit)
         include_tests = getattr(args, "include_tests", False)
         priorities = parse_priorities(getattr(args, "priority", None))
@@ -139,6 +161,7 @@ def main(args):
                 priorities=priorities,
                 budget=budget,
                 check_keys=check_keys,
+                per_check_limit=per_check_limit,
             )
         else:
             resolved = resolve_analyze_target(db, target, project_root, path_scope)
@@ -152,6 +175,7 @@ def main(args):
                     priorities=priorities,
                     budget=budget,
                     check_keys=check_keys,
+                    per_check_limit=per_check_limit,
                 )
             elif resolved.kind == "file":
                 file_include = _project_include_tests(include_tests, scope)
@@ -163,11 +187,18 @@ def main(args):
                     priorities=priorities,
                     budget=budget,
                     check_keys=check_keys,
+                    per_check_limit=per_check_limit,
                 )
                 if not budget.exhausted():
                     sections.extend(
                         _file_sections(
-                            db, scope, limit=limit, priorities=priorities, budget=budget, check_keys=check_keys
+                            db,
+                            scope,
+                            limit=limit,
+                            priorities=priorities,
+                            budget=budget,
+                            check_keys=check_keys,
+                            per_check_limit=per_check_limit,
                         )
                     )
             else:
@@ -177,9 +208,16 @@ def main(args):
                     path_scope=path_scope,
                 )
                 sections = symbol_checks.run_all(
-                    db, symbol_id, limit=limit, priorities=priorities, budget=budget, check_keys=check_keys
+                    db,
+                    symbol_id,
+                    limit=limit,
+                    priorities=priorities,
+                    budget=budget,
+                    check_keys=check_keys,
+                    per_check_limit=per_check_limit,
                 )
 
         _print_sections(sections)
     finally:
+        reset_live(live_token)
         db.close()

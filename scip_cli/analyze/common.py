@@ -8,6 +8,14 @@ from ..sql import debug_execute
 from ..symbols import extract_leaf_name, is_module_symbol
 
 DEFAULT_LIMIT = 20
+# Filters drop many SCIP false hits; overfetch so --limit still fills.
+ANALYZE_SQL_OVERFETCH = 25
+
+
+def sql_overfetch(limit: int) -> int:
+    """SQL row cap: post-filters drop many SCIP false hits."""
+    return limit * ANALYZE_SQL_OVERFETCH
+
 
 # Definition document for a symbol (our trimmed schema uses defn_enclosing_ranges).
 SYM_DEF_JOIN = """
@@ -36,19 +44,32 @@ def short_name(symbol: str) -> str:
 
 
 def is_test_path(relative_path: str) -> bool:
-    """True for common test layout paths and *.test.* / *.spec.* filenames."""
+    """True for common test layout paths and test-like filenames."""
     p = relative_path.replace("\\", "/")
     lower = p.lower()
     if lower.startswith(("tests/", "test/")):
         return True
     if "/tests/" in lower or "/test/" in lower or "/__tests__/" in lower:
         return True
+    if "/__fixtures__/" in lower or "/__mocks__/" in lower:
+        return True
     name = lower.rsplit("/", 1)[-1]
-    if ".test." in name or ".spec." in name:
+    if ".test." in name or ".spec." in name or ".mocha." in name:
+        return True
+    stem = name.rsplit(".", 1)[0]
+    if stem.endswith("_test") or stem.endswith("_spec"):
+        return True
+    if "test-fixture" in name or "test_fixture" in name or "test-mocks" in name:
         return True
     if name.startswith("test_") and name.endswith(".py"):
         return True
     return name == "conftest.py"
+
+
+def is_dynamic_loader_path(relative_path: str) -> bool:
+    """True for migration files typically loaded by filename; SCIP has no import edge."""
+    p = relative_path.replace("\\", "/").lower()
+    return "/migrations/" in p
 
 
 def is_cli_entrypoint(relative_path: str, symbol: str) -> bool:
@@ -57,6 +78,14 @@ def is_cli_entrypoint(relative_path: str, symbol: str) -> bool:
         return False
     path = relative_path.replace("\\", "/")
     return path == "scip_cli/__main__.py" or "/commands/" in path
+
+
+def is_task_entrypoint(relative_path: str, symbol: str) -> bool:
+    """Job runners typically invoke run() by filename; SCIP records no caller."""
+    if short_name(symbol) != "run":
+        return False
+    path = relative_path.replace("\\", "/")
+    return "/jobs/" in path or "/tasks/" in path
 
 
 def is_generated_analyze_path(relative_path: str) -> bool:
@@ -75,6 +104,12 @@ def analyze_noise(relative_path: str, symbol: str, *, include_tests: bool = Fals
     if short_name(symbol).startswith("_"):
         return True
     if is_cli_entrypoint(relative_path, symbol):
+        return True
+    if is_task_entrypoint(relative_path, symbol):
+        return True
+    if is_dynamic_loader_path(relative_path):
+        return True
+    if short_name(symbol) in {"<constructor>", "constructor"}:
         return True
     return is_analyze_dashboard_export(relative_path, symbol)
 

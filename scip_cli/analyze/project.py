@@ -13,9 +13,11 @@ from .common import (
     cycle_path_noise,
     fetch_all,
     file_pair_noise,
+    is_dynamic_loader_path,
     is_generated_analyze_path,
     is_test_path,
     short_name,
+    sql_overfetch,
     stale_type_noise,
 )
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
@@ -24,6 +26,8 @@ from .live import (
     file_has_scip_importers,
     has_same_file_reference_usage,
     has_same_file_usage_mention,
+    is_low_signal_dead_file,
+    live_for,
 )
 from .sections import Check, Priority, run_checks
 
@@ -82,7 +86,7 @@ def bottlenecks(
         ORDER BY score DESC, fi.fan_in DESC
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = [
         f"{short_name(symbol)}  score={score}  loc={loc}  fan_in={fan_in}  fan_out={fan_out}  ({path})"
@@ -116,7 +120,7 @@ def hotspots(
         ORDER BY ref_count DESC
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = [
         f"{short_name(symbol)}  refs={ref_count}  files={file_count}  ({path})"
@@ -133,7 +137,7 @@ def cycles(
     include_tests: bool = False,
     scope: str | None = None,
 ) -> list[str]:
-    cap = limit * 5
+    cap = sql_overfetch(limit)
     two_way = fetch_all(
         db,
         f"""
@@ -207,10 +211,10 @@ def stale_types(
         ORDER BY consumers ASC, def_d.relative_path
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = []
-    live = LiveIndex(db)
+    live = live_for(db)
     for sym_id, symbol, path, def_doc_id, consumers in rows:
         if analyze_noise(path, symbol, include_tests=include_tests):
             continue
@@ -254,9 +258,9 @@ def unreferenced_symbols(
         ORDER BY loc DESC, def_d.relative_path
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
-    return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
+    return _format_dead_export_rows(db, rows, live_for(db), include_tests=include_tests, limit=limit)
 
 
 def same_file_only(
@@ -267,7 +271,7 @@ def same_file_only(
     scope: str | None = None,
 ) -> list[str]:
     scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="def_d")
-    live = LiveIndex(db)
+    live = live_for(db)
     rows = fetch_all(
         db,
         f"""
@@ -289,7 +293,7 @@ def same_file_only(
         ORDER BY loc DESC, def_d.relative_path
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = []
     for symbol, path, loc, def_doc_id in rows:
@@ -336,7 +340,7 @@ def symbols_test_only_consumers(
         ORDER BY def_d.relative_path, gs.symbol
         LIMIT ?
         """,
-        (*scope_params, limit * 10),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = []
     for symbol, path, consumer_paths in rows:
@@ -375,9 +379,9 @@ def dead_exports(
         ORDER BY loc DESC, def_d.relative_path
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
-    return _format_dead_export_rows(db, rows, LiveIndex(db), include_tests=include_tests, limit=limit)
+    return _format_dead_export_rows(db, rows, live_for(db), include_tests=include_tests, limit=limit)
 
 
 def dead_files(
@@ -392,7 +396,7 @@ def dead_files(
     rows = fetch_all(
         db,
         f"""
-        SELECT d.relative_path
+        SELECT d.relative_path, d.id
         FROM documents d
         WHERE NOT EXISTS (
             SELECT 1
@@ -404,13 +408,17 @@ def dead_files(
         ORDER BY d.relative_path
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines: list[str] = []
-    for (path,) in rows:
+    for path, doc_id in rows:
         if not include_tests and is_test_path(path):
             continue
         if is_generated_analyze_path(path):
+            continue
+        if is_dynamic_loader_path(path):
+            continue
+        if is_low_signal_dead_file(db, doc_id):
             continue
         lines.append(path)
         if len(lines) >= limit:
@@ -442,7 +450,7 @@ def top_coupling(
         ORDER BY shared DESC
         LIMIT ?
         """,
-        (*scope_params, limit * 5),
+        (*scope_params, sql_overfetch(limit)),
     )
     lines = [
         f"{file1}  <->  {file2}  shared={shared}"
@@ -461,6 +469,7 @@ def run_all(
     priorities=None,
     budget=None,
     check_keys=None,
+    per_check_limit=None,
 ) -> list[tuple[str, list[str], str | None]]:
     suffix = _scope_suffix(scope)
     checks = [
@@ -494,4 +503,5 @@ def run_all(
         scope=scope,
         budget=budget,
         check_keys=check_keys,
+        per_check_limit=per_check_limit,
     )

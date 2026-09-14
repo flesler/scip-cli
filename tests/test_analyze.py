@@ -14,7 +14,12 @@ class TestAnalyzeNoise:
         assert is_test_path("src/foo.test.ts")
         assert is_test_path("src/foo.spec.tsx")
         assert is_test_path("pkg/__tests__/bar.js")
-        assert is_test_path("conftest.py")
+        assert is_test_path("src/foo.mocha.ts")
+        assert is_test_path("src/foo_test.ts")
+        assert is_test_path("src/lib/test-fixtures.ts")
+        assert is_test_path("pkg/__fixtures__/builders.ts")
+        assert is_test_path("pkg/__mocks__/fs.ts")
+        assert is_test_path("src/lib/test-mocks.ts")
         assert not is_test_path("scip_cli/queries.py")
 
     def test_skips_tests_and_private(self):
@@ -108,24 +113,54 @@ class TestProjectAnalyze:
         assert not any("moduleUsed" in line for line in lines)
 
     def test_run_all_global_limit_stops_early(self):
+        from scip_cli.analyze.sections import TRUNCATION_LINE
+
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=3)
-        total_rows = sum(len(lines) for _title, lines, _preface in sections if lines != ["(none)"])
-        assert total_rows <= 3
-        assert len(sections) < 9
+        data_rows = 0
+        for title, lines, _preface in sections:
+            if title.startswith("[note]"):
+                continue
+            if lines == ["(none)"]:
+                continue
+            data_rows += sum(1 for line in lines if line != TRUNCATION_LINE)
+        assert data_rows <= 3
+        assert any(title.startswith("[note]") for title, _lines, _preface in sections)
 
-    def test_run_all_returns_ten_sections(self):
+    def test_run_all_per_check_limit_spreads_budget(self):
+        from scip_cli.analyze.sections import TRUNCATION_LINE
+
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=20, per_check_limit=1)
+        hit_sections = [
+            [line for line in lines if line != TRUNCATION_LINE]
+            for title, lines, _preface in sections
+            if lines != ["(none)"] and not title.startswith("[note]")
+        ]
+        assert hit_sections
+        assert all(len(lines) <= 1 for lines in hit_sections)
+        assert len(hit_sections) > 1
+        assert any(TRUNCATION_LINE in lines for _title, lines, _preface in sections)
+
+    def test_run_all_returns_nine_sections_without_duplicate_unreferenced(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500)
-        assert len(sections) == 10
+        assert len(sections) == 9
         titles = [title for title, _lines, _preface in sections]
         assert sum(1 for t in titles if "[low]" in t) == 4
         assert sum(1 for t in titles if "[medium]" in t) == 1
-        titles = [title for title, _lines, _preface in sections]
+        assert not any("Unreferenced symbols" in title for title in titles)
+        assert any("Dead exports" in title for title in titles)
         assert titles[0].startswith("[high]")
         assert "Cycles" in titles[0]
         assert titles[-1].startswith("[low]")
         assert "Top coupling" in titles[-1]
+
+    def test_unreferenced_runs_when_dead_exports_off(self):
+        db = mini_codebase_db()
+        sections = project_checks.run_all(db, limit=20, check_keys={"unreferenced"})
+        assert len(sections) == 1
+        assert "Unreferenced" in sections[0][0]
 
     def test_dead_exports_preface_when_hits(self):
         db = mini_codebase_db()
@@ -136,13 +171,14 @@ class TestProjectAnalyze:
         if lines != ["(none)"]:
             assert preface is not None
             assert "rdeps" in preface
+            assert "STEM" in preface
 
     def test_run_all_high_priority_only(self):
         from scip_cli.analyze.sections import Priority
 
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500, priorities={Priority.HIGH})
-        assert len(sections) == 5
+        assert len(sections) == 4
         titles = [title for title, _lines, _preface in sections]
         assert all("[high]" in title for title in titles)
 
@@ -188,8 +224,45 @@ class TestProjectAnalyze:
         assert "Dead files" in _title
         if lines != ["(none)"]:
             assert preface is not None
-            assert "rdeps" in preface
-            assert "export const" in preface
+            assert "STEM" in preface
+            assert "rg -F" in preface
+
+    def test_dead_files_skips_module_and_type_only_docs(self):
+        b = AnalyzeDbBuilder()
+        b.define_module("src/ui/widget.ts")
+        b.define_type("src/ui/widget.ts", "WidgetProps")
+        db = b.finish()
+        lines = project_checks.dead_files(db, limit=20)
+        assert "src/ui/widget.ts" not in lines
+
+    def test_dead_files_skips_live_module_import(self):
+        b = AnalyzeDbBuilder()
+        mod = b.define_module("src/pkg/mod.ts")
+        b.reference("src/entry.ts", mod)
+        db = b.finish()
+        lines = project_checks.dead_files(db, limit=20)
+        assert "src/pkg/mod.ts" not in lines
+
+    def test_dead_exports_skips_job_run_entrypoint(self):
+        b = AnalyzeDbBuilder()
+        b.define("src/jobs/tasks/cleanup.ts", "run")
+        db = b.finish()
+        dead = project_checks.dead_exports(db, limit=20)
+        assert not any("run" in line and "cleanup.ts" in line for line in dead)
+
+    def test_dead_files_skips_migration_loader_paths(self):
+        b = AnalyzeDbBuilder()
+        b.define("src/db/migrations/001_init.ts", "up")
+        b.define("src/orphan.ts", "orphanFn")
+        lines = project_checks.dead_files(b.finish(), limit=20)
+        assert "src/orphan.ts" in lines
+        assert not any("migrations/" in line for line in lines)
+
+    def test_dead_files_does_not_skip_job_layout_paths(self):
+        b = AnalyzeDbBuilder()
+        b.define("src/jobs/tasks/cleanup.ts", "helper")
+        lines = project_checks.dead_files(b.finish(), limit=20)
+        assert "src/jobs/tasks/cleanup.ts" in lines
 
 
 class TestFileAnalyze:
@@ -227,6 +300,37 @@ class TestFileAnalyze:
         sections = file_checks.run_all(db, "src/lib.ts", limit=500)
         titles = [title for title, _lines, _preface in sections]
         assert any("Coupling partners" in title for title in titles)
+        assert not any("Unreferenced in file" in title for title in titles)
+        assert any("Dead exports in file" in title for title in titles)
+
+    def test_unreferenced_in_file_runs_when_dead_in_file_off(self):
+        db = mini_codebase_db()
+        sections = file_checks.run_all(db, "src/lib.ts", limit=20, check_keys={"unreferenced"})
+        assert len(sections) == 1
+        assert "Unreferenced in file" in sections[0][0]
+
+    def test_one_live_index_across_project_and_file_when_bound(self, monkeypatch):
+        from scip_cli.analyze import live as live_mod
+        from scip_cli.analyze.live import bind_live, reset_live
+        from scip_cli.analyze.sections import RowBudget
+
+        builds = {"n": 0}
+        orig = live_mod.LiveIndex.__init__
+
+        def wrapped(self, db):
+            builds["n"] += 1
+            orig(self, db)
+
+        monkeypatch.setattr(live_mod.LiveIndex, "__init__", wrapped)
+        db = mini_codebase_db()
+        token = bind_live(db)
+        try:
+            budget = RowBudget(remaining=500)
+            project_checks.run_all(db, limit=500, budget=budget)
+            file_checks.run_all(db, "src/lib.ts", limit=500, budget=budget)
+        finally:
+            reset_live(token)
+        assert builds["n"] == 1
 
 
 class TestAnalyzeTargets:

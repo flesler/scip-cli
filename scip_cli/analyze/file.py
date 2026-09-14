@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .common import DEFAULT_LIMIT, SYM_DEF_JOIN, analyze_noise, fetch_all, short_name
-from .live import LiveIndex, file_has_scip_importers, has_same_file_reference_usage
+from .live import file_has_scip_importers, has_same_file_reference_usage, live_for
 from .sections import FALSE_POSITIVE_PREFACES, Check, Priority, run_checks
 from .symbol import symbol_pressure
 
@@ -83,7 +83,7 @@ def file_consumers(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[s
 
 
 def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
-    live = LiveIndex(db)
+    live = live_for(db)
     rows = fetch_all(
         db,
         """
@@ -117,7 +117,7 @@ def unreferenced_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> 
 
 
 def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
-    live = LiveIndex(db)
+    live = live_for(db)
     rows = fetch_all(
         db,
         """
@@ -154,7 +154,7 @@ def same_file_only_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -
 
 
 def dead_in_file(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
-    live = LiveIndex(db)
+    live = live_for(db)
     rows = fetch_all(
         db,
         """
@@ -342,8 +342,11 @@ def _run_file_checks(
     *,
     budget=None,
     check_keys=None,
+    per_check_limit=None,
 ) -> list[tuple[str, list[str], str | None]]:
-    return run_checks(checks, db, limit, priorities, budget=budget, check_keys=check_keys)
+    return run_checks(
+        checks, db, limit, priorities, budget=budget, check_keys=check_keys, per_check_limit=per_check_limit
+    )
 
 
 def run_all(
@@ -353,6 +356,7 @@ def run_all(
     priorities=None,
     budget=None,
     check_keys=None,
+    per_check_limit=None,
 ) -> list[tuple[str, list[str], str | None]]:
     return _run_file_checks(
         _file_checks(relative_path, include_top_symbols=True),
@@ -361,6 +365,7 @@ def run_all(
         priorities,
         budget=budget,
         check_keys=check_keys,
+        per_check_limit=per_check_limit,
     )
 
 
@@ -371,6 +376,7 @@ def run_all_sections_only(
     priorities=None,
     budget=None,
     check_keys=None,
+    per_check_limit=None,
 ) -> list[tuple[str, list[str], str | None]]:
     """Per-file sections without top-symbols (directory batch)."""
     return _run_file_checks(
@@ -380,4 +386,5 @@ def run_all_sections_only(
         priorities,
         budget=budget,
         check_keys=check_keys,
+        per_check_limit=per_check_limit,
     )

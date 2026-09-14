@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from contextvars import ContextVar
 
 from ..sql import debug_execute
-from ..symbols import extract_leaf_name, is_module_symbol
+from ..symbols import extract_leaf_name, is_module_symbol, is_type_or_interface_symbol
 
 _EXTERNAL_MENTION = """
     SELECT 1 FROM mentions m
@@ -43,6 +44,32 @@ def export_value_base(symbol: str) -> str | None:
         leaf = extract_leaf_name(symbol)
         return leaf or None
     return None
+
+
+def is_low_signal_dead_file(db, document_id: int) -> bool:
+    """Skip dead-file hits when SCIP only recorded a module/type surface.
+
+    scip-typescript often omits export const / arrow / named handler defs, so
+    wired files look unreferenced. A file with no runtime `().` / value defs is
+    not evidence it is unused — only that the indexer did not see callers.
+    """
+    rows = _fetch_all(
+        db,
+        """
+        SELECT gs.symbol
+        FROM defn_enclosing_ranges der
+        JOIN global_symbols gs ON gs.id = der.symbol_id
+        WHERE der.document_id = ?
+        """,
+        (document_id,),
+    )
+    if not rows:
+        return False
+    for (symbol,) in rows:
+        if is_module_symbol(symbol) or is_type_or_interface_symbol(symbol):
+            continue
+        return False
+    return True
 
 
 def _def_doc_id_from_symbol(db, symbol: str) -> int | None:
@@ -181,3 +208,33 @@ def file_has_scip_importers(db, relative_path: str, *, live: LiveIndex, def_doc_
         return False
     symbol_ids = [row[0] for row in symbols]
     return bool(get_importer_paths(db, symbol_ids, relative_path))
+
+
+_BoundLive = tuple[object, LiveIndex]
+_CURRENT_LIVE: ContextVar[_BoundLive | None] = ContextVar("scip_cli_live_index", default=None)
+
+
+def _bound_for(db) -> LiveIndex | None:
+    cached = _CURRENT_LIVE.get()
+    if cached is not None and cached[0] is db:
+        return cached[1]
+    return None
+
+
+def live_for(db) -> LiveIndex:
+    """Reuse LiveIndex within a bound analyze pass; otherwise build a new one."""
+    return _bound_for(db) or LiveIndex(db)
+
+
+def bind_live(db) -> object:
+    """Install a shared LiveIndex for this analyze pass. Nested binds on the same db reuse it.
+
+    Reset the returned token in finally.
+    """
+    existing = _bound_for(db)
+    index = existing if existing is not None else LiveIndex(db)
+    return _CURRENT_LIVE.set((db, index))
+
+
+def reset_live(token) -> None:
+    _CURRENT_LIVE.reset(token)
