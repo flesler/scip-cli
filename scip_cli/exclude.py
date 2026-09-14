@@ -2,51 +2,33 @@
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path, PurePosixPath
 
 from .config import load_project_config
-
-EXCLUDE_FILENAME = "index-exclude.json"
-
-
-def _exclude_path(project_root: Path) -> Path:
-    from .cache import get_cache_dir
-
-    return get_cache_dir(project_root) / EXCLUDE_FILENAME
+from .metadata import IndexMetadata, load_metadata, save_metadata
 
 
 def load_persisted_exclude_globs(project_root: Path) -> tuple[str, ...]:
-    """Load exclude globs from the last scoped reindex --exclude, if any."""
-    path = _exclude_path(project_root)
-    if not path.is_file():
-        return ()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return ()
-    if not isinstance(data, dict):
-        return ()
-    raw = data.get("globs")
-    if not raw or not isinstance(raw, list) or not all(isinstance(g, str) for g in raw):
-        return ()
-    return tuple(raw)
+    """Load exclude globs from persisted reindex metadata, if any."""
+    metadata = load_metadata(project_root)
+    return metadata.exclude_globs or ()
 
 
 def save_persisted_exclude_globs(project_root: Path, globs: list[str] | None) -> None:
-    """Persist or clear reindex --exclude globs for a project."""
-    path = _exclude_path(project_root)
-    if not globs:
-        if path.is_file():
-            path.unlink()
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"globs": globs}, indent=2) + "\n", encoding="utf-8")
+    """Persist or clear reindex exclude globs for a project."""
+    current = load_metadata(project_root)
+    save_metadata(
+        project_root,
+        IndexMetadata(
+            scope_paths=current.scope_paths,
+            exclude_globs=tuple(globs) if globs else None,
+        ),
+    )
 
 
 def resolve_exclude_globs(project_root: Path) -> tuple[str, ...]:
-    """Merge .scip-cli.json excludeGlobs with persisted reindex --exclude globs."""
+    """Merge .scip-cli.json excludeGlobs with persisted reindex exclude globs."""
     settings = load_project_config(project_root)
     merged: list[str] = []
     seen: set[str] = set()

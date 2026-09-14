@@ -14,19 +14,19 @@ AI agents waste tokens on grep and file scanning. scip-cli gives them precise, t
 - **Agent-first**: Install as a skill for Claude Code, Cursor, or any AI agent — precise code navigation without burning context
 - **Token-efficient**: One record per line, stderr for warnings, pipe-friendly output
 - **Fast**: Direct SQLite queries — 10x to 213x faster than alternatives
-- **`analyze`**: Find dead exports, import cycles, stale types, coupling hotspots — actionable health dashboards at project, file, or symbol scope
+- `analyze`: Find dead exports, import cycles, stale types, coupling hotspots — actionable health dashboards at project, file, or symbol scope
 - **Auto-indexing**: Indexes on first query, caches in SQLite, zero config
 
 ## Ports
 
 CLI/output parity ports of this project (Python is the reference):
 
-| Language           | Repository                                                        |
-| ------------------ | ----------------------------------------------------------------- |
-| Python (reference) | [flesler/scip-cli](https://github.com/flesler/scip-cli)           |
-| Go                 | [flesler/scip-cli-go](https://github.com/flesler/scip-cli-go)     |
-| Rust               | [flesler/scip-cli-rust](https://github.com/flesler/scip-cli-rust) |
-| Zig                | [flesler/scip-cli-zig](https://github.com/flesler/scip-cli-zig)   |
+|Language|Repository|
+|---|---|
+|Python (reference)|[flesler/scip-cli](https://github.com/flesler/scip-cli)|
+|Go|[flesler/scip-cli-go](https://github.com/flesler/scip-cli-go)|
+|Rust|[flesler/scip-cli-rust](https://github.com/flesler/scip-cli-rust)|
+|Zig|[flesler/scip-cli-zig](https://github.com/flesler/scip-cli-zig)|
 
 ## For AI Agents
 
@@ -223,13 +223,13 @@ Optional `.scip-cli.json` in the project root:
 
 Other environment variables:
 
-| Variable                       | Purpose                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `SCIP_CLI_MAX_HEAP_MB`         | Node heap for `scip-typescript` / `scip-python` (overrides `maxHeapMb` in config)             |
-| `SCIP_CLI_TS_INDEX_BATCH_SIZE` | Split large TS repos into multiple `scip-typescript` runs (default: all tsconfigs in one run) |
-| `SCIP_CLI_MERGE_BATCH_SIZE`    | SQLite ATTACH batch size when merging part DBs (max 9)                                        |
-| `SCIP_CLI_MAX_DEF_LINES`       | Max definition lines in `code` output                                                         |
-| `SCIP_CLI_DEBUG`               | Log SQL queries to stderr                                                                     |
+|Variable|Purpose|
+|---|---|
+|`SCIP_CLI_MAX_HEAP_MB`|Node heap for `scip-typescript` / `scip-python` (overrides `maxHeapMb` in config)|
+|`SCIP_CLI_TS_INDEX_BATCH_SIZE`|Split large TS repos into multiple `scip-typescript` runs (default: all tsconfigs in one run)|
+|`SCIP_CLI_MERGE_BATCH_SIZE`|SQLite ATTACH batch size when merging part DBs (max 9)|
+|`SCIP_CLI_MAX_DEF_LINES`|Max definition lines in `code` output|
+|`SCIP_CLI_DEBUG`|Log SQL queries to stderr|
 
 **Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. Language indexers (`scip-typescript`, `scip-python` via `npx`; `scip-go` via `go install @latest`) install at latest on first use. `rust-analyzer` installs via `rustup component add`.
 
@@ -242,9 +242,12 @@ scip-cli reindex --path packages/server
 scip-cli reindex --path packages/api --path packages/worker
 scip-cli reindex --tsconfig 'apps/api/tsconfig.*.json'
 scip-cli reindex --tsconfig tsconfig.app.json --tsconfig tsconfig.spec.json
+scip-cli reindex --exclude '**/*.test.ts' '**/*.spec.ts'
+scip-cli reindex --exclude          # clear persisted excludes
+scip-cli reindex --fresh            # full index; clear metadata.json
 ```
 
-`--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only.** The scope is saved as `index-scope.json` next to `index.db` and reused until you run a full `scip-cli reindex` with no `--path`/`--tsconfig`.
+`--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only.** Scope and exclude defaults are saved in `metadata.json` next to `index.db` and reused on later `reindex` runs; use `reindex --fresh` to clear them and restore a full index. `--exclude` updates the persisted exclude list; a lone bare `--exclude` clears it.
 
 When a tsconfig (after `extends`) has `allowJs: true`, matching `.js`/`.jsx` files under that config's `include`/`files` are indexed too (same roots as `.ts`/`.tsx`). `allowJs: false` or unset leaves JavaScript out. JS-only repos with no `tsconfig.json` still use `--infer-tsconfig`.
 
@@ -265,24 +268,24 @@ scip-cli analyze --check dead_files --limit 25
 
 Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 
-| Tier       | Project sections                                            | Action                                                               |
-| ---------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| **high**   | Cycles, unreferenced, dead exports, dead files, stale types | Nuke or fix cycles; delete unused; `_` prefix                        |
-| **medium** | Same-file only, change surface (file target)                | Module-private by usage                                              |
-| **low**    | Test-only consumers, coupling, bottlenecks, hotspots        | Noisy on Python (index omits many same-file calls); verify with `rg` |
+|Tier|Project sections|Action|
+|---|---|---|
+|**high**|Cycles, unreferenced, dead exports, dead files, stale types|Nuke or fix cycles; delete unused; `_` prefix|
+|**medium**|Same-file only, change surface (file target)|Module-private by usage|
+|**low**|Test-only consumers, coupling, bottlenecks, hotspots|Noisy on Python (index omits many same-file calls); verify with `rg`|
 
 Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
 
 **What to look at first**
 
-| Section                 | Easy pickings                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Cycles**              | Import/mention cycles between production files — break the edge or extract shared code                 |
-| **Unreferenced**        | No usage in the index at all — delete                                                                  |
-| **Dead exports**        | No external refs — delete or `_` prefix                                                                |
-| **Stale types**         | Classes/types with no external consumer in the index — verify in-file or type-only use before removing |
-| **Same-file only**      | Used only inside defining file — rename to `_`                                                         |
-| **Test-only consumers** | Cross-file refs are all from tests — promote to e2e or accept as internal                              |
+|Section|Easy pickings|
+|---|---|
+|**Cycles**|Import/mention cycles between production files — break the edge or extract shared code|
+|**Unreferenced**|No usage in the index at all — delete|
+|**Dead exports**|No external refs — delete or `_` prefix|
+|**Stale types**|Classes/types with no external consumer in the index — verify in-file or type-only use before removing|
+|**Same-file only**|Used only inside defining file — rename to `_`|
+|**Test-only consumers**|Cross-file refs are all from tests — promote to e2e or accept as internal|
 
 **Per-file or package drill-down** on hubs or suspects:
 
@@ -325,7 +328,8 @@ scip_cli/
 ├── paths.py         # --path scope filtering
 ├── project.py       # Project root + language detection
 ├── cache.py         # Index cache paths
-├── scope.py         # Persisted reindex scope (index-scope.json)
+├── metadata.py      # Persisted reindex defaults (metadata.json)
+├── scope.py         # Scoped reindex helpers
 ├── debug.py         # SCIP_CLI_DEBUG stderr helpers
 ├── indexing.py      # SCIP index build + get_db
 ├── symbols.py       # Symbol parsing and kinds

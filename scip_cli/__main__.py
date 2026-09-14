@@ -154,7 +154,7 @@ def main() -> None:
         "--path",
         action="append",
         metavar="PATH",
-        help="Index only tsconfig projects under PATH (repeatable; persisted until full reindex)",
+        help="Index only tsconfig projects under PATH (repeatable; persisted in metadata.json)",
     )
     reindex_parser.add_argument(
         "--tsconfig",
@@ -162,18 +162,25 @@ def main() -> None:
         metavar="GLOB",
         help=(
             "Index these tsconfig*.json files instead of auto-discovery "
-            "(repeatable, globs ok; persisted until full reindex). "
+            "(repeatable, globs ok; persisted in metadata.json). "
             "Cannot be combined with --path."
         ),
     )
     reindex_parser.add_argument(
         "--exclude",
         action="append",
+        nargs="*",
         metavar="GLOB",
         help=(
             "Omit indexed files matching GLOB from the SQLite index "
-            "(repeatable; merged with excludeGlobs in .scip-cli.json; persisted until full reindex)"
+            "(repeatable; merged with excludeGlobs in .scip-cli.json; persisted in metadata.json). "
+            "Bare --exclude clears persisted excludes."
         ),
+    )
+    reindex_parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Ignore persisted metadata.json; clear it unless scope/exclude flags are set on this run",
     )
     reindex_parser.add_argument(
         "--with-external",

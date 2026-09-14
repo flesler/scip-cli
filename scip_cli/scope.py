@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
-SCOPE_FILENAME = "index-scope.json"
+from .metadata import IndexMetadata, load_metadata, save_metadata
 
 
 @dataclass(frozen=True)
@@ -16,42 +15,23 @@ class IndexScope:
     paths: tuple[str, ...]
 
 
-def _scope_path(project_root: Path) -> Path:
-    from .cache import get_cache_dir
-
-    return get_cache_dir(project_root) / SCOPE_FILENAME
-
-
 def load_index_scope(project_root: Path) -> IndexScope | None:
     """Load the last reindex scope for a project, if any."""
-    path = _scope_path(project_root)
-    if not path.is_file():
+    metadata = load_metadata(project_root)
+    if not metadata.scope_paths:
         return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    raw_paths = data.get("paths")
-    if not raw_paths:
-        return None
-    if not isinstance(raw_paths, list) or not all(isinstance(p, str) for p in raw_paths):
-        return None
-    return IndexScope(paths=tuple(raw_paths))
+    return IndexScope(paths=metadata.scope_paths)
 
 
 def save_index_scope(project_root: Path, paths: list[str] | None) -> None:
     """Persist or clear the index scope for a project."""
-    path = _scope_path(project_root)
-    if not paths:
-        if path.is_file():
-            path.unlink()
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"paths": paths}, indent=2) + "\n",
-        encoding="utf-8",
+    current = load_metadata(project_root)
+    save_metadata(
+        project_root,
+        IndexMetadata(
+            scope_paths=tuple(paths) if paths else None,
+            exclude_globs=current.exclude_globs,
+        ),
     )
 
 

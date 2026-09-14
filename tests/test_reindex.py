@@ -1,20 +1,45 @@
 """Tests for reindex command."""
 
+import argparse
 import contextlib
 from argparse import Namespace
 
 import pytest
 
 from scip_cli.commands import reindex
+from scip_cli.exclude import load_persisted_exclude_globs, save_persisted_exclude_globs
 from scip_cli.project import Language
 from scip_cli.scope import load_index_scope, save_index_scope
 
 
-def test_full_reindex_clears_persisted_scope(tmp_path, monkeypatch):
+def _reindex_namespace(**kwargs):
+    defaults = {
+        "path": None,
+        "tsconfig": None,
+        "exclude": None,
+        "fresh": False,
+        "with_external": False,
+    }
+    defaults.update(kwargs)
+    return Namespace(**defaults)
+
+
+def test_reindex_exclude_argparse_bare_flag():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exclude", action="append", nargs="*", default=None)
+    assert parser.parse_args([]).exclude is None
+    assert parser.parse_args(["--exclude"]).exclude == [[]]
+    assert parser.parse_args(["--exclude", "tests/**"]).exclude == [["tests/**"]]
+    assert parser.parse_args(["--exclude", "a", "b"]).exclude == [["a", "b"]]
+    assert parser.parse_args(["--exclude", "foo", "--exclude"]).exclude == [["foo"], []]
+
+
+def test_reindex_preserves_persisted_metadata(tmp_path, monkeypatch):
     root = tmp_path / "proj"
     root.mkdir()
     (root / "package.json").write_text("{}", encoding="utf-8")
     save_index_scope(root, ["packages/api"])
+    save_persisted_exclude_globs(root, ["tests/**"])
 
     def fake_get_cache_dir(project_root):
         cache_dir = tmp_path / "cache"
@@ -35,9 +60,65 @@ def test_full_reindex_clears_persisted_scope(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "promote_next_index", lambda _cache: None)
     monkeypatch.setattr(reindex, "log_index_complete", lambda *_a, **_k: None)
 
-    reindex.main(Namespace(path=None))
+    reindex.main(_reindex_namespace())
+
+    scope = load_index_scope(root)
+    assert scope is not None
+    assert scope.paths == ("packages/api",)
+    assert load_persisted_exclude_globs(root) == ("tests/**",)
+
+
+def test_fresh_reindex_with_path_clears_exclude(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+    save_persisted_exclude_globs(root, ["tests/**"])
+
+    _stub_index(tmp_path, monkeypatch, root, Language.TYPESCRIPT)
+    reindex.main(_reindex_namespace(fresh=True, path=["packages/api"]))
+
+    scope = load_index_scope(root)
+    assert scope is not None
+    assert scope.paths == ("packages/api",)
+    assert load_persisted_exclude_globs(root) == ()
+
+
+def test_fresh_reindex_clears_persisted_metadata(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+    save_index_scope(root, ["packages/api"])
+    save_persisted_exclude_globs(root, ["tests/**"])
+
+    _stub_index(tmp_path, monkeypatch, root, Language.TYPESCRIPT)
+    reindex.main(_reindex_namespace(fresh=True))
 
     assert load_index_scope(root) is None
+    assert load_persisted_exclude_globs(root) == ()
+
+
+def test_reindex_exclude_clears_persisted_exclude(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+    save_persisted_exclude_globs(root, ["tests/**"])
+
+    _stub_index(tmp_path, monkeypatch, root, Language.TYPESCRIPT)
+    reindex.main(_reindex_namespace(exclude=[[]]))
+
+    assert load_persisted_exclude_globs(root) == ()
+
+
+def test_reindex_exclude_replaces_persisted_exclude(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+    save_persisted_exclude_globs(root, ["tests/**"])
+
+    _stub_index(tmp_path, monkeypatch, root, Language.TYPESCRIPT)
+    reindex.main(_reindex_namespace(exclude=[["**/*.spec.ts"]]))
+
+    assert load_persisted_exclude_globs(root) == ("**/*.spec.ts",)
 
 
 def test_reindex_path_rejected_for_python(tmp_path, monkeypatch):
@@ -49,7 +130,7 @@ def test_reindex_path_rejected_for_python(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.PYTHON))
 
     with pytest.raises(SystemExit) as exc:
-        reindex.main(Namespace(path=["src"]))
+        reindex.main(_reindex_namespace(path=["src"]))
     assert exc.value.code == 1
 
 
@@ -62,7 +143,7 @@ def test_reindex_rejects_empty_path(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
 
     with pytest.raises(SystemExit) as exc:
-        reindex.main(Namespace(path=[""]))
+        reindex.main(_reindex_namespace(path=[""]))
     assert exc.value.code == 1
     assert load_index_scope(root) is None
 
@@ -98,7 +179,7 @@ def test_reindex_tsconfig_glob_persists_files(tmp_path, monkeypatch):
     (root / "package.json").write_text("{}", encoding="utf-8")
 
     _stub_index(tmp_path, monkeypatch, root, Language.TYPESCRIPT)
-    reindex.main(Namespace(path=None, tsconfig=["pkg/tsconfig.*.json"]))
+    reindex.main(_reindex_namespace(tsconfig=["pkg/tsconfig.*.json"]))
 
     scope = load_index_scope(root)
     assert scope is not None
@@ -113,7 +194,7 @@ def test_reindex_rejects_path_and_tsconfig(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
 
     with pytest.raises(SystemExit) as exc:
-        reindex.main(Namespace(path=["pkg"], tsconfig=["pkg/tsconfig.*.json"]))
+        reindex.main(_reindex_namespace(path=["pkg"], tsconfig=["pkg/tsconfig.*.json"]))
     assert exc.value.code == 1
 
 
@@ -124,5 +205,5 @@ def test_reindex_tsconfig_rejected_for_python(tmp_path, monkeypatch):
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.PYTHON))
 
     with pytest.raises(SystemExit) as exc:
-        reindex.main(Namespace(path=None, tsconfig=["tsconfig.app.json"]))
+        reindex.main(_reindex_namespace(tsconfig=["tsconfig.app.json"]))
     assert exc.value.code == 1

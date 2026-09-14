@@ -9,11 +9,10 @@ from ..cache import (
     index_db_path,
     promote_next_index,
 )
-from ..exclude import save_persisted_exclude_globs
 from ..indexing import index_project, log_index_complete
+from ..metadata import UNSET, apply_metadata_updates
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
-from ..scope import save_index_scope
 from ..tsconfig import expand_tsconfig_patterns
 
 
@@ -25,7 +24,8 @@ def main(args):
 
     path_args = getattr(args, "path", None) or []
     tsconfig_args = getattr(args, "tsconfig", None) or []
-    exclude_args = getattr(args, "exclude", None) or []
+    exclude_groups = getattr(args, "exclude", None)
+    fresh = getattr(args, "fresh", False)
     if path_args and tsconfig_args:
         print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
         sys.exit(1)
@@ -34,6 +34,7 @@ def main(args):
         print(f"Error: reindex {flag} is only supported for TypeScript projects", file=sys.stderr)
         sys.exit(1)
 
+    scope_update: list[str] | object | None = UNSET
     if tsconfig_args:
         try:
             tsconfig_paths = expand_tsconfig_patterns(tsconfig_args, root)
@@ -41,12 +42,12 @@ def main(args):
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
         scope_paths = [path.as_posix() for path in tsconfig_paths]
-        save_index_scope(root, scope_paths)
+        scope_update = scope_paths
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
         print(
             (
                 "Warning: scoped reindex replaces the cache with only these tsconfig files; "
-                "run reindex with no --path/--tsconfig to restore the full index"
+                "run reindex --fresh to restore the full index"
             ),
             file=sys.stderr,
         )
@@ -58,23 +59,22 @@ def main(args):
                 print(f"Error: invalid or empty --path: {path!r}", file=sys.stderr)
                 sys.exit(1)
             scope_paths.append(normalized)
-        save_index_scope(root, scope_paths)
+        scope_update = scope_paths
         print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
         print(
             (
                 "Warning: scoped reindex replaces the cache with only these projects; "
-                "run reindex with no --path/--tsconfig to restore the full index"
+                "run reindex --fresh to restore the full index"
             ),
             file=sys.stderr,
         )
-    else:
-        save_index_scope(root, None)
 
-    if exclude_args:
-        save_persisted_exclude_globs(root, exclude_args)
-        print(f"Index exclude: {', '.join(exclude_args)}", file=sys.stderr)
-    else:
-        save_persisted_exclude_globs(root, None)
+    exclude_update: list[str] | object = UNSET
+    if exclude_groups is not None:
+        exclude_globs = [glob for group in exclude_groups for glob in group]
+        exclude_update = exclude_globs
+        if exclude_globs:
+            print(f"Index exclude: {', '.join(exclude_globs)}", file=sys.stderr)
 
     cache_dir = get_cache_dir(root)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -84,6 +84,12 @@ def main(args):
         sys.exit(1)
 
     with index_build_lock(cache_dir):
+        apply_metadata_updates(
+            root,
+            fresh=fresh,
+            scope_paths=scope_update,
+            exclude_globs=exclude_update,
+        )
         cleanup_in_progress_index(cache_dir)
         try:
             # Pass --with-external flag to indexer via environment
