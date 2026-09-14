@@ -1,3 +1,3 @@
 """scip-cli: Fast code intelligence via SCIP indexes."""
 
-__version__ = "2.7.0"
+__version__ = "2.8.0"
