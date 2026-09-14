@@ -1,6 +1,7 @@
 """Force re-indexing of the current project."""
 
 import sys
+import time
 
 from ..cache import (
     cleanup_in_progress_index,
@@ -98,7 +99,9 @@ def main(args):
 
                 os.environ["SCIP_CLI_KEEP_EXTERNAL"] = "1"
 
+            started = time.perf_counter()
             _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
+            elapsed_seconds = time.perf_counter() - started
         except RuntimeError as e:
             cleanup_in_progress_index(cache_dir)
             print(f"Error: {e}", file=sys.stderr)
@@ -116,4 +119,5 @@ def main(args):
             lang.value,
             projects=total if total > 1 else None,
             skipped=skipped,
+            elapsed_seconds=elapsed_seconds,
         )

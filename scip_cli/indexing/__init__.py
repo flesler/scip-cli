@@ -8,7 +8,7 @@ from .constants import (
     DEFAULT_TS_INDEX_BATCH_SIZE,
     MAX_TS_INDEX_BATCH_SIZE,
 )
-from .core import format_db_size, get_db, index_project, indexer_env, log_index_complete
+from .core import format_db_size, format_elapsed, get_db, index_project, indexer_env, log_index_complete
 from .orchestrate import effective_ts_batch_size, ts_index_batch_size
 from .runners import run_indexer_with_fallback
 from .typescript import typescript_projects
@@ -19,6 +19,7 @@ __all__ = [
     "MAX_TS_INDEX_BATCH_SIZE",
     "effective_ts_batch_size",
     "format_db_size",
+    "format_elapsed",
     "get_db",
     "index_project",
     "indexer_env",

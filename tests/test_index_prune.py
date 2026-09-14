@@ -110,18 +110,26 @@ class TestIndexLogging:
         kb.write_bytes(b"x" * 2048)
         assert format_db_size(kb) == "2.0 KB"
 
+    def test_format_elapsed(self):
+        from scip_cli.indexing import format_elapsed
+
+        assert format_elapsed(0.4) == "0.4s"
+        assert format_elapsed(12.3) == "12s"
+        assert format_elapsed(65.0) == "1m 5s"
+
     def test_log_index_complete(self, tmp_path, capsys):
         from scip_cli.indexing import log_index_complete
 
         db = tmp_path / "index.db"
         db.write_bytes(b"x" * 1024)
-        log_index_complete(db, "typescript", projects=3, skipped=1)
+        log_index_complete(db, "typescript", projects=3, skipped=1, elapsed_seconds=47.2)
         err = capsys.readouterr().err
         assert "Indexed" in err
         assert "1.0 KB" in err
         assert "typescript" in err
         assert "3 projects" in err
         assert "1 skipped" in err
+        assert "47s" in err
 
 
 class TestDocumentPathPrefix:

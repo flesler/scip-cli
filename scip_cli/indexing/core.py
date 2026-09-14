@@ -34,12 +34,27 @@ def format_db_size(db_path: Path) -> str:
     return f"{nbytes / (1024 * 1024):.1f} MB"
 
 
+def format_elapsed(seconds: float) -> str:
+    """Human-readable wall-clock duration for index completion logs."""
+    if seconds >= 60:
+        minutes = int(seconds // 60)
+        secs = round(seconds % 60)
+        if secs == 60:
+            minutes += 1
+            secs = 0
+        return f"{minutes}m {secs}s"
+    if seconds >= 10:
+        return f"{round(seconds)}s"
+    return f"{seconds:.1f}s"
+
+
 def log_index_complete(
     db_path: Path,
     lang: str,
     *,
     projects: int | None = None,
     skipped: int = 0,
+    elapsed_seconds: float | None = None,
 ) -> None:
     """One-line stderr summary after a successful index write."""
     size = format_db_size(db_path)
@@ -48,6 +63,8 @@ def log_index_complete(
         suffix = f", {projects} projects"
         if skipped:
             suffix += f", {skipped} skipped"
+    if elapsed_seconds is not None:
+        suffix += f", {format_elapsed(elapsed_seconds)}"
     print(f"Indexed {db_path} ({size}, {lang}{suffix})", file=sys.stderr)
 
 
