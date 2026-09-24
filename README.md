@@ -245,7 +245,7 @@ scip-cli reindex --tsconfig tsconfig.app.json --tsconfig tsconfig.spec.json
 scip-cli reindex --exclude '**/*.test.ts' '**/*.spec.ts'
 scip-cli reindex --exclude          # clear persisted excludes
 scip-cli reindex --fresh            # full index; clear metadata.json
-scip-cli reindex --incremental      # TypeScript: reuse unchanged tsconfig shards
+scip-cli reindex --incremental      # reuse unchanged project shards (see SKILL for language support)
 ```
 
 `--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only.** Scope and exclude defaults are saved in `metadata.json` next to `index.db` and reused on later `reindex` runs; use `reindex --fresh` to clear them and restore a full index. `--exclude` updates the persisted exclude list; a lone bare `--exclude` clears it.

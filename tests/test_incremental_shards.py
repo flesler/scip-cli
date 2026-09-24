@@ -47,6 +47,25 @@ class TestShardFingerprint:
         after = compute_shard_fingerprint(root, project)
         assert before != after
 
+    def test_fingerprint_ignores_tsconfig_exclude(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        pkg = root / "pkg"
+        pkg.mkdir()
+        (pkg / "tsconfig.json").write_text(
+            '{"include": ["src/**/*.ts"], "exclude": ["src/api/**"]}',
+            encoding="utf-8",
+        )
+        src = pkg / "src"
+        (src / "api").mkdir(parents=True)
+        (src / "api" / "x.ts").write_text("export const x = 1;\n", encoding="utf-8")
+        (src / "main.ts").write_text("export const m = 1;\n", encoding="utf-8")
+        project = Path("pkg/tsconfig.json")
+        before = compute_shard_fingerprint(root, project)
+        (src / "api" / "x.ts").write_text("export const x = 2;\n", encoding="utf-8")
+        after = compute_shard_fingerprint(root, project)
+        assert before == after
+
     def test_fingerprint_changes_with_exclude_globs(self, tmp_path):
         root = tmp_path / "repo"
         root.mkdir()

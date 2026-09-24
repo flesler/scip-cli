@@ -140,6 +140,18 @@ def resolved_allow_js(path: Path) -> bool:
     return False
 
 
+def resolved_exclude(path: Path) -> list[str]:
+    """`exclude` from the leaf tsconfig (first entry in the extends chain)."""
+    chain = walk_tsconfig_chain(path.resolve())
+    if not chain:
+        return []
+    _file, data = chain[0]
+    exclude = data.get("exclude")
+    if isinstance(exclude, list) and all(isinstance(item, str) for item in exclude):
+        return list(exclude)
+    return []
+
+
 def resolved_include_or_files(path: Path) -> tuple[list[str] | None, list[str] | None]:
     """First `include` or `files` found walking leaf → base. The other is None."""
     for _file, data in walk_tsconfig_chain(path):

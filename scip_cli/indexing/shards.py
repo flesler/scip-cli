@@ -7,7 +7,8 @@ import json
 import shutil
 from pathlib import Path
 
-from ..tsconfig import resolved_include_or_files, tsconfig_for_project, walk_tsconfig_chain
+from ..exclude import path_matches_glob
+from ..tsconfig import resolved_exclude, resolved_include_or_files, tsconfig_for_project, walk_tsconfig_chain
 
 MANIFEST_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
@@ -107,6 +108,18 @@ def _glob_source_files(base_dir: Path, patterns: list[str]) -> list[Path]:
     return sorted(found)
 
 
+def _tsconfig_excludes_path(tsconfig: Path, file_path: Path) -> bool:
+    """Return True when a file is excluded by the leaf tsconfig exclude list."""
+    exclude_patterns = resolved_exclude(tsconfig)
+    if not exclude_patterns:
+        return False
+    try:
+        relative = file_path.relative_to(tsconfig.parent).as_posix()
+    except ValueError:
+        return False
+    return any(path_matches_glob(relative, pattern) for pattern in exclude_patterns)
+
+
 def list_project_source_files(root: Path, project: Path) -> list[Path]:
     """Source files that contribute to a shard fingerprint (tsconfig include/files)."""
     root = Path(root).resolve()
@@ -117,10 +130,12 @@ def list_project_source_files(root: Path, project: Path) -> list[Path]:
     include, files = resolved_include_or_files(tsconfig)
     base_dir = tsconfig.parent
     if files is not None:
-        return _glob_source_files(base_dir, files)
-    if include is not None:
-        return _glob_source_files(base_dir, include)
-    return _glob_source_files(base_dir, ["**/*"])
+        candidates = _glob_source_files(base_dir, files)
+    elif include is not None:
+        candidates = _glob_source_files(base_dir, include)
+    else:
+        candidates = _glob_source_files(base_dir, ["**/*"])
+    return [path for path in candidates if not _tsconfig_excludes_path(tsconfig, path)]
 
 
 def compute_shard_fingerprint(

@@ -199,7 +199,7 @@ def index_typescript(
         show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
         if incremental and show_progress:
-            print(f"Incremental reindex: {total} TypeScript project shards...", file=sys.stderr)
+            print(f"Incremental reindex: {total} project shard(s)...", file=sys.stderr)
 
         if show_progress and use_parallel and not incremental:
             batch_desc = ts_batch_limit_display(batch_size, total)

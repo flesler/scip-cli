@@ -4,7 +4,7 @@ Phased plan to avoid full `scip-typescript` runs on every `reindex`. Shard reuse
 
 ## Phase 1 — scip-cli shard reuse (shipped)
 
-Per-tsconfig shard cache with content fingerprints. **Shippable:** unit + integration tests in-repo; large monorepo validated manually via ephemeral `/tmp` fixture (not in repo).
+Per-tsconfig shard cache with content fingerprints. **Shippable:** unit + integration tests in-repo; large monorepos can be validated manually outside the repo (not checked in).
 
 - [x] Roadmap doc
 - [x] `shards/manifest.json` in cache dir (fingerprint + part DB path per tsconfig project)
@@ -37,6 +37,6 @@ Per-tsconfig shard cache with content fingerprints. **Shippable:** unit + integr
 
 ## Phase 4 — Polish
 
-- [ ] Dogfood on this repo + optional large-repo manual smoke
+- [ ] Dogfood on this repo + optional large-monorepo validation (manual, outside CI)
 - [ ] Submit scip-typescript fork as upstream PR (phase 2, then 3 indexer pieces)
 - [ ] `scripts/bench.sh` scenario for incremental reindex

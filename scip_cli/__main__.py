@@ -199,8 +199,7 @@ def main() -> None:
         "--incremental",
         action="store_true",
         help=(
-            "TypeScript only: reuse cached per-tsconfig shard DBs when inputs are unchanged "
-            "(full reindex clears the shard cache)"
+            "Reuse cached per-project index parts when inputs are unchanged (full reindex clears the incremental cache)"
         ),
     )
     reindex_parser.add_argument(
