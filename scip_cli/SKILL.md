@@ -1,6 +1,6 @@
 ---
 name: scip-cli
-description: Read when needing symbols, definitions, refs, members, or SQL health dashboards in TS/JS, Python, Go, or Rust
+description: Read when needing symbol lookup or SQL health dashboards in code.
 ---
 
 TypeScript/JavaScript (.ts, .tsx, .js, .jsx), Python (.py), Go (.go), and Rust (.rs) — not GraphQL, CSS, or other files.
@@ -168,3 +168,5 @@ reindex [--path DIR ...] [--tsconfig FILE_OR_GLOB ...] [--exclude [GLOB ...]] [-
 `--exclude GLOB` omits matching files from the SQLite index after conversion (repeatable; merged with `excludeGlobs` in `.scip-cli.json`). Passing `--exclude` updates the persisted exclude list; a lone bare `--exclude` (no globs on that flag) clears it — `--exclude foo --exclude` keeps `foo`. Patterns without `/` match basenames (`*.test.ts`); patterns with `/` match repo-relative paths (`tests/**`, `**/__tests__/**`). Indexers still parse excluded files when production code imports them — post-process removal is authoritative.
 
 `--fresh` ignores persisted `metadata.json` and clears it before indexing unless `--path`, `--tsconfig`, or `--exclude` are set on the same command (use `reindex --fresh` to restore a full index).
+
+`--incremental` (**TypeScript only**) reuses cached per-tsconfig shard DBs under `shards/` in the cache dir when inputs are unchanged. Forces one `scip-typescript` run per project. A plain `reindex` clears the shard cache; run `reindex --incremental` after an initial full index to benefit. Cannot combine with `--fresh`.

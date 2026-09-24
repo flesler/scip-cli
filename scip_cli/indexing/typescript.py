@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,6 +25,16 @@ from .orchestrate import (
     ts_batch_limit_display,
 )
 from .runners import run_indexer_with_fallback
+from .shards import (
+    SHARDS_DIRNAME,
+    compute_shard_fingerprint,
+    load_shard_manifest,
+    resolve_cached_shard_db,
+    save_shard_manifest,
+    shard_db_filename,
+    shard_db_path,
+    shard_key,
+)
 
 
 def typescript_projects(root: Path) -> list[Path]:
@@ -125,15 +136,60 @@ def index_ts_projects(
     return label, db_path, None
 
 
-def index_typescript(root, cache_dir, projects, env, *, replace=False, exclude_globs: tuple[str, ...] = ()):
+def _persist_shard_db(cache_dir: Path, project: Path, source_db: Path) -> Path:
+    """Copy a part DB into the shard cache for incremental reuse."""
+    dest = shard_db_path(cache_dir, project)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_db, dest)
+    return dest
+
+
+def _index_shard_batch(
+    root: Path,
+    cache_dir: Path,
+    batch: list[Path],
+    work_dir: Path,
+    env,
+    *,
+    exclude_globs: tuple[str, ...],
+    output_db: Path | None,
+) -> tuple[str, Path | None, str | None]:
+    label, db_path, error = index_ts_projects(
+        root,
+        batch,
+        work_dir,
+        env,
+        output_db=output_db,
+        exclude_globs=exclude_globs,
+    )
+    if db_path is None:
+        return label, None, error
+    if len(batch) == 1:
+        _persist_shard_db(cache_dir, batch[0], db_path)
+    return label, db_path, None
+
+
+def index_typescript(
+    root,
+    cache_dir,
+    projects,
+    env,
+    *,
+    replace=False,
+    exclude_globs: tuple[str, ...] = (),
+    incremental: bool = False,
+):
     """Index one or more TypeScript projects and write the merged index.db."""
     root = Path(root)
     cache_dir = Path(cache_dir)
     output_db = index_db_path(cache_dir, replace=replace)
     workers = index_workers()
-    batch_size = effective_ts_batch_size(projects)
+    batch_size = 1 if incremental else effective_ts_batch_size(projects)
     batches = batch_projects(projects, batch_size)
     use_parallel = len(batches) > 1 and workers > 1
+    manifest = load_shard_manifest(cache_dir) if incremental else {}
+    updated_shards: dict[str, dict[str, str]] = {}
+    reused = 0
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
@@ -142,14 +198,99 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False, exclude_g
         total = len(projects)
         show_progress = total > PROGRESS_LOG_MIN_PROJECTS
 
-        if show_progress and use_parallel:
+        if incremental and show_progress:
+            print(f"Incremental reindex: {total} TypeScript project shards...", file=sys.stderr)
+
+        if show_progress and use_parallel and not incremental:
             batch_desc = ts_batch_limit_display(batch_size, total)
             print(
                 f"Indexing {total} TypeScript projects ({workers} workers, {batch_desc}; merge is serial)...",
                 file=sys.stderr,
             )
 
-        if use_parallel:
+        def _record_shard(project: Path, fingerprint: str) -> None:
+            relative = shard_db_filename(project)
+            updated_shards[shard_key(project)] = {
+                "fingerprint": fingerprint,
+                "part_db": f"{SHARDS_DIRNAME}/{relative}",
+            }
+
+        def _try_reuse_shard(project: Path) -> Path | None:
+            nonlocal reused
+            fingerprint = compute_shard_fingerprint(root, project, exclude_globs=exclude_globs)
+            cached = resolve_cached_shard_db(cache_dir, project, fingerprint, manifest)
+            if cached is None:
+                return None
+            reused += 1
+            _record_shard(project, fingerprint)
+            if show_progress:
+                print(f"Reused shard: {shard_key(project)}", file=sys.stderr)
+            return cached
+
+        if incremental:
+            ordered_parts: list[tuple[int, Path]] = []
+            pending: list[tuple[int, list[Path]]] = []
+            for index, batch in enumerate(batches, start=1):
+                project = batch[0]
+                cached = _try_reuse_shard(project)
+                if cached is not None:
+                    ordered_parts.append((index, cached))
+                    continue
+                pending.append((index, batch))
+
+            if pending:
+                if use_parallel and len(pending) > 1:
+                    with ThreadPoolExecutor(max_workers=workers) as pool:
+                        futures = {
+                            pool.submit(
+                                _index_shard_batch,
+                                root,
+                                cache_dir,
+                                batch,
+                                tmpdir_path / f"part-{index}",
+                                env,
+                                exclude_globs=exclude_globs,
+                                output_db=None,
+                            ): (index, batch)
+                            for index, batch in pending
+                        }
+                        for future in as_completed(futures):
+                            batch_index, batch = futures[future]
+                            label, db_path, error = future.result()
+                            if db_path is None:
+                                skipped += len(batch)
+                                print(f"Warning: skipped {label}: {error}", file=sys.stderr)
+                            else:
+                                project = batch[0]
+                                fingerprint = compute_shard_fingerprint(root, project, exclude_globs=exclude_globs)
+                                _record_shard(project, fingerprint)
+                                ordered_parts.append((batch_index, db_path))
+                                if show_progress:
+                                    print(f"Indexed shard: {shard_key(project)}", file=sys.stderr)
+                else:
+                    for index, batch in pending:
+                        project = batch[0]
+                        if show_progress:
+                            print(f"Indexing shard: {shard_key(project)}", file=sys.stderr)
+                        label, db_path, error = _index_shard_batch(
+                            root,
+                            cache_dir,
+                            batch,
+                            tmpdir_path / f"part-{index}",
+                            env,
+                            exclude_globs=exclude_globs,
+                            output_db=None,
+                        )
+                        if db_path is None:
+                            skipped += len(batch)
+                            print(f"Warning: skipped {label}: {error}", file=sys.stderr)
+                            continue
+                        fingerprint = compute_shard_fingerprint(root, project, exclude_globs=exclude_globs)
+                        _record_shard(project, fingerprint)
+                        ordered_parts.append((index, db_path))
+
+            part_dbs = [db for _, db in sorted(ordered_parts, key=lambda item: item[0])]
+        elif use_parallel:
             completed = 0
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = {
@@ -203,5 +344,13 @@ def index_typescript(root, cache_dir, projects, env, *, replace=False, exclude_g
             raise RuntimeError("Failed to index project")
 
         finalize_part_dbs(part_dbs, output_db)
+
+        if incremental:
+            save_shard_manifest(cache_dir, updated_shards)
+            if show_progress or reused:
+                print(
+                    f"Incremental: {reused} shard(s) reused, {len(updated_shards) - reused} reindexed",
+                    file=sys.stderr,
+                )
 
         return output_db, len(part_dbs), skipped, total

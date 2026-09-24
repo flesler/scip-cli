@@ -97,7 +97,7 @@ def indexer_env(project_root=None):
     return env
 
 
-def index_project(root, lang, cache_dir, *, replace=False, log=True):
+def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental=False):
     """Run the language-specific indexer and convert to DB."""
     from ..project import Language
 
@@ -110,7 +110,13 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True):
     if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
         output_db, _indexed, skipped, total = index_typescript(
-            root, cache_dir, projects, env, replace=replace, exclude_globs=exclude_globs
+            root,
+            cache_dir,
+            projects,
+            env,
+            replace=replace,
+            exclude_globs=exclude_globs,
+            incremental=incremental,
         )
         if log:
             log_index_complete(

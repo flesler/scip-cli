@@ -196,6 +196,14 @@ def main() -> None:
         help="Ignore persisted metadata.json; clear it unless scope/exclude flags are set on this run",
     )
     reindex_parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help=(
+            "TypeScript only: reuse cached per-tsconfig shard DBs when inputs are unchanged "
+            "(full reindex clears the shard cache)"
+        ),
+    )
+    reindex_parser.add_argument(
         "--with-external",
         action="store_true",
         default=False,

@@ -11,6 +11,7 @@ from ..cache import (
     promote_next_index,
 )
 from ..indexing import index_project, log_index_complete
+from ..indexing.shards import clear_shard_cache
 from ..metadata import UNSET, apply_metadata_updates
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
@@ -27,6 +28,13 @@ def main(args):
     tsconfig_args = getattr(args, "tsconfig", None) or []
     exclude_groups = getattr(args, "exclude", None)
     fresh = getattr(args, "fresh", False)
+    incremental = getattr(args, "incremental", False)
+    if incremental and fresh:
+        print("Error: reindex --incremental and --fresh cannot be combined", file=sys.stderr)
+        sys.exit(1)
+    if incremental and lang is not None and lang != Language.TYPESCRIPT:
+        print("Error: reindex --incremental is only supported for TypeScript projects", file=sys.stderr)
+        sys.exit(1)
     if path_args and tsconfig_args:
         print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
         sys.exit(1)
@@ -92,6 +100,8 @@ def main(args):
             exclude_globs=exclude_update,
         )
         cleanup_in_progress_index(cache_dir)
+        if fresh or not incremental:
+            clear_shard_cache(cache_dir)
         try:
             # Pass --with-external flag to indexer via environment
             if getattr(args, "with_external", False):
@@ -100,7 +110,14 @@ def main(args):
                 os.environ["SCIP_CLI_KEEP_EXTERNAL"] = "1"
 
             started = time.perf_counter()
-            _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
+            _output_db, skipped, total = index_project(
+                root,
+                lang,
+                cache_dir,
+                replace=True,
+                log=False,
+                incremental=incremental,
+            )
             elapsed_seconds = time.perf_counter() - started
         except RuntimeError as e:
             cleanup_in_progress_index(cache_dir)
