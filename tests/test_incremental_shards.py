@@ -13,6 +13,7 @@ from scip_cli.indexing.shards import (
     save_shard_manifest,
     shard_db_path,
     shard_key,
+    ts_build_info_dir,
 )
 
 
@@ -27,6 +28,41 @@ def _write_ts_project(root: Path, rel_dir: str, *, source: str = "export const x
     src.mkdir(parents=True, exist_ok=True)
     (src / "index.ts").write_text(source, encoding="utf-8")
     return Path(rel_dir)
+
+
+class TestTsBuildInfoDir:
+    def test_lives_under_cache_dir(self, tmp_path):
+        cache_dir = tmp_path / "cache"
+        assert ts_build_info_dir(cache_dir) == cache_dir / "tsbuildinfo"
+
+
+class TestTypescriptIndexArgs:
+    def test_incremental_passes_tsc_flags(self, tmp_path):
+        from scip_cli.indexing.typescript import _typescript_index_args
+
+        cache_dir = tmp_path / "cache"
+        args = _typescript_index_args(
+            tmp_path,
+            tmp_path / "out.scip",
+            [Path("pkg/tsconfig.json")],
+            cache_dir=cache_dir,
+            tsc_incremental=True,
+        )
+        assert "--incremental" in args
+        assert "--ts-build-info-dir" in args
+        assert str(ts_build_info_dir(cache_dir)) in args
+
+    def test_full_reindex_omits_tsc_flags(self, tmp_path):
+        from scip_cli.indexing.typescript import _typescript_index_args
+
+        args = _typescript_index_args(
+            tmp_path,
+            tmp_path / "out.scip",
+            [Path("pkg/tsconfig.json")],
+            tsc_incremental=False,
+        )
+        assert "--incremental" not in args
+        assert "--ts-build-info-dir" not in args
 
 
 class TestShardFingerprint:
@@ -205,7 +241,17 @@ class TestIndexTypescriptIncremental:
         cache_dir = tmp_path / "cache"
         calls: list[list[Path]] = []
 
-        def fake_index_ts_projects(_root, batch, work_dir, _env, *, output_db=None, exclude_globs=()):
+        def fake_index_ts_projects(
+            _root,
+            batch,
+            work_dir,
+            _env,
+            *,
+            output_db=None,
+            exclude_globs=(),
+            cache_dir=None,
+            tsc_incremental=False,
+        ):
             calls.append(list(batch))
             db = Path(output_db) if output_db is not None else Path(work_dir) / "index.db"
             label = batch[0].as_posix()

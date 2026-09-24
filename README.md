@@ -231,7 +231,7 @@ Other environment variables:
 |`SCIP_CLI_MAX_DEF_LINES`|Max definition lines in `code` output|
 |`SCIP_CLI_DEBUG`|Log SQL queries to stderr|
 
-**Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. Language indexers (`scip-typescript`, `scip-python` via `npx`; `scip-go` via `go install @latest`) install at latest on first use. `rust-analyzer` installs via `rustup component add`.
+**Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. `scip-typescript` installs via npx from the GitHub fork in `scip_cli/indexing/constants.py` when not on PATH (until upstream ships incremental flags). `scip-python` via `npx` at latest; `scip-go` via `go install @latest`. `rust-analyzer` installs via `rustup component add`.
 
 Large monorepos (>10 tsconfig projects) log per-project progress to stderr during indexing; smaller repos stay quiet aside from the final `Indexed … (size)` line.
 

@@ -247,8 +247,7 @@ class TestRunIndexerWithFallback:
                 ["index"],
                 "/tmp",
                 env={},
-                npx_package="@sourcegraph/scip-typescript",
-                npx_version="0.4.0",
+                npx_package="github:flesler/scip-typescript#feat/incremental-tsc",
             )
             assert result is mock_result
             mock_npx.assert_called_once()
