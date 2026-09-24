@@ -18,13 +18,15 @@ Per-tsconfig shard cache with content fingerprints. **Shippable:** unit + integr
 - [x] Stderr stats: `Incremental: N shard(s) reused, M reindexed`
 - [x] Update `scip_cli/SKILL.md` and README flag list
 
-## Phase 2 — scip-typescript fork: TSC incremental program
+## Phase 2 — scip-typescript fork: TSC incremental program (in progress)
 
-- [ ] Fork `sourcegraph/scip-typescript`
-- [ ] `--incremental` / `--ts-build-info-file` CLI flags
-- [ ] `createIncrementalProgram` + `createIncrementalCompilerHost` in `ProjectIndexer`
-- [ ] Default `tsBuildInfoFile` under scip-cli cache dir (not repo root)
-- [ ] scip-cli passes `--ts-build-info-file` when shard is dirty
+Fork work lives outside this repo (local clone + PR to `sourcegraph/scip-typescript`).
+
+- [x] Fork `sourcegraph/scip-typescript` (local: implement + tests passing)
+- [x] `--incremental` / `--ts-build-info-dir` CLI flags
+- [x] `createIncrementalProgram` + `createIncrementalCompilerHost` in `ProjectIndexer`
+- [x] scip-cli passes `--incremental --ts-build-info-dir <cache>/tsbuildinfo` on `reindex --incremental` dirty shards
+- [ ] Publish fork / upstream PR merged; pin or detect in scip-cli
 - [ ] Benchmark dirty shard: program build time before/after
 
 ## Phase 3 — File-level incremental inside a shard
