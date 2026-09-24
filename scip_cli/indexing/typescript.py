@@ -34,7 +34,6 @@ from .shards import (
     shard_db_filename,
     shard_db_path,
     shard_key,
-    ts_build_info_dir,
 )
 
 
@@ -68,22 +67,11 @@ def typescript_projects(root: Path) -> list[Path]:
     return sorted(merged.values(), key=str)
 
 
-def _typescript_index_args(
-    root,
-    output_scip,
-    projects,
-    *,
-    cache_dir: Path | None = None,
-    tsc_incremental: bool = False,
-):
+def _typescript_index_args(root, output_scip, projects):
     args = ["index", "--output", str(output_scip)]
     root = Path(root)
     if not (root / "tsconfig.json").exists():
         args.insert(1, "--infer-tsconfig")
-    if tsc_incremental and cache_dir is not None:
-        build_info_dir = ts_build_info_dir(cache_dir)
-        build_info_dir.mkdir(parents=True, exist_ok=True)
-        args.extend(["--incremental", "--ts-build-info-dir", str(build_info_dir)])
     args.extend(str(project) for project in projects)
     return args
 
@@ -122,8 +110,6 @@ def index_ts_projects(
     *,
     output_db: Path | None = None,
     exclude_globs: tuple[str, ...] = (),
-    cache_dir: Path | None = None,
-    tsc_incremental: bool = False,
 ):
     """Index one or more TypeScript projects into work_dir/index.db (or output_db when set)."""
     root = Path(root)
@@ -133,13 +119,7 @@ def index_ts_projects(
     part_scip = work_dir / "index.scip"
     db_path = Path(output_db) if output_db is not None else work_dir / "index.db"
     index_projects = materialize_allow_js_projects(root, projects, work_dir)
-    index_args = _typescript_index_args(
-        root,
-        part_scip,
-        index_projects,
-        cache_dir=cache_dir,
-        tsc_incremental=tsc_incremental,
-    )
+    index_args = _typescript_index_args(root, part_scip, index_projects)
     result = run_indexer_with_fallback(
         "scip-typescript",
         index_args,
@@ -181,8 +161,6 @@ def _index_shard_batch(
         env,
         output_db=output_db,
         exclude_globs=exclude_globs,
-        cache_dir=cache_dir,
-        tsc_incremental=True,
     )
     if db_path is None:
         return label, None, error

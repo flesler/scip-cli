@@ -12,18 +12,12 @@ from ..tsconfig import resolved_include_or_files, tsconfig_for_project, walk_tsc
 MANIFEST_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
 SHARDS_DIRNAME = "shards"
-TSBUILDINFO_DIRNAME = "tsbuildinfo"
 
 _SOURCE_SUFFIXES = frozenset({".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"})
 
 
 def shards_dir(cache_dir: Path) -> Path:
     return Path(cache_dir) / SHARDS_DIRNAME
-
-
-def ts_build_info_dir(cache_dir: Path) -> Path:
-    """Directory for per-tsconfig .tsbuildinfo files passed to scip-typescript."""
-    return Path(cache_dir) / TSBUILDINFO_DIRNAME
 
 
 def manifest_path(cache_dir: Path) -> Path:

@@ -169,4 +169,4 @@ reindex [--path DIR ...] [--tsconfig FILE_OR_GLOB ...] [--exclude [GLOB ...]] [-
 
 `--fresh` ignores persisted `metadata.json` and clears it before indexing unless `--path`, `--tsconfig`, or `--exclude` are set on the same command (use `reindex --fresh` to restore a full index).
 
-`--incremental` (**TypeScript only**) reuses cached per-tsconfig shard DBs under `shards/` in the cache dir when inputs are unchanged. Forces one `scip-typescript` run per project. Passes `--incremental --ts-build-info-dir` to scip-typescript (`.tsbuildinfo` under `tsbuildinfo/` in the cache dir) — requires a scip-typescript build with those flags (stock `@sourcegraph/scip-typescript` does not yet). A plain `reindex` clears the shard cache; run `reindex --incremental` after an initial full index to benefit. Cannot combine with `--fresh`.
+`--incremental` (**TypeScript only**) reuses cached per-tsconfig shard DBs under `shards/` in the cache dir when inputs are unchanged. Forces one `scip-typescript` run per project. A plain `reindex` clears the shard cache; run `reindex --incremental` after an initial full index to benefit. Cannot combine with `--fresh`.
