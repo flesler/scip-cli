@@ -1,6 +1,6 @@
 {
   "root": "/path/to/your-monorepo-checkout",
   "touch_large": [
-    "apps/api/src/services/dataStore.ts"
+    "packages/bulk/src/modules/module_25.ts"
   ]
 }

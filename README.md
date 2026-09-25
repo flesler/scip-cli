@@ -206,7 +206,7 @@ scip-cli deps greet --paths-only | sort -u
 6. Compacts the database after each reindex (`VACUUM` + WAL checkpoint)
 7. Subsequent queries are SQLite lookups against that cache (not re-indexing)
 
-**Incremental reindex (TypeScript, v3.0+):** plain `scip-cli reindex` in a git worktree is incremental by default — reuses unchanged tsconfig shards via `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`). Dirty shards reindex only changed files (git delta → importer closure → fork `--files`) and upsert into the live `index.db`. Use `--no-incremental` or `--fresh` for a full rebuild; `--unversioned` and non-git projects always full-reindex. See [docs/benchmarks.md](docs/benchmarks.md) for timings.
+**Incremental reindex (TypeScript, v3.0+):** plain `scip-cli reindex` in a git worktree is incremental by default — reuses unchanged tsconfig shards via `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`). Dirty shards reindex only changed files (git delta → importer closure → fork `--files`) and upsert into the live `index.db`. Use `--no-incremental` or `--fresh` for a full rebuild; `--unversioned` and non-git projects always full-reindex. Bench locally with `scripts/bench_incremental_gate.sh --branch fixture`.
 
 ## Configuration
 
@@ -244,7 +244,7 @@ Large monorepos (>10 tsconfig projects) log per-project progress to stderr durin
 Scoped indexing without editing `.scip-cli.json`:
 
 ```bash
-scip-cli reindex --path packages/server
+scip-cli reindex --path packages/core
 scip-cli reindex --path packages/api --path packages/worker
 scip-cli reindex --tsconfig 'apps/api/tsconfig.*.json'
 scip-cli reindex --tsconfig tsconfig.app.json --tsconfig tsconfig.spec.json
@@ -322,36 +322,6 @@ Inspired by [scip-query](https://github.com/PlunderStruck/scip-query), scip-cli 
 - `members`: 3.1s → 0.03s (103x faster)
 
 The speedup comes from using optimized direct SQLite queries and cutting some nice but very slow goodies (like ts-morph).
-
-## Architecture
-
-```
-scip_cli/
-├── __init__.py
-├── __main__.py      # CLI entry point
-├── cli_args.py      # Shared argparse helpers
-├── config.py        # .scip-cli.json loader
-├── discover.py      # TypeScript project discovery
-├── merge.py         # SQLite index merging
-├── scip_tool.py     # scip binary download
-├── sql.py           # SQLite helpers
-├── paths.py         # --path scope filtering
-├── project.py       # Project root + language detection
-├── cache.py         # Index cache paths
-├── metadata.py      # Persisted reindex defaults (metadata.json)
-├── scope.py         # Scoped reindex helpers
-├── debug.py         # SCIP_CLI_DEBUG stderr helpers
-├── indexing/        # SCIP index build (incremental, merge, git delta, …)
-├── indexing.py      # Re-exports get_db + index entry points
-├── symbols.py       # Symbol parsing and kinds
-├── queries.py       # Symbol/file SQL queries
-├── source.py        # Filesystem source reads
-├── output.py        # CLI formatting helpers
-├── session.py       # setup() and single-match resolution
-├── targets.py       # file-path heuristics (tests; analyze uses analyze/targets.py)
-├── analyze/         # SQL dashboard queries (project/file/symbol)
-└── commands/        # Subcommand implementations
-```
 
 ## Development
 

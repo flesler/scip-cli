@@ -10,7 +10,7 @@ SCIP_INSTALL_URL = "https://github.com/scip-code/scip/releases"
 #
 # TODO: Remove github_npm.py and runners github: branch when switching back to upstream npm.
 # scip-typescript npx fallback (when the binary is not on PATH). Fork adds --files
-# for partial document indexing (see docs/benchmarks.md). Pin >= ce6e9c9.
+# for partial document indexing. Pin >= ce6e9c9.
 SCIP_TYPESCRIPT_NPX_PACKAGE = "github:flesler/scip-typescript#feat/partial-files"
 
 # scip-typescript accepts many tsconfig paths per invocation (one .scip, one convert, no merge).
