@@ -109,6 +109,11 @@ def run_indexer_with_fallback(
     if rustup_component:
         return install_via_rustup(rustup_component, binary, args, cwd, run_env)
     if npx_package:
+        # TODO: Remove github_npm fork install boilerplate when switching back to upstream npm.
+        if npx_package.startswith("github:"):
+            from .github_npm import install_via_github_npm
+
+            return install_via_github_npm(npx_package, args, cwd, run_env)
         return install_via_npx(npx_package, npx_version, args, cwd, run_env)
 
     if result is None:

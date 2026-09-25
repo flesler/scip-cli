@@ -236,7 +236,28 @@ class TestRunIndexerWithFallback:
             assert result is mock_result
 
     def test_npx_fallback(self):
-        """Binary not found, falls back to npx."""
+        """Binary not found, falls back to github npm install for github: specs."""
+        # TODO: Remove with github_npm.py when switching back to upstream npm.
+        mock_result = MagicMock()
+        with (
+            patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
+            patch(
+                "scip_cli.indexing.github_npm.install_via_github_npm",
+                return_value=mock_result,
+            ) as mock_gh,
+        ):
+            result = run_indexer_with_fallback(
+                "scip-typescript",
+                ["index"],
+                "/tmp",
+                env={},
+                npx_package="github:flesler/scip-typescript#feat/partial-files",
+            )
+            assert result is mock_result
+            mock_gh.assert_called_once()
+
+    def test_npx_fallback_registry(self):
+        """Binary not found, falls back to npx for registry packages."""
         mock_result = MagicMock()
         with (
             patch("scip_cli.indexing.runners.run_indexer_command", return_value=(False, None)),
@@ -247,7 +268,8 @@ class TestRunIndexerWithFallback:
                 ["index"],
                 "/tmp",
                 env={},
-                npx_package="github:flesler/scip-typescript#feat/partial-files",
+                npx_package="@sourcegraph/scip-typescript",
+                npx_version="0.4.0",
             )
             assert result is mock_result
             mock_npx.assert_called_once()
