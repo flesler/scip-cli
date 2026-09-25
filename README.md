@@ -80,7 +80,8 @@ On **first index**, scip-cli runs language indexers and builds a SQLite cache. Y
 
 Install `scip-cli` and run it. On first index, scip-cli will:
 
-- Download `scip-typescript` / `scip-python` via `npx`, `scip-go` via `go install`, or `rust-analyzer` via `rustup` when not already on PATH
+- Install `scip-typescript` from the [flesler/scip-typescript](https://github.com/flesler/scip-typescript) fork (`feat/partial-files`) when not on PATH — clones, `npm install`, and builds into `~/.cache/scip-cli/tools/github-npm/` (upstream npm does not ship partial `--files` yet)
+- Download `scip-python` via `npx`, `scip-go` via `go install`, or `rust-analyzer` via `rustup` when not already on PATH
 - Download the `scip` converter binary from [GitHub releases](https://github.com/scip-code/scip/releases) into `~/.cache/scip-cli/bin/` when not already on PATH
 - Walk the repo for `tsconfig*.json` project roots (TypeScript monorepos), run `scip-typescript` per project (parallel by default), convert each partial index, then merge into one `index.db`
 
@@ -88,11 +89,12 @@ No `.scip-cli.json` required for discovery. Subsequent queries read the cached d
 
 **Option B: Install indexers globally ahead of time**
 
-Same indexing steps as Option A; this only avoids `npx` download on the first run:
+Same indexing steps as Option A; this only avoids the first-run download/build:
 
 ```bash
-# TypeScript/JavaScript indexer (also handles plain JS via --infer-tsconfig)
-npm install -g @sourcegraph/scip-typescript
+# TypeScript/JavaScript indexer — fork with partial --files (required for reindex --incremental)
+git clone --depth 1 --branch feat/partial-files https://github.com/flesler/scip-typescript.git
+cd scip-typescript && npm install --ignore-scripts && npm run build && npm install -g .
 
 # Python indexer
 npm install -g @sourcegraph/scip-python
@@ -133,7 +135,7 @@ scip-cli <command> [arguments]
 - `deps <symbol|file>` - Find outbound dependencies (what a symbol or file calls) (`--path`, `--paths-only`)
 - `members <symbol>` - List members of a class/interface (`--path`)
 - `analyze [target]` - SQL health dashboards (`--limit`, `--per-check-limit`, `--priority`, `--check`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
-- `reindex` - Force re-indexing of the current project (`--path` to limit scope; repeatable)
+- `reindex` - Force re-indexing (`--path`, `--tsconfig`, `--exclude`, `--fresh`, `--incremental`; TypeScript scope flags)
 - `skill [path]` - Install or dump the SKILL.md
 
 ### Examples
@@ -201,7 +203,10 @@ scip-cli deps greet --paths-only | sort -u
 3. Runs `scip-typescript` per project (in parallel when there are multiple projects; set `SCIP_CLI_INDEX_WORKERS=1` to force serial), `scip-python` for Python, `scip-go` for Go, or `rust-analyzer scip` for Rust
 4. Converts each SCIP output to SQLite with `scip expt-convert`, then merges partial databases when needed
 5. Caches the result in `~/.cache/scip-cli/projects/<dirname>-<hash>/index.db` (e.g. `my-monorepo-1a3f7a`)
-6. Subsequent queries are SQLite lookups against that cache (not re-indexing)
+6. Compacts the database after each reindex (`VACUUM` + WAL checkpoint)
+7. Subsequent queries are SQLite lookups against that cache (not re-indexing)
+
+**Incremental reindex (TypeScript, v3.0+):** `scip-cli reindex --incremental` in a git worktree reuses unchanged tsconfig shards via `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`). Dirty shards reindex only changed files (git delta → importer closure → fork `--files`) and upsert into the live `index.db`. Requires git; not combinable with `--unversioned` or `--fresh`. See [docs/benchmarks.md](docs/benchmarks.md) for timings.
 
 ## Configuration
 
@@ -228,10 +233,12 @@ Other environment variables:
 |`SCIP_CLI_MAX_HEAP_MB`|Node heap for `scip-typescript` / `scip-python` (overrides `maxHeapMb` in config)|
 |`SCIP_CLI_TS_INDEX_BATCH_SIZE`|Split large TS repos into multiple `scip-typescript` runs (default: all tsconfigs in one run)|
 |`SCIP_CLI_MERGE_BATCH_SIZE`|SQLite ATTACH batch size when merging part DBs (max 9)|
+|`SCIP_CLI_FILE_INCREMENTAL`|`1` (default) — partial shard reindex via fork `--files`; `0` disables|
+|`SCIP_CLI_INDEX_TIMING`|`1` — per-phase `INDEX_TIMING:` lines on stderr during reindex|
 |`SCIP_CLI_MAX_DEF_LINES`|Max definition lines in `code` output|
 |`SCIP_CLI_DEBUG`|Log SQL queries to stderr|
 
-**Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. `scip-typescript` installs via npx from the GitHub fork in `scip_cli/indexing/constants.py` when not on PATH (until upstream ships incremental flags). `scip-python` via `npx` at latest; `scip-go` via `go install @latest`. `rust-analyzer` installs via `rustup component add`.
+**Version policy:** only the `scip` converter (`expt-convert`) is pinned to the 0.8.x release line because it defines the SQLite schema. **TypeScript** uses [flesler/scip-typescript](https://github.com/flesler/scip-typescript) `feat/partial-files` (see `SCIP_TYPESCRIPT_NPX_PACKAGE` in `scip_cli/indexing/constants.py`) — auto-built when not on PATH; switch back to `@sourcegraph/scip-typescript` on npm once upstream merges `--files`. `scip-python` via `npx` at latest; `scip-go` via `go install @latest`. `rust-analyzer` installs via `rustup component add`.
 
 Large monorepos (>10 tsconfig projects) log per-project progress to stderr during indexing; smaller repos stay quiet aside from the final `Indexed … (size)` line.
 
@@ -245,10 +252,10 @@ scip-cli reindex --tsconfig tsconfig.app.json --tsconfig tsconfig.spec.json
 scip-cli reindex --exclude '**/*.test.ts' '**/*.spec.ts'
 scip-cli reindex --exclude          # clear persisted excludes
 scip-cli reindex --fresh            # full index; clear metadata.json
-scip-cli reindex --incremental      # reuse unchanged project shards (see SKILL for language support)
+scip-cli reindex --incremental      # TypeScript + git only: reuse clean shards, partial reindex dirty ones
 ```
 
-`--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are expanded inside the tool). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only.** Scope and exclude defaults are saved in `metadata.json` next to `index.db` and reused on later `reindex` runs; use `reindex --fresh` to clear them and restore a full index. `--exclude` updates the persisted exclude list; a lone bare `--exclude` clears it.
+`--path` limits which discovered tsconfig **directories** are indexed (prefix match, same idea as query `--path`). `--tsconfig` skips discovery and indexes those `tsconfig*.json` **files** (repeatable; globs are repo-relative to the detected project root — run from monorepo root or shorten the glob). File-based runs default to one `scip-typescript` process per file so each gets its own heap (`SCIP_CLI_TS_INDEX_BATCH_SIZE` still overrides). Cannot combine `--path` and `--tsconfig`. **TypeScript only** for `--path`, `--tsconfig`, and `--incremental`. Scope and exclude defaults are saved in `metadata.json` next to `index.db` and reused on later `reindex` runs; use `reindex --fresh` to clear them and restore a full index. `--exclude` updates the persisted exclude list (honored during `--incremental` too); a lone bare `--exclude` clears it. `--incremental` requires a git worktree; use plain `reindex` for `--unversioned` or non-git projects.
 
 When a tsconfig (after `extends`) has `allowJs: true`, matching `.js`/`.jsx` files under that config's `include`/`files` are indexed too (same roots as `.ts`/`.tsx`). `allowJs: false` or unset leaves JavaScript out. JS-only repos with no `tsconfig.json` still use `--infer-tsconfig`.
 
@@ -335,7 +342,8 @@ scip_cli/
 ├── metadata.py      # Persisted reindex defaults (metadata.json)
 ├── scope.py         # Scoped reindex helpers
 ├── debug.py         # SCIP_CLI_DEBUG stderr helpers
-├── indexing.py      # SCIP index build + get_db
+├── indexing/        # SCIP index build (incremental, merge, git delta, …)
+├── indexing.py      # Re-exports get_db + index entry points
 ├── symbols.py       # Symbol parsing and kinds
 ├── queries.py       # Symbol/file SQL queries
 ├── source.py        # Filesystem source reads
