@@ -1,0 +1,1 @@
+export { bulkSize } from "./meta";

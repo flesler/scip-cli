@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Sequence
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -38,3 +39,28 @@ def configure_bulk_write_connection(db: sqlite3.Connection) -> None:
         PRAGMA cache_size = -64000;
         PRAGMA mmap_size = 268435456;
     """)
+
+
+def _unlink_sqlite_sidecars(db_path: Path) -> None:
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(f"{db_path}{suffix}")
+        if sidecar.is_file():
+            sidecar.unlink()
+
+
+def finalize_index_db(db_path: Path) -> None:
+    """Checkpoint WAL pages and compact the index file after indexing."""
+    db_path = Path(db_path)
+    if not db_path.is_file():
+        return
+    if db_path.read_bytes()[:15] != b"SQLite format 3":
+        return
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.execute("VACUUM")
+    finally:
+        conn.close()
+
+    _unlink_sqlite_sidecars(db_path)

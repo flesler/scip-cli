@@ -88,3 +88,15 @@ def path_matches_any_glob(relative_path: str, patterns: tuple[str, ...] | list[s
     if not patterns:
         return False
     return any(path_matches_glob(relative_path, pattern) for pattern in patterns)
+
+
+def filter_excluded_paths(
+    paths: tuple[str, ...] | frozenset[str] | list[str],
+    exclude_globs: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Drop repo-relative paths that match persisted/config exclude globs."""
+    if not exclude_globs:
+        if isinstance(paths, tuple):
+            return paths
+        return tuple(sorted(paths))
+    return tuple(sorted(path for path in paths if not path_matches_any_glob(path, exclude_globs)))

@@ -37,7 +37,7 @@ class TestCliBasics:
     def test_skill_outputs_markdown(self):
         result = run_cli(["skill"])
         assert result.returncode == 0
-        assert "Quick Decision Guide" in result.stdout
+        assert "Quick guide" in result.stdout
 
 
 class TestSearch:

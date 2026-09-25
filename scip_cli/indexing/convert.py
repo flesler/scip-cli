@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ..scip_tool import ensure_scip_binary
 from .constants import SCIP_INSTALL_URL
+from .performance import metric, phase
 from .postprocess import postprocess_index
 from .runners import run_subprocess
 
@@ -74,6 +75,7 @@ def convert_scip_to_db(
     *,
     document_path_prefix: Path | str | None = None,
     exclude_globs: tuple[str, ...] | None = None,
+    skip_postprocess: bool = False,
 ):
     """Convert a SCIP protobuf file to a SQLite index at db_path."""
     db_path = Path(db_path)
@@ -84,17 +86,25 @@ def convert_scip_to_db(
     scip_binary = resolve_scip_binary()
     _warn_old_scip(scip_binary)
 
-    result = run_subprocess(
-        [scip_binary, "expt-convert", str(scip_path), "--output", db_path.name],
-        cwd=str(db_path.parent),
-    )
+    with phase("scip_expt_convert"):
+        result = run_subprocess(
+            [scip_binary, "expt-convert", str(scip_path), "--output", db_path.name],
+            cwd=str(db_path.parent),
+        )
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
         raise RuntimeError("Failed to convert index")
     if not db_path.exists():
         raise RuntimeError("Failed to convert index")
 
-    postprocess_index(db_path, exclude_globs=exclude_globs or ())
+    if skip_postprocess:
+        metric("postprocess_skipped", 1)
+    elif exclude_globs:
+        with phase("scip_postprocess"):
+            postprocess_index(db_path, exclude_globs=exclude_globs)
+    else:
+        with phase("scip_postprocess"):
+            postprocess_index(db_path, exclude_globs=exclude_globs or ())
     prefix = project_path_prefix(document_path_prefix)
     if prefix is not None:
         prefix_document_paths(db_path, prefix)

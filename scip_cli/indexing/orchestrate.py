@@ -20,7 +20,7 @@ from .constants import (
 
 
 def index_workers():
-    """Parallel workers for per-project indexer runs (merge stays serial)."""
+    """Parallel workers for per-project indexer runs."""
     env_val = os.environ.get("SCIP_CLI_INDEX_WORKERS")
     if env_val is not None:
         try:
@@ -69,12 +69,6 @@ def batch_projects(projects: list[Path], batch_size: int | None) -> list[list[Pa
     return [projects[i : i + batch_size] for i in range(0, len(projects), batch_size)]
 
 
-def ts_batch_limit_display(batch_size: int | None, total: int) -> str:
-    if batch_size is None or batch_size >= total:
-        return "all tsconfigs per run"
-    return f"up to {batch_size} tsconfigs per run"
-
-
 def project_label(project: Path) -> str:
     return "." if project == Path(".") else str(project)
 
@@ -101,7 +95,6 @@ def index_discovered_projects(
     env,
     *,
     replace: bool,
-    progress_noun: str,
     index_one,
     exclude_globs: tuple[str, ...] = (),
 ) -> tuple[Path, int, int, int]:
@@ -116,12 +109,6 @@ def index_discovered_projects(
         tmpdir_path = Path(tmpdir)
         part_dbs: list[Path] = []
         skipped = 0
-
-        if show_progress and use_parallel:
-            print(
-                f"Indexing {total} {progress_noun} ({workers} workers; merge is serial)...",
-                file=sys.stderr,
-            )
 
         if use_parallel:
             completed = 0

@@ -7,6 +7,7 @@ import sqlite3
 import pytest
 
 from scip_cli.exclude import (
+    filter_excluded_paths,
     path_matches_any_glob,
     path_matches_glob,
     resolve_exclude_globs,
@@ -42,6 +43,12 @@ class TestPathMatchesGlob:
         patterns = ("**/*.spec.ts", "**/*.test.ts")
         assert path_matches_any_glob("src/widget.spec.ts", patterns)
         assert path_matches_any_glob("src/widget.ts", patterns) is False
+
+
+class TestFilterExcludedPaths:
+    def test_drops_matching_paths(self):
+        paths = ("src/helper.ts", "src/widget.test.ts")
+        assert filter_excluded_paths(paths, ("**/*.test.ts",)) == ("src/helper.ts",)
 
 
 class TestResolveExcludeGlobs:

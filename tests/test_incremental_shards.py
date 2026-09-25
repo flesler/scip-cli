@@ -1,20 +1,29 @@
-"""Tests for per-tsconfig shard fingerprints and incremental reindex."""
+"""Tests for git-anchored shard manifest and incremental reindex."""
 
 import sqlite3
+import subprocess
 from pathlib import Path
 
 from scip_cli.indexing.core import indexer_env
+from scip_cli.indexing.git_delta import clear_git_delta_cache, git_index_delta
 from scip_cli.indexing.shards import (
     clear_shard_cache,
-    compute_shard_fingerprint,
+    load_manifest_data,
     load_shard_manifest,
     manifest_path,
-    resolve_cached_shard_db,
     save_shard_manifest,
-    shard_db_path,
+    shard_entry_for_project,
+    shard_is_clean,
     shard_key,
-    ts_build_info_dir,
+    tsconfig_chain_digest,
 )
+from scip_cli.tsconfig import tsconfig_for_project
+
+
+def _init_git(root: Path) -> None:
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=root, check=True, capture_output=True)
 
 
 def _write_ts_project(root: Path, rel_dir: str, *, source: str = "export const x = 1;\n") -> Path:
@@ -27,159 +36,110 @@ def _write_ts_project(root: Path, rel_dir: str, *, source: str = "export const x
     src = project / "src"
     src.mkdir(parents=True, exist_ok=True)
     (src / "index.ts").write_text(source, encoding="utf-8")
-    return Path(rel_dir)
-
-
-class TestTsBuildInfoDir:
-    def test_lives_under_cache_dir(self, tmp_path):
-        cache_dir = tmp_path / "cache"
-        assert ts_build_info_dir(cache_dir) == cache_dir / "tsbuildinfo"
-
-
-class TestTypescriptIndexArgs:
-    def test_incremental_passes_tsc_flags(self, tmp_path):
-        from scip_cli.indexing.typescript import _typescript_index_args
-
-        cache_dir = tmp_path / "cache"
-        args = _typescript_index_args(
-            tmp_path,
-            tmp_path / "out.scip",
-            [Path("pkg/tsconfig.json")],
-            cache_dir=cache_dir,
-            tsc_incremental=True,
-        )
-        assert "--incremental" in args
-        assert "--ts-build-info-dir" in args
-        assert str(ts_build_info_dir(cache_dir)) in args
-
-    def test_full_reindex_omits_tsc_flags(self, tmp_path):
-        from scip_cli.indexing.typescript import _typescript_index_args
-
-        args = _typescript_index_args(
-            tmp_path,
-            tmp_path / "out.scip",
-            [Path("pkg/tsconfig.json")],
-            tsc_incremental=False,
-        )
-        assert "--incremental" not in args
-        assert "--ts-build-info-dir" not in args
-
-
-class TestShardFingerprint:
-    def test_fingerprint_stable_for_same_tree(self, tmp_path):
-        root = tmp_path / "repo"
-        root.mkdir()
-        project = _write_ts_project(root, "packages/a")
-        first = compute_shard_fingerprint(root, project)
-        second = compute_shard_fingerprint(root, project)
-        assert first == second
-
-    def test_fingerprint_changes_when_source_changes(self, tmp_path):
-        root = tmp_path / "repo"
-        root.mkdir()
-        project = _write_ts_project(root, "packages/a")
-        before = compute_shard_fingerprint(root, project)
-        (root / "packages/a/src/index.ts").write_text("export const x = 2;\n", encoding="utf-8")
-        after = compute_shard_fingerprint(root, project)
-        assert before != after
-
-    def test_fingerprint_ignores_tsconfig_exclude(self, tmp_path):
-        root = tmp_path / "repo"
-        root.mkdir()
-        pkg = root / "pkg"
-        pkg.mkdir()
-        (pkg / "tsconfig.json").write_text(
-            '{"include": ["src/**/*.ts"], "exclude": ["src/api/**"]}',
-            encoding="utf-8",
-        )
-        src = pkg / "src"
-        (src / "api").mkdir(parents=True)
-        (src / "api" / "x.ts").write_text("export const x = 1;\n", encoding="utf-8")
-        (src / "main.ts").write_text("export const m = 1;\n", encoding="utf-8")
-        project = Path("pkg/tsconfig.json")
-        before = compute_shard_fingerprint(root, project)
-        (src / "api" / "x.ts").write_text("export const x = 2;\n", encoding="utf-8")
-        after = compute_shard_fingerprint(root, project)
-        assert before == after
-
-    def test_fingerprint_changes_with_exclude_globs(self, tmp_path):
-        root = tmp_path / "repo"
-        root.mkdir()
-        project = _write_ts_project(root, "packages/a")
-        plain = compute_shard_fingerprint(root, project)
-        with_exclude = compute_shard_fingerprint(root, project, exclude_globs=("**/*.test.ts",))
-        assert plain != with_exclude
+    return Path(f"{rel_dir}/tsconfig.json")
 
 
 class TestShardManifest:
     def test_save_and_load_round_trip(self, tmp_path):
         cache_dir = tmp_path / "cache"
-        shards = {
-            "pkg/tsconfig.json": {
-                "fingerprint": "abc",
-                "part_db": "shards/pkg__tsconfig.json.db",
-            }
-        }
-        save_shard_manifest(cache_dir, shards)
-        assert load_shard_manifest(cache_dir) == shards
+        root = tmp_path / "repo"
+        root.mkdir()
+        _init_git(root)
+        project = _write_ts_project(root, "pkg")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+        entry = shard_entry_for_project(root, project)
+        save_shard_manifest(cache_dir, {"pkg/tsconfig.json": entry}, project_root=root)
+        loaded = load_shard_manifest(cache_dir)
+        assert loaded["pkg/tsconfig.json"]["tsconfig_digest"] == entry["tsconfig_digest"]
+        _, commit = load_manifest_data(cache_dir)
+        assert commit is not None
 
     def test_save_merges_with_existing_manifest(self, tmp_path):
         cache_dir = tmp_path / "cache"
+        root = tmp_path / "repo"
+        root.mkdir()
+        _init_git(root)
+        _write_ts_project(root, "a")
+        _write_ts_project(root, "b")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
         save_shard_manifest(
             cache_dir,
-            {
-                "a/tsconfig.json": {"fingerprint": "1", "part_db": "shards/a.db"},
-            },
+            {"a/tsconfig.json": shard_entry_for_project(root, Path("a/tsconfig.json"))},
+            project_root=root,
         )
         save_shard_manifest(
             cache_dir,
-            {
-                "b/tsconfig.json": {"fingerprint": "2", "part_db": "shards/b.db"},
-            },
+            {"b/tsconfig.json": shard_entry_for_project(root, Path("b/tsconfig.json"))},
+            project_root=root,
         )
         manifest = load_shard_manifest(cache_dir)
-        assert manifest["a/tsconfig.json"]["fingerprint"] == "1"
-        assert manifest["b/tsconfig.json"]["fingerprint"] == "2"
+        assert "a/tsconfig.json" in manifest
+        assert "b/tsconfig.json" in manifest
 
     def test_clear_shard_cache_removes_manifest(self, tmp_path):
         cache_dir = tmp_path / "cache"
-        save_shard_manifest(cache_dir, {"a": {"fingerprint": "x", "part_db": "shards/a.db"}})
-        shard_db_path(cache_dir, Path("a")).parent.mkdir(parents=True, exist_ok=True)
-        shard_db_path(cache_dir, Path("a")).write_text("db", encoding="utf-8")
+        save_shard_manifest(cache_dir, {"a/tsconfig.json": {"tsconfig_digest": "x"}})
         clear_shard_cache(cache_dir)
         assert not manifest_path(cache_dir).exists()
-        assert not shard_db_path(cache_dir, Path("a")).exists()
 
 
-class TestResolveCachedShard:
-    def test_returns_db_when_fingerprint_matches(self, tmp_path):
+class TestTsconfigDigest:
+    def test_digest_changes_when_tsconfig_changes(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        project = _write_ts_project(root, "pkg")
+        tsconfig = tsconfig_for_project(root, project)
+        before = tsconfig_chain_digest(project, tsconfig)
+        (root / "pkg/tsconfig.json").write_text(
+            '{"include": ["src/**/*.ts"], "exclude": ["src/api/**"]}',
+            encoding="utf-8",
+        )
+        after = tsconfig_chain_digest(project, tsconfig_for_project(root, project))
+        assert before != after
+
+    def test_shard_dirty_when_tsconfig_changes(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        _init_git(root)
+        project = _write_ts_project(root, "pkg")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+        entry = shard_entry_for_project(root, project)
         cache_dir = tmp_path / "cache"
-        project = Path("pkg/tsconfig.json")
-        db = shard_db_path(cache_dir, project)
-        db.parent.mkdir(parents=True, exist_ok=True)
-        db.write_bytes(b"sqlite")
-        manifest = {
-            shard_key(project): {
-                "fingerprint": "deadbeef",
-                "part_db": f"shards/{db.name}",
-            }
-        }
-        resolved = resolve_cached_shard_db(cache_dir, project, "deadbeef", manifest)
-        assert resolved == db
+        save_shard_manifest(cache_dir, {shard_key(project): entry}, project_root=root)
+        _, commit = load_manifest_data(cache_dir)
+        delta = git_index_delta(root, commit)
+        assert shard_is_clean(root, project, entry, commit, delta)
+        (root / "pkg/tsconfig.json").write_text(
+            '{"include": ["src/**/*.ts"], "exclude": ["src/legacy/**"]}',
+            encoding="utf-8",
+        )
+        assert not shard_is_clean(root, project, entry, commit, delta)
 
-    def test_returns_none_when_fingerprint_differs(self, tmp_path):
+    def test_tsconfig_only_change_marks_shard_dirty(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        _init_git(root)
+        project = _write_ts_project(root, "pkg")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+        entry = shard_entry_for_project(root, project)
         cache_dir = tmp_path / "cache"
-        project = Path("pkg/tsconfig.json")
-        db = shard_db_path(cache_dir, project)
-        db.parent.mkdir(parents=True, exist_ok=True)
-        db.write_bytes(b"sqlite")
-        manifest = {
-            shard_key(project): {
-                "fingerprint": "old",
-                "part_db": f"shards/{db.name}",
-            }
-        }
-        assert resolve_cached_shard_db(cache_dir, project, "new", manifest) is None
+        save_shard_manifest(cache_dir, {shard_key(project): entry}, project_root=root)
+        _, commit = load_manifest_data(cache_dir)
+        delta = git_index_delta(root, commit)
+        assert shard_is_clean(root, project, entry, commit, delta)
+
+        (root / "pkg/tsconfig.json").write_text(
+            '{"include": ["src/**/*.ts"], "exclude": ["src/legacy/**"]}',
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "add", "pkg/tsconfig.json"], cwd=root, check=True, capture_output=True)
+        clear_git_delta_cache()
+        delta = git_index_delta(root, commit)
+        assert not shard_is_clean(root, project, entry, commit, delta)
 
 
 _MERGEABLE_SCHEMA = """
@@ -228,12 +188,15 @@ def _write_mergeable_shard_db(path: Path, doc_path: str) -> None:
 
 
 class TestIndexTypescriptIncremental:
-    def test_warm_run_skips_indexer(self, tmp_path, monkeypatch):
+    def test_warm_run_skips_indexer_and_promote(self, tmp_path, monkeypatch):
         root = tmp_path / "repo"
         root.mkdir()
         (root / "package.json").write_text("{}", encoding="utf-8")
+        _init_git(root)
         _write_ts_project(root, "packages/a")
         _write_ts_project(root, "packages/b", source="export const y = 1;\n")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
         projects = [
             Path("packages/a/tsconfig.json"),
             Path("packages/b/tsconfig.json"),
@@ -249,8 +212,7 @@ class TestIndexTypescriptIncremental:
             *,
             output_db=None,
             exclude_globs=(),
-            cache_dir=None,
-            tsc_incremental=False,
+            index_files=None,
         ):
             calls.append(list(batch))
             db = Path(output_db) if output_db is not None else Path(work_dir) / "index.db"
@@ -259,15 +221,21 @@ class TestIndexTypescriptIncremental:
             return label, db, None
 
         monkeypatch.setattr(
-            "scip_cli.indexing.typescript.index_ts_projects",
+            "scip_cli.indexing.ts_projects.index_ts_projects",
             fake_index_ts_projects,
         )
+        from scip_cli.cache import index_db_path, promote_next_index
         from scip_cli.indexing.typescript import index_typescript
 
         env = indexer_env(root)
-        index_typescript(root, cache_dir, projects, env, replace=True, incremental=True)
+        _db, _, _, _, promote = index_typescript(root, cache_dir, projects, env, replace=True, incremental=True)
+        assert promote is True
         assert len(calls) == 2
+        promote_next_index(cache_dir)
+        assert index_db_path(cache_dir).is_file()
 
         calls.clear()
-        index_typescript(root, cache_dir, projects, env, replace=True, incremental=True)
+        db, _, _, _, promote = index_typescript(root, cache_dir, projects, env, replace=True, incremental=True)
         assert calls == []
+        assert promote is False
+        assert db == index_db_path(cache_dir)

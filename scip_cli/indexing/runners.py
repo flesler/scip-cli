@@ -36,15 +36,15 @@ def run_indexer_command(binary, args, cwd, env):
         if "not found" in result.stderr.lower():
             return False, result
         return True, result  # Command ran but failed - return the error
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         return False, None
 
 
-def install_via_npx(package, version, args, cwd, env):
+def install_via_npx(package, version, args, cwd, env, binary="scip-typescript"):
     """Install and run via npx."""
     npx_spec = f"{package}@~{version}" if version else package
     debug_log("Tool not found, trying npx (will download automatically)...")
-    return run_subprocess(["npx", "-y", npx_spec, *args], cwd, env=env)
+    return run_subprocess(["npx", "-y", "-p", npx_spec, binary, *args], cwd, env=env)
 
 
 def install_via_go_install(package, binary, args, cwd, env, *, version: str | None = None):

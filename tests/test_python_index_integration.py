@@ -58,7 +58,7 @@ def test_index_project_python_merges_nested_packages(python_monorepo, tmp_path, 
         lambda parts, out: _merge_fixture(parts, out),
     )
 
-    output_db, skipped, total = index_project(
+    output_db, skipped, total, _promote = index_project(
         python_monorepo,
         Language.PYTHON,
         cache_dir,

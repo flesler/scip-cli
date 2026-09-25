@@ -68,6 +68,21 @@ class TestMetadata:
         assert load_index_scope(tmp_path) is None
         assert load_persisted_exclude_globs(tmp_path) == ("tests/**",)
 
+    def test_unversioned_round_trip(self, tmp_path):
+        save_metadata(tmp_path, IndexMetadata(unversioned=True))
+        assert load_metadata(tmp_path).unversioned is True
+        data = json.loads(metadata_path(tmp_path).read_text(encoding="utf-8"))
+        assert data == {"unversioned": True}
+
+    def test_apply_unversioned_flag(self, tmp_path):
+        apply_metadata_updates(tmp_path, unversioned=True)
+        assert load_metadata(tmp_path).unversioned is True
+
+    def test_fresh_clears_unversioned(self, tmp_path):
+        apply_metadata_updates(tmp_path, unversioned=True)
+        apply_metadata_updates(tmp_path, fresh=True)
+        assert load_metadata(tmp_path).unversioned is False
+
     def test_bare_exclude_clears_slice(self, tmp_path):
         save_index_scope(tmp_path, ["packages/api"])
         save_persisted_exclude_globs(tmp_path, ["tests/**"])

@@ -18,6 +18,7 @@ from ..cache import (
 from ..config import load_project_config
 from ..discover import discover_golang_modules, discover_python_projects, discover_rust_crates
 from ..exclude import resolve_exclude_globs
+from ..sql import finalize_index_db
 from .constants import DEFAULT_MAX_HEAP_MB
 from .languages import index_golang_module, index_python_project, index_rust_crate
 from .orchestrate import index_discovered_projects
@@ -109,7 +110,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
 
     if lang == Language.TYPESCRIPT:
         projects = typescript_projects(root)
-        output_db, _indexed, skipped, total = index_typescript(
+        output_db, _indexed, skipped, total, promote = index_typescript(
             root,
             cache_dir,
             projects,
@@ -125,7 +126,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
                 projects=total if total > 1 else None,
                 skipped=skipped,
             )
-        return output_db, skipped, total
+        return output_db, skipped, total, promote
 
     if lang == Language.PYTHON:
         projects = discover_python_projects(root)
@@ -135,7 +136,6 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
             projects,
             env,
             replace=replace,
-            progress_noun="Python packages",
             index_one=index_python_project,
             exclude_globs=exclude_globs,
         )
@@ -146,7 +146,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
                 projects=total if total > 1 else None,
                 skipped=skipped,
             )
-        return output_db, skipped, total
+        return output_db, skipped, total, True
 
     if lang == Language.GOLANG:
         modules = discover_golang_modules(root)
@@ -156,7 +156,6 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
             modules,
             env,
             replace=replace,
-            progress_noun="Go modules",
             index_one=index_golang_module,
             exclude_globs=exclude_globs,
         )
@@ -167,7 +166,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
                 projects=total if total > 1 else None,
                 skipped=skipped,
             )
-        return output_db, skipped, total
+        return output_db, skipped, total, True
 
     if lang == Language.RUST:
         crates = discover_rust_crates(root)
@@ -177,7 +176,6 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
             crates,
             env,
             replace=replace,
-            progress_noun="Rust crates",
             index_one=index_rust_crate,
             exclude_globs=exclude_globs,
         )
@@ -188,7 +186,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
                 projects=total if total > 1 else None,
                 skipped=skipped,
             )
-        return output_db, skipped, total
+        return output_db, skipped, total, True
 
     raise RuntimeError(f"Unsupported language '{lang}'")
 
@@ -217,8 +215,12 @@ def get_db(project_root=None):
             else:
                 cleanup_in_progress_index(cache_dir)
                 try:
-                    _output_db, skipped, total = index_project(root, lang, cache_dir, replace=True, log=False)
-                    promote_next_index(cache_dir)
+                    _output_db, skipped, total, promote = index_project(root, lang, cache_dir, replace=True, log=False)
+                    if promote:
+                        finalize_index_db(index_db_path(cache_dir, replace=True))
+                        promote_next_index(cache_dir)
+                    else:
+                        finalize_index_db(index_db_path(cache_dir, replace=False))
                     log_index_complete(
                         index_db_path(cache_dir),
                         lang.value,

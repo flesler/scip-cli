@@ -1,45 +1,76 @@
-# Incremental reindex roadmap
+# Incremental reindex (settled)
 
-Phased plan to avoid full `scip-typescript` runs on every `reindex`. Shard reuse first; file-level and upstream TSC incremental follow.
+## Model
 
-## Phase 1 — scip-cli shard reuse (shipped)
+Two modes only:
 
-Per-tsconfig shard cache with content fingerprints. **Shippable:** unit + integration tests in-repo; large monorepos can be validated manually outside the repo (not checked in).
+| Mode | Trigger | Behaviour |
+|------|---------|-----------|
+| **Git incremental** | `reindex --incremental` in a git repo (not `--unversioned`) | Manifest stores `git_commit` + per-shard `tsconfig_digest`. Shard skip when git delta empty for shard. Partial reindex via `--files` on dirty paths ∪ importers. Upsert into live `index.db`. |
+| **Full reindex** | Plain `reindex`, `--unversioned`, or non-git | No incremental. Clears shard manifest (unless `--incremental` on same run). Full indexer per shard. |
 
-- [x] Roadmap doc
-- [x] `shards/manifest.json` in cache dir (fingerprint + part DB path per tsconfig project)
-- [x] `compute_shard_fingerprint()` — tsconfig chain + included source file content hashes + exclude globs
-- [x] `reindex --incremental` — per-project shards (batch size 1), reuse unchanged part DBs
-- [x] Persist shard part DBs under `cache/shards/*.db`
-- [x] Full `reindex` clears shard cache (avoid stale reuse after non-incremental rebuild)
-- [x] `reindex --fresh` clears shard cache
-- [x] Unit tests for fingerprint, manifest merge, and warm `index_typescript` reuse
-- [x] Reindex CLI flag tests (`--incremental`, rejects with `--fresh` / Python)
-- [x] Stderr stats: `Incremental: N shard(s) reused, M reindexed`
-- [x] Update `scip_cli/SKILL.md` and README flag list
+**Removed:** content hashes, stat fast-path, `SCIP_CLI_FINGERPRINT=*`, `SCIP_CLI_FINGERPRINT_DISCOVERY=*`, `SCIP_CLI_FINGERPRINT_CACHE`, manifest `file_hashes` / `fingerprint`.
 
-## Phase 2 — scip-typescript fork: TSC incremental program (in progress)
+## Git delta (change detection)
 
-Fork work lives outside this repo (local clone + PR to `sourcegraph/scip-typescript`).
+Since `manifest.git_commit`:
 
-- [x] Fork `sourcegraph/scip-typescript` (local: implement + tests passing)
-- [x] `--incremental` / `--ts-build-info-dir` CLI flags
-- [x] `createIncrementalProgram` + `createIncrementalCompilerHost` in `ProjectIndexer`
-- [x] scip-cli passes `--incremental --ts-build-info-dir <cache>/tsbuildinfo` on `reindex --incremental` dirty shards
-- [x] npx fallback via `github:flesler/scip-typescript#feat/incremental-tsc` (`SCIP_TYPESCRIPT_NPX_PACKAGE`; switch back when upstream merges)
-- [ ] Upstream PR merged or fork published to npm long-term
-- [ ] Benchmark dirty shard: program build time before/after
+1. `git diff <commit>..HEAD` (committed)
+2. `git diff` (unstaged)
+3. `git diff --cached` (staged)
+4. `git ls-files --others --exclude-standard` (untracked)
 
-## Phase 3 — File-level incremental inside a shard
+`git mv` is treated as **delete old path + add new path** (implementation disables git rename folding so the old path lands in the removal set).
 
-- [ ] Document-level upsert in SQLite (replace rows for changed paths; merge is insert-only today)
-- [ ] `reindex --incremental` accepts optional changed-file list (content-hash manifest in cache)
-- [ ] Invalidation: changed files ∪ direct importers (from existing index `mentions`)
-- [ ] scip-typescript fork: skip unchanged files in `ProjectIndexer` loop (`--files` or internal dirty set)
-- [ ] Optional git input via env / scip-atlas (`last_index_commit`, `git diff --name-only`) — not a hard scip-cli dependency
+Deletions flow to `remove_documents_by_paths`. Modifications/additions filtered through tsconfig include/exclude, then importer closure for partial scope.
 
-## Phase 4 — Polish
+## Manifest v4
 
-- [ ] Dogfood on this repo + optional large-monorepo validation (manual, outside CI)
-- [ ] Submit scip-typescript fork as upstream PR (phase 2, then 3 indexer pieces)
-- [ ] `scripts/bench.sh` scenario for incremental reindex
+```json
+{
+  "version": 4,
+  "git_commit": "<HEAD at last successful index>",
+  "shards": {
+    "packages/a/tsconfig.json": {
+      "tsconfig_digest": "<hex sha256 — see below>"
+    }
+  }
+}
+```
+
+### `tsconfig_digest`
+
+Per-shard **SHA-256 hex** of the tsconfig *chain* (not source files). Built in `tsconfig_chain_digest()`:
+
+1. Shard key (`packages/a/tsconfig.json` posix path) + `\0`
+2. For each file in `extends` chain (root tsconfig first, then parents), in order:
+   - absolute path string + `\0`
+   - raw file bytes + `\0`
+
+Any change to the shard tsconfig or an extended parent (include/exclude/files, compiler options, path) changes the digest → **full shard reindex** even when git reports no file changes.
+
+Shard skip: `tsconfig_digest` unchanged **and** no paths in git delta intersect this shard (via tsconfig include/exclude rules).
+
+## Env
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SCIP_CLI_FILE_INCREMENTAL` | `1` | Partial `--files` reindex when git delta is small |
+
+## Benchmarks
+
+See [benchmarks.md](benchmarks.md).
+
+```bash
+scripts/bench_incremental_gate.sh --branch fixture
+scripts/bench_fingerprint_smoke.py   # requires local smoke.local.json
+SCIP_CLI_INDEX_TIMING=1 scip-cli reindex --incremental
+```
+
+## Upstream (scip-typescript)
+
+| | |
+|---|---|
+| **Upstream** | https://github.com/sourcegraph/scip-typescript |
+| **Fork** | https://github.com/flesler/scip-typescript (`feat/partial-files`, `--files` only) |
+| **Pin** | `ce6e9c9` on `feat/partial-files` |

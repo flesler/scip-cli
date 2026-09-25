@@ -258,6 +258,11 @@ def _prune_excluded_documents(conn: sqlite3.Connection, exclude_globs: tuple[str
         _replace_table(conn, "defn_enclosing_ranges", "defn_enclosing_ranges_new")
 
 
+def recreate_index_indexes(conn: sqlite3.Connection) -> None:
+    """Recreate indexes dropped when index tables are rebuilt."""
+    _recreate_postprocess_indexes(conn)
+
+
 def _recreate_postprocess_indexes(conn: sqlite3.Connection) -> None:
     """expt-convert indexes are dropped when tables are rebuilt."""
     conn.execute("CREATE INDEX IF NOT EXISTS idx_global_symbols_symbol ON global_symbols(symbol)")

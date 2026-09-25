@@ -51,7 +51,7 @@ def test_reindex_preserves_persisted_metadata(tmp_path, monkeypatch):
     def fake_index_project(_root, _lang, cache_dir, *, replace=False, log=True, incremental=False):
         db = cache_dir / ("index.db.next" if replace else "index.db")
         db.write_text("sqlite", encoding="utf-8")
-        return db, 0, 1
+        return db, 0, 1, True
 
     monkeypatch.chdir(root)
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
@@ -159,7 +159,7 @@ def _stub_index(tmp_path, monkeypatch, root, lang):
     def fake_index_project(_root, _lang, cache_dir, *, replace=False, log=True, incremental=False):
         db = cache_dir / ("index.db.next" if replace else "index.db")
         db.write_text("sqlite", encoding="utf-8")
-        return db, 0, 1
+        return db, 0, 1, True
 
     monkeypatch.chdir(root)
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, lang))
@@ -201,9 +201,16 @@ def test_reindex_rejects_path_and_tsconfig(tmp_path, monkeypatch):
 
 
 def test_reindex_incremental_clears_shards_on_full_reindex(tmp_path, monkeypatch):
+    import subprocess
+
     root = tmp_path / "proj"
     root.mkdir()
     (root / "package.json").write_text("{}", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -216,7 +223,7 @@ def test_reindex_incremental_clears_shards_on_full_reindex(tmp_path, monkeypatch
         calls.append(incremental)
         db = cache / ("index.db.next" if replace else "index.db")
         db.write_text("sqlite", encoding="utf-8")
-        return db, 0, 1
+        return db, 0, 1, True
 
     monkeypatch.chdir(root)
     monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
@@ -235,6 +242,19 @@ def test_reindex_incremental_clears_shards_on_full_reindex(tmp_path, monkeypatch
     manifest_path(cache_dir).write_text('{"version": 1, "shards": {}}', encoding="utf-8")
     reindex.main(_reindex_namespace(incremental=True))
     assert calls == [False, True]
+
+
+def test_reindex_incremental_rejected_without_git(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "package.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(reindex, "find_project_root_and_language", lambda: (root, Language.TYPESCRIPT))
+
+    with pytest.raises(SystemExit) as exc:
+        reindex.main(_reindex_namespace(incremental=True))
+    assert exc.value.code == 1
 
 
 def test_reindex_incremental_rejected_for_python(tmp_path, monkeypatch):

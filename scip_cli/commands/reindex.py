@@ -12,9 +12,11 @@ from ..cache import (
 )
 from ..indexing import index_project, log_index_complete
 from ..indexing.shards import clear_shard_cache
-from ..metadata import UNSET, apply_metadata_updates
+from ..indexing.source_discovery import is_versioned_repo
+from ..metadata import UNSET, apply_metadata_updates, index_unversioned
 from ..paths import normalize_path_scope
 from ..project import Language, find_project_root_and_language
+from ..sql import finalize_index_db
 from ..tsconfig import expand_tsconfig_patterns
 
 
@@ -29,11 +31,21 @@ def main(args):
     exclude_groups = getattr(args, "exclude", None)
     fresh = getattr(args, "fresh", False)
     incremental = getattr(args, "incremental", False)
+    unversioned = getattr(args, "unversioned", False)
     if incremental and fresh:
         print("Error: reindex --incremental and --fresh cannot be combined", file=sys.stderr)
         sys.exit(1)
     if incremental and lang is not None and lang != Language.TYPESCRIPT:
         print("Error: reindex --incremental is only supported for TypeScript projects", file=sys.stderr)
+        sys.exit(1)
+    if incremental and (index_unversioned(root) or not is_versioned_repo(root)):
+        print(
+            (
+                "Error: reindex --incremental requires a git repository "
+                "(use full reindex without --incremental for --unversioned or non-git projects)"
+            ),
+            file=sys.stderr,
+        )
         sys.exit(1)
     if path_args and tsconfig_args:
         print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
@@ -52,14 +64,11 @@ def main(args):
             sys.exit(1)
         scope_paths = [path.as_posix() for path in tsconfig_paths]
         scope_update = scope_paths
-        print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
-        print(
-            (
-                "Warning: scoped reindex replaces the cache with only these tsconfig files; "
-                "run reindex --fresh to restore the full index"
-            ),
-            file=sys.stderr,
-        )
+        if len(scope_paths) == 1:
+            print(f"Index scope: {scope_paths[0]}", file=sys.stderr)
+        else:
+            patterns = ", ".join(tsconfig_args)
+            print(f"Index scope: {patterns} ({len(scope_paths)} tsconfigs)", file=sys.stderr)
     elif path_args:
         scope_paths: list[str] = []
         for path in path_args:
@@ -69,14 +78,10 @@ def main(args):
                 sys.exit(1)
             scope_paths.append(normalized)
         scope_update = scope_paths
-        print(f"Index scope: {', '.join(scope_paths)}", file=sys.stderr)
-        print(
-            (
-                "Warning: scoped reindex replaces the cache with only these projects; "
-                "run reindex --fresh to restore the full index"
-            ),
-            file=sys.stderr,
-        )
+        if len(scope_paths) == 1:
+            print(f"Index scope: {scope_paths[0]}", file=sys.stderr)
+        else:
+            print(f"Index scope: {len(scope_paths)} paths", file=sys.stderr)
 
     exclude_update: list[str] | object = UNSET
     if exclude_groups is not None:
@@ -98,6 +103,7 @@ def main(args):
             fresh=fresh,
             scope_paths=scope_update,
             exclude_globs=exclude_update,
+            unversioned=unversioned if unversioned else UNSET,
         )
         cleanup_in_progress_index(cache_dir)
         if fresh or not incremental:
@@ -110,7 +116,7 @@ def main(args):
                 os.environ["SCIP_CLI_KEEP_EXTERNAL"] = "1"
 
             started = time.perf_counter()
-            _output_db, skipped, total = index_project(
+            _output_db, skipped, total, promote = index_project(
                 root,
                 lang,
                 cache_dir,
@@ -124,13 +130,26 @@ def main(args):
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
 
-        next_db = index_db_path(cache_dir, replace=True)
-        if not next_db.is_file():
+        live_db = index_db_path(cache_dir, replace=False)
+        from scip_cli.indexing.performance import phase
+
+        if promote:
+            next_db = index_db_path(cache_dir, replace=True)
+            if not next_db.is_file():
+                cleanup_in_progress_index(cache_dir)
+                print("Error: No index.db found after indexing", file=sys.stderr)
+                sys.exit(1)
+            with phase("finalize"):
+                finalize_index_db(next_db)
+            with phase("promote"):
+                promote_next_index(cache_dir)
+        elif live_db.is_file():
+            with phase("finalize"):
+                finalize_index_db(live_db)
+        elif not live_db.is_file():
             cleanup_in_progress_index(cache_dir)
             print("Error: No index.db found after indexing", file=sys.stderr)
             sys.exit(1)
-
-        promote_next_index(cache_dir)
         log_index_complete(
             index_db_path(cache_dir, replace=False),
             lang.value,

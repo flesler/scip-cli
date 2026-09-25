@@ -1,0 +1,6 @@
+{
+  "root": "/path/to/your-monorepo-checkout",
+  "touch_large": [
+    "apps/api/src/services/dataStore.ts"
+  ]
+}

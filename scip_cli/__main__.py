@@ -203,6 +203,14 @@ def main() -> None:
         ),
     )
     reindex_parser.add_argument(
+        "--unversioned",
+        action="store_true",
+        help=(
+            "Discover sources via on-disk glob instead of git (persisted in metadata.json; "
+            "for tarballs or when gitignored files must be indexed). Cleared by reindex --fresh"
+        ),
+    )
+    reindex_parser.add_argument(
         "--with-external",
         action="store_true",
         default=False,

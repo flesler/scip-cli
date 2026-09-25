@@ -64,7 +64,7 @@ class TestInstallViaNpx:
             result = install_via_npx("@sourcegraph/scip-typescript", "0.4.0", ["index"], "/tmp", {})
             assert result is mock_result
             mock_run.assert_called_once_with(
-                ["npx", "-y", "@sourcegraph/scip-typescript@~0.4.0", "index"],
+                ["npx", "-y", "-p", "@sourcegraph/scip-typescript@~0.4.0", "scip-typescript", "index"],
                 "/tmp",
                 env={},
             )
@@ -76,7 +76,7 @@ class TestInstallViaNpx:
             result = install_via_npx("@sourcegraph/scip-python", None, ["index"], "/tmp", {})
             assert result is mock_result
             mock_run.assert_called_once_with(
-                ["npx", "-y", "@sourcegraph/scip-python", "index"],
+                ["npx", "-y", "-p", "@sourcegraph/scip-python", "scip-typescript", "index"],
                 "/tmp",
                 env={},
             )
@@ -247,7 +247,7 @@ class TestRunIndexerWithFallback:
                 ["index"],
                 "/tmp",
                 env={},
-                npx_package="github:flesler/scip-typescript#feat/incremental-tsc",
+                npx_package="github:flesler/scip-typescript#feat/partial-files",
             )
             assert result is mock_result
             mock_npx.assert_called_once()

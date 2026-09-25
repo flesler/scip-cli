@@ -49,5 +49,10 @@ dogfood.md
 
 # Local-only dev scripts (repo-specific smoke harnesses)
 scripts/deep-smoke.sh
+scripts/smoke.local.json
 tmp/
 *.db
+node_modules/
+
+# Generated when indexing the incremental-bench fixture (sources are .ts)
+tests/fixtures/incremental-bench/**/*.js
