@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .convert import convert_scip_to_db
 from .orchestrate import project_label
-from .runners import run_indexer_with_fallback
+from .runners import indexer_failure_message, run_indexer_with_fallback
 
 
 def _project_cwd(root: Path, project: Path) -> Path:
@@ -29,7 +29,7 @@ def index_python_project(root, project, work_dir, env, *, output_db=None, exclud
         npx_package="@sourcegraph/scip-python",
     )
     if result.returncode != 0:
-        return label, None, result.stderr.strip() or "indexing failed"
+        return label, None, indexer_failure_message(result)
     try:
         convert_scip_to_db(part_scip, db_path, document_path_prefix=project, exclude_globs=exclude_globs)
     finally:
@@ -53,7 +53,7 @@ def index_golang_module(root, module, work_dir, env, *, output_db=None, exclude_
         go_package="github.com/scip-code/scip-go/cmd/scip-go",
     )
     if result.returncode != 0:
-        return label, None, result.stderr.strip() or "indexing failed"
+        return label, None, indexer_failure_message(result)
     try:
         convert_scip_to_db(part_scip, db_path, document_path_prefix=module, exclude_globs=exclude_globs)
     finally:
@@ -77,7 +77,7 @@ def index_rust_crate(root, crate, work_dir, env, *, output_db=None, exclude_glob
         rustup_component="rust-analyzer",
     )
     if result.returncode != 0:
-        return label, None, result.stderr.strip() or "indexing failed"
+        return label, None, indexer_failure_message(result)
     try:
         convert_scip_to_db(part_scip, db_path, document_path_prefix=crate, exclude_globs=exclude_globs)
     finally:

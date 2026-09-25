@@ -11,6 +11,17 @@ from ..debug import debug_log
 from .constants import INDEX_TIMEOUT
 
 
+def indexer_failure_message(result: subprocess.CompletedProcess[str]) -> str:
+    """Best-effort detail when an indexer subprocess exits non-zero."""
+    stderr = (result.stderr or "").strip()
+    if stderr:
+        return stderr
+    stdout = (result.stdout or "").strip()
+    if stdout:
+        return stdout
+    return "indexing failed"
+
+
 def run_subprocess(cmd, cwd, env=None):
     """Run subprocess with timeout; raise RuntimeError on timeout."""
     try:

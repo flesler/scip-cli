@@ -11,7 +11,7 @@ from .constants import SCIP_TYPESCRIPT_NPX_PACKAGE
 from .convert import convert_scip_to_db
 from .orchestrate import project_batch_label
 from .performance import phase
-from .runners import run_indexer_with_fallback
+from .runners import indexer_failure_message, run_indexer_with_fallback
 
 
 def typescript_index_args(
@@ -96,7 +96,7 @@ def index_ts_projects(
             npx_package=SCIP_TYPESCRIPT_NPX_PACKAGE,
         )
     if result.returncode != 0:
-        return label, None, result.stderr.strip() or "indexing failed"
+        return label, None, indexer_failure_message(result)
     try:
         with phase("scip_convert"):
             convert_scip_to_db(
