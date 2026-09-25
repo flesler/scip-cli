@@ -10,7 +10,6 @@ from pathlib import Path
 
 from ..cache import index_db_path
 from ..debug import debug_log
-from .constants import file_incremental_enabled
 from .document_upsert import document_paths_in_db, remove_documents_by_paths, upsert_shard_documents
 from .git_delta import (
     GitIndexDelta,
@@ -20,7 +19,7 @@ from .git_delta import (
     shard_dirty_paths,
 )
 from .orchestrate import batch_projects, finalize_part_dbs, index_workers, project_batch_label
-from .performance import flush_summary, metric, note, phase
+from .performance import flush_summary, metric, phase
 from .shard_files import PartialReindexPlan, resolve_partial_reindex_plan, shard_relative_paths
 from .shards import (
     load_manifest_data,
@@ -88,7 +87,7 @@ def _index_dirty_shard(
 ) -> tuple[str, ShardUpdate | None, str | None]:
     project = batch[0]
     partial: PartialReindexPlan | None = None
-    if file_incremental_enabled() and delta is not None:
+    if delta is not None:
         partial = resolve_partial_reindex_plan(
             root,
             project,
@@ -97,8 +96,6 @@ def _index_dirty_shard(
             delta,
             exclude_globs=exclude_globs,
         )
-    elif not file_incremental_enabled():
-        note(f"{shard_key(project)}:partial_off")
 
     if partial is not None and not partial.index_paths and not partial.remove_paths:
         return (

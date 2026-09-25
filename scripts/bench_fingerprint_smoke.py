@@ -51,7 +51,7 @@ def _restore_snapshot(cache_dir: Path) -> None:
 def _run_reindex(smoke_root: Path, env: dict[str, str]) -> tuple[float, str, str]:
     t0 = time.perf_counter()
     proc = subprocess.run(
-        ["scip-cli", "reindex", "--incremental"],
+        ["scip-cli", "reindex"],
         cwd=smoke_root,
         capture_output=True,
         text=True,
@@ -86,8 +86,6 @@ def _git_delta_scan(smoke_root: Path) -> float:
 def bench_incremental(smoke_root: Path) -> None:
     env = os.environ.copy()
     env["SCIP_CLI_INDEX_TIMING"] = "1"
-    env["SCIP_CLI_FILE_INCREMENTAL"] = "1"
-
     _restore_snapshot(get_cache_dir_from_root(smoke_root))
     warm_wall, warm_line, warm_summary = _run_reindex(smoke_root, env)
     delta_s = _git_delta_scan(smoke_root)

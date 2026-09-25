@@ -196,10 +196,11 @@ def main() -> None:
         help="Ignore persisted metadata.json; clear it unless scope/exclude flags are set on this run",
     )
     reindex_parser.add_argument(
-        "--incremental",
+        "--no-incremental",
         action="store_true",
         help=(
-            "Reuse cached per-project index parts when inputs are unchanged (full reindex clears the incremental cache)"
+            "Full reindex every shard and clear the shard manifest "
+            "(default: incremental in git TypeScript repos; --fresh also forces full)"
         ),
     )
     reindex_parser.add_argument(

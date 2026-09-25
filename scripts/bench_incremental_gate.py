@@ -33,9 +33,7 @@ BENCH_DIR = ROOT / "tmp" / "benchmarks"
 DECISIONS_PATH = BENCH_DIR / ".incremental-gate-decisions.json"
 FIXTURE_SOURCE = ROOT / "tests" / "fixtures" / "incremental-bench"
 
-BASE_ENV: dict[str, str] = {
-    "SCIP_CLI_FILE_INCREMENTAL": "1",
-}
+BASE_ENV: dict[str, str] = {}
 
 FIXTURE_TOUCH_LARGE = ["packages/bulk/src/modules/module_25.ts"]
 SMOKE_BASELINE_DIR = BENCH_DIR / "gate-smoke-baseline"
@@ -160,7 +158,7 @@ def _run_reindex(work_root: Path, env_overrides: dict[str, str]) -> tuple[float,
     env.update(env_overrides)
     t0 = time.perf_counter()
     proc = subprocess.run(
-        ["scip-cli", "reindex", "--incremental"],
+        ["scip-cli", "reindex"],
         cwd=work_root,
         capture_output=True,
         text=True,

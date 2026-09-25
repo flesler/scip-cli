@@ -123,7 +123,7 @@ Priority **high → medium → low**. `--limit` = total finding rows (default 20
 ### reindex
 
 ```bash
-reindex [--path DIR ...] [--tsconfig GLOB ...] [--exclude [GLOB ...]] [--fresh] [--incremental] [--unversioned] [--with-external]
+reindex [--path DIR ...] [--tsconfig GLOB ...] [--exclude [GLOB ...]] [--fresh] [--no-incremental] [--unversioned] [--with-external]
 ```
 
 `--path` and `--tsconfig` are TS-only and mutually exclusive. `--tsconfig` globs expanded in-tool; one heap per file by default (`SCIP_CLI_TS_INDEX_BATCH_SIZE` overrides). Scope/exclude persist in `metadata.json`.
@@ -132,4 +132,4 @@ reindex [--path DIR ...] [--tsconfig GLOB ...] [--exclude [GLOB ...]] [--fresh] 
 
 `--fresh` clears persisted metadata (unless combined with scope flags on same command).
 
-`--incremental` — git repo required; errors with `--unversioned` or non-git. Reuses `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`); skips clean shards. Dirty: git delta ∪ importer closure → fork `--files` → upsert live `index.db`; deletions remove documents. `SCIP_CLI_FILE_INCREMENTAL=0|1` (default on). `--unversioned` forces glob/full discovery (persisted). Plain `reindex` clears manifest. No `--incremental` with `--fresh`.
+**Incremental by default** in git TypeScript repos: reuses `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`); skips clean shards. Dirty: git delta ∪ importer closure → fork `--files` → upsert live `index.db`; deletions remove documents. `--no-incremental` or `--fresh` forces full reindex and clears the manifest. Non-git, `--unversioned`, or non-TypeScript projects always full-reindex.

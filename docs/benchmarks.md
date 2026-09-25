@@ -1,6 +1,6 @@
 # Incremental reindex benchmarks
 
-Results from benchmarking `scip-cli reindex --incremental` on ephemeral fixtures.  
+Results from benchmarking `scip-cli reindex` (incremental by default in git repos) on ephemeral fixtures.  
 **Do not name customer repos, paths, or symbols in this file.** Large-monorepo numbers use a local tmpfs checkout (16 shard tsconfigs, ~14k source files, ~90 MB index).
 
 Related: [incremental-reindex-roadmap.md](incremental-reindex-roadmap.md) (phases and design).
@@ -49,9 +49,9 @@ partial index: 4 document(s), 662/1760 project sources in program
 
 ## Current architecture (settled)
 
-- **Git incremental:** `reindex --incremental` in a git repo stores `manifest.git_commit` + per-shard `tsconfig_digest`. Shard skip when git delta empty for shard. Partial: git delta → importer closure → `--files` → upsert into live `index.db`.
-- **Full reindex:** plain `reindex`, `--unversioned`, or non-git (no incremental).
-- **Env:** `SCIP_CLI_FILE_INCREMENTAL=1`. Profiling: `SCIP_CLI_INDEX_TIMING=1`.
+- **Git incremental (default):** `reindex` in a git TypeScript repo stores `manifest.git_commit` + per-shard `tsconfig_digest`. Shard skip when git delta empty for shard. Partial: git delta → importer closure → `--files` → upsert into live `index.db`.
+- **Full reindex:** `--no-incremental`, `--fresh`, `--unversioned`, or non-git.
+- **Profiling:** `SCIP_CLI_INDEX_TIMING=1`.
 
 ---
 

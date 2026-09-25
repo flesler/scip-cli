@@ -20,6 +20,24 @@ from ..sql import finalize_index_db
 from ..tsconfig import expand_tsconfig_patterns
 
 
+def _resolve_incremental(
+    root,
+    lang,
+    *,
+    fresh: bool,
+    no_incremental: bool,
+    unversioned: bool,
+) -> bool:
+    """Incremental reindex when eligible; full reindex otherwise."""
+    if fresh or no_incremental:
+        return False
+    if lang != Language.TYPESCRIPT:
+        return False
+    if unversioned or index_unversioned(root):
+        return False
+    return is_versioned_repo(root)
+
+
 def main(args):
     root, lang = find_project_root_and_language()
     if not root:
@@ -30,23 +48,15 @@ def main(args):
     tsconfig_args = getattr(args, "tsconfig", None) or []
     exclude_groups = getattr(args, "exclude", None)
     fresh = getattr(args, "fresh", False)
-    incremental = getattr(args, "incremental", False)
+    no_incremental = getattr(args, "no_incremental", False)
     unversioned = getattr(args, "unversioned", False)
-    if incremental and fresh:
-        print("Error: reindex --incremental and --fresh cannot be combined", file=sys.stderr)
-        sys.exit(1)
-    if incremental and lang is not None and lang != Language.TYPESCRIPT:
-        print("Error: reindex --incremental is only supported for TypeScript projects", file=sys.stderr)
-        sys.exit(1)
-    if incremental and (index_unversioned(root) or not is_versioned_repo(root)):
-        print(
-            (
-                "Error: reindex --incremental requires a git repository "
-                "(use full reindex without --incremental for --unversioned or non-git projects)"
-            ),
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    incremental = _resolve_incremental(
+        root,
+        lang,
+        fresh=fresh,
+        no_incremental=no_incremental,
+        unversioned=unversioned,
+    )
     if path_args and tsconfig_args:
         print("Error: reindex --path and --tsconfig cannot be combined", file=sys.stderr)
         sys.exit(1)

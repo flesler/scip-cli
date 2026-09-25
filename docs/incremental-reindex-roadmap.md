@@ -6,8 +6,8 @@ Two modes only:
 
 | Mode | Trigger | Behaviour |
 |------|---------|-----------|
-| **Git incremental** | `reindex --incremental` in a git repo (not `--unversioned`) | Manifest stores `git_commit` + per-shard `tsconfig_digest`. Shard skip when git delta empty for shard. Partial reindex via `--files` on dirty paths ∪ importers. Upsert into live `index.db`. |
-| **Full reindex** | Plain `reindex`, `--unversioned`, or non-git | No incremental. Clears shard manifest (unless `--incremental` on same run). Full indexer per shard. |
+| **Git incremental (default)** | `reindex` in a git TypeScript repo (not `--unversioned`) | Manifest stores `git_commit` + per-shard `tsconfig_digest`. Shard skip when git delta empty for shard. Partial reindex via `--files` on dirty paths ∪ importers. Upsert into live `index.db`. |
+| **Full reindex** | `--no-incremental`, `--fresh`, `--unversioned`, or non-git | Clears shard manifest. Full indexer per shard. |
 
 **Removed:** content hashes, stat fast-path, `SCIP_CLI_FINGERPRINT=*`, `SCIP_CLI_FINGERPRINT_DISCOVERY=*`, `SCIP_CLI_FINGERPRINT_CACHE`, manifest `file_hashes` / `fingerprint`.
 
@@ -55,7 +55,6 @@ Shard skip: `tsconfig_digest` unchanged **and** no paths in git delta intersect 
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SCIP_CLI_FILE_INCREMENTAL` | `1` | Partial `--files` reindex when git delta is small |
 
 ## Benchmarks
 
@@ -64,7 +63,7 @@ See [benchmarks.md](benchmarks.md).
 ```bash
 scripts/bench_incremental_gate.sh --branch fixture
 scripts/bench_fingerprint_smoke.py   # requires local smoke.local.json
-SCIP_CLI_INDEX_TIMING=1 scip-cli reindex --incremental
+SCIP_CLI_INDEX_TIMING=1 scip-cli reindex
 ```
 
 ## Upstream (scip-typescript)

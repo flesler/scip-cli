@@ -15,9 +15,7 @@ from scip_cli.indexing.typescript import index_typescript, typescript_projects
 FIXTURE_SOURCE = Path(__file__).parent / "fixtures" / "incremental-bench"
 FIXTURE_TOUCH_LARGE = "packages/bulk/src/modules/module_25.ts"
 
-INCREMENTAL_ENV = {
-    "SCIP_CLI_FILE_INCREMENTAL": "1",
-}
+INCREMENTAL_ENV: dict[str, str] = {}
 
 
 def _init_git(root: Path) -> None:

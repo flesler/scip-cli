@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark reindex --incremental on the versioned multi-shard fixture.
+"""Benchmark incremental reindex on the versioned multi-shard fixture.
 
 Manual only — not part of pre-commit or scripts/test.sh. Requires Node.js + npx.
 
@@ -7,9 +7,7 @@ Manual only — not part of pre-commit or scripts/test.sh. Requires Node.js + np
   scripts/bench_incremental.sh --baseline   # save baseline
   scripts/bench_incremental.sh --compare    # diff against baseline
 
-Default env is Phase 1+3 (shard skip + --files). Phase 2 (TSC --incremental) removed.
-
-  SCIP_CLI_FILE_INCREMENTAL=0  scripts/bench_incremental.sh   # Phase 1 only
+Incremental reindex is the default in git repos (shard skip + partial --files).
 
 Dirty-file cases modify content (append), not mtime-only touch.
 
@@ -168,7 +166,7 @@ def run_benchmarks() -> list[BenchRow]:
     _backup_touch_files(work_root)
     rows: list[BenchRow] = []
 
-    seed = _bench_row(work_root, "seed_warm", ["--incremental"], note="build warm shard cache")
+    seed = _bench_row(work_root, "seed_warm", [], note="build warm shard cache")
     rows.append(seed)
     _save_snapshot(cache)
 
@@ -182,22 +180,22 @@ def run_benchmarks() -> list[BenchRow]:
         _reset_to_warm(work_root, cache)
         rows.append(_bench_row(work_root, scenario, args, note=note, touch=touch))
 
-    bench("warm_all_cached", ["--incremental"], note="no file changes")
+    bench("warm_all_cached", [], note="no file changes")
     bench(
         "touch_small_shard",
-        ["--incremental"],
+        [],
         note="packages/alpha (~4 files)",
         touch=TOUCH_SMALL,
     )
     bench(
         "touch_large_shard",
-        ["--incremental"],
+        [],
         note=f"packages/bulk (~{len(list((FIXTURE_SOURCE / 'packages/bulk/src').rglob('*.ts')))} files)",
         touch=TOUCH_LARGE,
     )
     bench(
         "touch_small_and_large",
-        ["--incremental"],
+        [],
         note="alpha + bulk (2 shards)",
         touch=TOUCH_BOTH,
     )
@@ -208,7 +206,7 @@ def run_benchmarks() -> list[BenchRow]:
         _bench_row(
             work_root,
             "cold_incremental",
-            ["--incremental"],
+            [],
             note="empty shard cache",
         )
     )
@@ -218,7 +216,7 @@ def run_benchmarks() -> list[BenchRow]:
         _bench_row(
             work_root,
             "full_reindex",
-            [],
+            ["--no-incremental"],
             note="non-incremental baseline",
         )
     )
