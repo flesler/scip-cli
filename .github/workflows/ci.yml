@@ -29,7 +29,13 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install -e ".[dev]"
-          npm install -g github:flesler/scip-typescript#feat/incremental-tsc
+          # GitHub npx spec runs prepare (needs pnpm for snapshot fixtures); CI installs a built global binary instead.
+          git clone --depth 1 --branch feat/partial-files https://github.com/flesler/scip-typescript.git /tmp/scip-typescript
+          cd /tmp/scip-typescript
+          npm install --ignore-scripts
+          npm run build
+          npm install -g .
+          cd -
           mkdir -p ~/.local/bin
           curl -sL https://github.com/scip-code/scip/releases/download/v0.9.0/scip-linux-amd64.tar.gz | tar xz -C ~/.local/bin
           echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
