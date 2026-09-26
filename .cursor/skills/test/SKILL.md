@@ -11,7 +11,7 @@ Repo root only. Bootstrap: `.cursor/rules/agent.mdc` (editable install, Node for
 
 |Goal|Command|
 |---|---|
-|Pre-commit / CI parity|`scripts/test.sh`|
+|Pre-commit / CI / publish|`scripts/test.sh`|
 |Full|`pytest`|
 |CLI + fixture index|`pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py`|
 |One class / test|`pytest tests/test_e2e.py::TestQuery -q`|

@@ -48,10 +48,9 @@ cd scip-cli
 # Install with dev dependencies
 pip install -e ".[dev]"
 
-# Install pre-commit hooks (auto-fix ruff, then typecheck + pytest — no duplicate lint)
+# Install pre-commit hook (same command as CI — no pre-push hook)
 pre-commit install
 
-# Same gate as CI / publish.sh
 ./scripts/test.sh
 
 # Run linter
