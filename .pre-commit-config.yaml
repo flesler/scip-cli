@@ -1,15 +1,9 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
   - repo: local
     hooks:
       - id: ci-gate
-        name: CI gate (scripts/test.sh)
-        entry: bash scripts/test.sh
+        name: lint/format fix + typecheck + tests
+        entry: bash scripts/pre-commit.sh
         language: system
         pass_filenames: false
         always_run: true

@@ -38,7 +38,7 @@ Node.js + `npx` required for integration tests (`scip-typescript`). Optional: `S
 |Lint / format|`ruff check .` / `ruff format .`|
 |Typecheck|`basedpyright --warnings scip_cli/ scripts/`|
 
-Pre-commit: ruff + ruff-format + `scripts/test.sh` (same gate as CI). E2e before commit on command changes.
+Pre-commit: `scripts/pre-commit.sh` (ruff fix/format once, then `test.sh --skip-lint`). CI/publish: `scripts/test.sh` only. E2e before commit on command changes.
 
 **Use `scripts/test.sh`** before committing to catch all issues (lint, format, types, tests). This matches what pre-commit and CI run.
 
