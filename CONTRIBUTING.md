@@ -48,11 +48,11 @@ cd scip-cli
 # Install with dev dependencies
 pip install -e ".[dev]"
 
-# Install pre-commit hooks
+# Install pre-commit hooks (ruff + full scripts/test.sh gate)
 pre-commit install
 
-# Run tests
-pytest
+# Run tests (same gate as CI)
+./scripts/test.sh
 
 # Run linter
 ruff check .

@@ -70,7 +70,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Tests and lint: `pytest`, `ruff check .`, `basedpyright scip_cli/` from the same environment (or `scripts/test.sh` for the publish gate).
+Tests and lint: `scripts/test.sh` (same as CI and pre-commit), or run `pytest`, `ruff check .`, `basedpyright --warnings scip_cli/ scripts/` from `.venv`.
 
 ### 2. Install prerequisites (optional)
 

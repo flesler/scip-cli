@@ -6,7 +6,6 @@ import csv
 import json
 import sys
 from collections.abc import Sequence
-from typing import Any
 
 from ..session import setup
 from ..sql import debug_execute
@@ -18,14 +17,14 @@ def _column_names(cursor) -> list[str]:
     return [col[0] for col in cursor.description]
 
 
-def _emit_tsv(columns: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
+def _emit_tsv(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> None:
     if columns:
         print("\t".join(columns))
     for row in rows:
         print("\t".join("" if value is None else str(value) for value in row))
 
 
-def _emit_csv(columns: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
+def _emit_csv(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> None:
     writer = csv.writer(sys.stdout, lineterminator="\n")
     if columns:
         writer.writerow(columns)
@@ -33,12 +32,12 @@ def _emit_csv(columns: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
         writer.writerow(row)
 
 
-def _emit_json(columns: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
+def _emit_json(columns: Sequence[str], rows: Sequence[Sequence[object]]) -> None:
     payload = [dict(zip(columns, row, strict=True)) for row in rows]
     print(json.dumps(payload, ensure_ascii=False))
 
 
-def emit_result(columns: Sequence[str], rows: Sequence[Sequence[Any]], fmt: str) -> None:
+def emit_result(columns: Sequence[str], rows: Sequence[Sequence[object]], fmt: str) -> None:
     if fmt == "tsv":
         _emit_tsv(columns, rows)
     elif fmt == "csv":

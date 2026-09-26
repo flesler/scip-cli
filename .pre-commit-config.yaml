@@ -5,16 +5,11 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
-    rev: 1.39.9
-    hooks:
-      - id: basedpyright
   - repo: local
     hooks:
-      - id: pytest
-        name: pytest
-        entry: pytest
-        language: python
-        additional_dependencies: [pytest>=7]
+      - id: ci-gate
+        name: CI gate (scripts/test.sh)
+        entry: bash scripts/test.sh
+        language: system
         pass_filenames: false
         always_run: true

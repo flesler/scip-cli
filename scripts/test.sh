@@ -21,7 +21,7 @@ echo "Formatting..."
 $RUFF format --check .
 
 echo "Type checking..."
-$PYRIGHT scip_cli/ scripts/
+$PYRIGHT --warnings scip_cli/ scripts/
 
 echo "Running tests..."
 $PYTEST
