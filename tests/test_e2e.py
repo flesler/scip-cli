@@ -1,5 +1,6 @@
 """End-to-end command tests against the shared indexed fixture."""
 
+import json
 import sqlite3
 
 import pytest
@@ -288,6 +289,25 @@ class TestAnalyze:
         result = cli.run("analyze", "--check", "not_a_check")
         assert result.returncode == 1
         assert "unknown analyze check" in result.stderr
+
+
+class TestQuery:
+    def test_query_tsv_default(self, cli):
+        result = cli.run("query", "SELECT COUNT(*) AS n FROM documents")
+        assert result.returncode == 0
+        lines = result.stdout.strip().splitlines()
+        assert lines[0] == "n"
+        assert int(lines[1]) >= 25
+
+    def test_query_csv(self, cli):
+        result = cli.run("query", "--format", "csv", "SELECT 1 AS one, 2 AS two")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "one,two\n1,2"
+
+    def test_query_json(self, cli):
+        result = cli.run("query", "--format", "json", "SELECT 42 AS answer LIMIT 1")
+        assert result.returncode == 0
+        assert json.loads(result.stdout) == [{"answer": 42}]
 
 
 class TestIndex:

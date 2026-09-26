@@ -20,6 +20,7 @@ COMMAND_SETUP_PATHS = (
     "scip_cli.commands.code.setup",
     "scip_cli.commands.deps.setup",
     "scip_cli.commands.members.setup",
+    "scip_cli.commands.query.setup",
     "scip_cli.commands.refs.setup",
     "scip_cli.commands.rdeps.setup",
     "scip_cli.commands.search.setup",

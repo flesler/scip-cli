@@ -18,7 +18,7 @@ from .cli_args import (
     add_paths_only_argument,
     positive_int,
 )
-from .commands import analyze, code, deps, members, rdeps, refs, reindex, search, skill, symbols
+from .commands import analyze, code, deps, members, query, rdeps, refs, reindex, search, skill, symbols
 from .symbols import SymbolKind
 
 # Set up debug logging based on SCIP_CLI_DEBUG env var
@@ -122,6 +122,15 @@ def main() -> None:
     members_parser.add_argument("symbol", help="Symbol name")
 
     # skill
+    query_parser = subparsers.add_parser("query", help="Run SQL against the project index database")
+    query_parser.add_argument("sql", nargs="+", help="SQL to execute (read-only)")
+    query_parser.add_argument(
+        "--format",
+        choices=("tsv", "csv", "json"),
+        default="tsv",
+        help="Output format (default: tsv)",
+    )
+
     skill_parser = subparsers.add_parser("skill", help="Install or dump the scip-cli SKILL.md")
     skill_parser.add_argument("path", nargs="?", help="Optional file path to write to (creates dirs)")
 
@@ -234,6 +243,7 @@ def main() -> None:
         "rdeps": rdeps.main,
         "deps": deps.main,
         "members": members.main,
+        "query": query.main,
         "skill": skill.main,
         "analyze": analyze.main,
         "reindex": reindex.main,

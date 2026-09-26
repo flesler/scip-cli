@@ -19,6 +19,7 @@ TypeScript/JavaScript, Python, Go, Rust — not GraphQL, CSS, or other files. Ru
 |What does this use?|`deps target`|Outbound deps (symbol or file)|
 |Class members|`members Class`|Methods/fields + line ranges|
 |Health / risk|`analyze`|SQL dashboard — project, dir, file, or symbol|
+|Raw SQL|`query "SELECT …"`|Rows from `index.db` (`--format tsv|csv|json`)|
 
 Default `--limit` is **10** on query commands unless noted. Stdout = records; stderr = warnings/progress. Pipe with `--paths-only` / `--names-only`.
 
@@ -102,6 +103,14 @@ members [--limit N] [--path PATH] [--names-only] <symbol>
 ```
 
 `start:end kind name`. Prefix match under parent; missing ranges filled from source when needed.
+
+### query
+
+```bash
+query [--format tsv|csv|json] <sql> [...]
+```
+
+Read-only SQL against the cached project `index.db`. Default `--format` is **tsv** (header row + tab-separated values). `csv` and `json` (array of objects) are also supported. Connection uses the same read-only pragmas as other commands.
 
 ### analyze
 
