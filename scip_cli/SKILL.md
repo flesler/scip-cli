@@ -112,6 +112,14 @@ query [--format tsv|csv|json] <sql> [...]
 
 Read-only SQL against the cached project `index.db`. Default `--format` is **tsv** (header row + tab-separated values). `csv` and `json` (array of objects) are also supported. Connection uses the same read-only pragmas as other commands.
 
+Introspect schema (SQLite catalog + `PRAGMA`):
+
+```bash
+query "SELECT name FROM sqlite_schema WHERE type='table' ORDER BY 1"
+query "PRAGMA table_info(mentions)"
+query "SELECT m.name AS table_name, p.name AS column_name, p.type FROM sqlite_schema m JOIN pragma_table_info(m.name) p WHERE m.type='table' AND m.name NOT LIKE 'sqlite_%' ORDER BY 1, p.cid"
+```
+
 ### analyze
 
 ```bash

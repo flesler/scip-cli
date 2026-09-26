@@ -172,6 +172,10 @@ scip-cli members Widget
 # Project health dashboard (or: scip-cli analyze src/foo.ts / scip-cli analyze greet)
 scip-cli analyze
 
+# List index tables / columns (read-only SQL)
+scip-cli query "SELECT name FROM sqlite_schema WHERE type='table' ORDER BY 1"
+scip-cli query "PRAGMA table_info(global_symbols)"
+
 # Install skill file
 scip-cli skill ~/.claude/skills/scip-cli/SKILL.md
 ```
