@@ -107,10 +107,10 @@ members [--limit N] [--path PATH] [--names-only] <symbol>
 ### query
 
 ```bash
-query [--format tsv|csv|json] <sql> [...]
+query [--format tsv|csv|json] [--write] <sql> [...]
 ```
 
-Read-only SQL against the cached project `index.db`. Default `--format` is **tsv** (header row + tab-separated values). `csv` and `json` (array of objects) are also supported. Connection uses the same read-only pragmas as other commands.
+SQL against the cached project `index.db`. **Read-only by default** (`PRAGMA query_only`); `--write` allows mutations (commits after each statement). Default `--format` is **tsv** (header row + tab-separated values). `csv` and `json` (array of objects) are also supported. Prefer `reindex` over hand-editing the cache.
 
 Introspect schema (SQLite catalog + `PRAGMA`):
 

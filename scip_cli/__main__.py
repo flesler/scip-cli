@@ -123,12 +123,17 @@ def main() -> None:
 
     # skill
     query_parser = subparsers.add_parser("query", help="Run SQL against the project index database")
-    query_parser.add_argument("sql", nargs="+", help="SQL to execute (read-only)")
+    query_parser.add_argument("sql", nargs="+", help="SQL to execute")
     query_parser.add_argument(
         "--format",
         choices=("tsv", "csv", "json"),
         default="tsv",
         help="Output format (default: tsv)",
+    )
+    query_parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Allow INSERT/UPDATE/DELETE (default: read-only)",
     )
 
     skill_parser = subparsers.add_parser("skill", help="Install or dump the scip-cli SKILL.md")

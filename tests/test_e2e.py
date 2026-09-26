@@ -1,11 +1,13 @@
 """End-to-end command tests against the shared indexed fixture."""
 
 import json
+import shutil
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
-from tests.e2e_harness import run_cli
+from tests.e2e_harness import open_index_db, run_cli
 from tests.fixture_catalog import (
     APP_HANDLER_FILE,
     CLASS_HANDLER,
@@ -308,6 +310,41 @@ class TestQuery:
         result = cli.run("query", "--format", "json", "SELECT 42 AS answer LIMIT 1")
         assert result.returncode == 0
         assert json.loads(result.stdout) == [{"answer": 42}]
+
+    def test_query_write_blocked_by_default(self, cli):
+        result = cli.run("query", "CREATE TABLE _scip_cli_ro_test(x INTEGER)")
+        assert result.returncode == 1
+        assert "Database error" in result.stderr
+
+    def test_query_write_allows_ddl(self, indexed_fixture, tmp_path):
+        db_path = tmp_path / "index.db"
+        shutil.copy2(indexed_fixture.db_path, db_path)
+        root = indexed_fixture.root
+
+        def fake_setup(write: bool = False):
+            if write:
+                from scip_cli.sql import configure_write_connection
+
+                conn = sqlite3.connect(db_path)
+                configure_write_connection(conn)
+            else:
+                conn = open_index_db(db_path)
+            return conn, root
+
+        with patch("scip_cli.commands.query.setup", fake_setup):
+            create = run_cli(
+                ["query", "--write", "CREATE TABLE _scip_cli_rw_test(x INTEGER)"],
+                None,
+            )
+            assert create.returncode == 0
+            insert = run_cli(
+                ["query", "--write", "INSERT INTO _scip_cli_rw_test VALUES (7)"],
+                None,
+            )
+            assert insert.returncode == 0
+            read = run_cli(["query", "SELECT x FROM _scip_cli_rw_test"], None)
+        assert read.returncode == 0
+        assert "7" in read.stdout
 
 
 class TestIndex:

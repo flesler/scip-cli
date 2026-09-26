@@ -1,4 +1,4 @@
-"""query command — run read-only SQL against the project index database."""
+"""query command — run SQL against the project index database."""
 
 from __future__ import annotations
 
@@ -55,9 +55,11 @@ def main(args) -> None:
         print("Error: SQL query required", file=sys.stderr)
         sys.exit(1)
 
-    db, _project_root = setup()
+    db, _project_root = setup(write=args.write)
     try:
         cursor = debug_execute(db, sql)
+        if args.write:
+            db.commit()
         columns = _column_names(cursor)
         rows = cursor.fetchall() if columns else []
         emit_result(columns, rows, args.format)

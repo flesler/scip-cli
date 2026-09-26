@@ -191,7 +191,7 @@ def index_project(root, lang, cache_dir, *, replace=False, log=True, incremental
     raise RuntimeError(f"Unsupported language '{lang}'")
 
 
-def get_db(project_root=None):
+def get_db(project_root=None, *, read_only: bool = True):
     """Get a sqlite3 connection to the index.db.
 
     If no index exists, auto-index the project with the detected language.
@@ -235,8 +235,11 @@ def get_db(project_root=None):
         if not db_path:
             raise RuntimeError("No index.db found after indexing")
 
-    from ..sql import configure_read_connection
+    from ..sql import configure_read_connection, configure_write_connection
 
     conn = sqlite3.connect(str(db_path))
-    configure_read_connection(conn)
+    if read_only:
+        configure_read_connection(conn)
+    else:
+        configure_write_connection(conn)
     return conn

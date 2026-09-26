@@ -64,9 +64,15 @@ def run_cli(argv: list[str], fixture: IndexedFixture | None = None) -> CliResult
     out_buf, err_buf = StringIO(), StringIO()
     exit_code = 0
 
-    def fake_setup():
+    def fake_setup(write: bool = False):
         if fixture is None:
             raise RuntimeError("indexed fixture required for this command")
+        if write:
+            from scip_cli.sql import configure_write_connection
+
+            conn = sqlite3.connect(fixture.db_path)
+            configure_write_connection(conn)
+            return conn, fixture.root
         return open_index_db(fixture.db_path), fixture.root
 
     stack = contextlib.ExitStack()

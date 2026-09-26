@@ -134,7 +134,7 @@ scip-cli <command> [arguments]
 - `rdeps <file>` - Find files that depend on a file (`--path`)
 - `deps <symbol|file>` - Find outbound dependencies (what a symbol or file calls) (`--path`, `--paths-only`)
 - `members <symbol>` - List members of a class/interface (`--path`)
-- `query <sql>` - Run read-only SQL against the project index (`--format tsv|csv|json`, default tsv)
+- `query <sql>` - SQL against the project index (`--format tsv|csv|json`, default tsv; read-only unless `--write`)
 - `analyze [target]` - SQL health dashboards (`--limit`, `--per-check-limit`, `--priority`, `--check`, `--include-tests`). No target: project-wide; directory or file path; symbol name. See [Finding easy wins with `analyze`](#finding-easy-wins-with-analyze).
 - `reindex` - Force re-indexing (`--path`, `--tsconfig`, `--exclude`, `--fresh`, `--no-incremental`; incremental by default in git TS repos)
 - `skill [path]` - Install or dump the SKILL.md

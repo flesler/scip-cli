@@ -10,7 +10,7 @@ from .project import find_project_root
 from .queries import resolve_file, resolve_symbol
 
 
-def setup():
+def setup(*, write: bool = False):
     """Find project root and return an open index database connection."""
     project_root = find_project_root()
     if not project_root:
@@ -18,7 +18,7 @@ def setup():
         sys.exit(1)
     try:
         load_project_config(Path(project_root))
-        db = get_db(project_root)
+        db = get_db(project_root, read_only=not write)
     except RuntimeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

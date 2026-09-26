@@ -30,6 +30,13 @@ def configure_read_connection(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA mmap_size = 268435456")
 
 
+def configure_write_connection(db: sqlite3.Connection) -> None:
+    """Tune SQLite for interactive read-write CLI (query --write)."""
+    db.execute("PRAGMA temp_store = MEMORY")
+    db.execute("PRAGMA cache_size = -64000")
+    db.execute("PRAGMA mmap_size = 268435456")
+
+
 def configure_bulk_write_connection(db: sqlite3.Connection) -> None:
     """Tune SQLite for single-writer bulk rebuilds (postprocess, merge)."""
     db.executescript("""
