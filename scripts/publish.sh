@@ -17,6 +17,8 @@ SYNC_RELEASE="${GH_SCRIPTS}/sync-github-release.sh"
 usage() {
     echo "Usage: $0 [patch|minor|major]"
     echo ""
+    echo "Canonical release path: test → bump (optional) → build → tag → GitHub release → PyPI → smoke."
+    echo ""
     echo "  patch|minor|major  Bump scip_cli/__init__.py __version__, commit, then publish"
     echo "  (no argument)      Publish the current __version__ without bumping"
     exit 1
@@ -118,7 +120,19 @@ echo "View at: https://pypi.org/project/scip-cli/$VERSION/"
 echo "Release: https://github.com/$REPO/releases/tag/v$VERSION"
 
 echo "Smoke testing PyPI..."
-pip install "scip-cli==$VERSION"
+PYPI_RETRY_MAX="${PYPI_RETRY_MAX:-12}"
+PYPI_RETRY_SLEEP="${PYPI_RETRY_SLEEP:-10}"
+for attempt in $(seq 1 "$PYPI_RETRY_MAX"); do
+    if pip install "scip-cli==$VERSION"; then
+        break
+    fi
+    if [[ "$attempt" -eq "$PYPI_RETRY_MAX" ]]; then
+        echo "Error: scip-cli==$VERSION not on PyPI after $PYPI_RETRY_MAX attempts" >&2
+        exit 1
+    fi
+    echo "PyPI propagation delay (attempt $attempt/$PYPI_RETRY_MAX), retrying in ${PYPI_RETRY_SLEEP}s..."
+    sleep "$PYPI_RETRY_SLEEP"
+done
 scip-cli --version
 pip install -e ".[dev]"
 scip-cli --version

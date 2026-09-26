@@ -4,8 +4,11 @@
 Smoke monorepo paths live in scripts/smoke.local.json (gitignored).
 See scripts/smoke.local.example.json.
 
-scripts/bench_incremental_gate.sh --branch smoke    # warm + modify_large (~5 min)
-scripts/bench_incremental_gate.sh --branch fixture  # mini fixture sanity (~2 min)
+  python scripts/bench_incremental_gate.py --branch smoke    # warm + modify_large (~5 min)
+  python scripts/bench_incremental_gate.py --branch fixture  # mini fixture sanity (~2 min)
+
+Faster: --scenario warm
+After a dirty prior run: --reset-baseline
 """
 
 from __future__ import annotations
@@ -92,6 +95,17 @@ def _augment_path(env: dict[str, str]) -> dict[str, str]:
     if extra:
         env["PATH"] = os.pathsep.join([*extra, env.get("PATH", "")])
     return env
+
+
+def _ensure_fixture() -> None:
+    if FIXTURE_SOURCE.is_dir():
+        return
+    print("Generating incremental bench fixture...")
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "generate_incremental_bench_fixture.py")],
+        cwd=ROOT,
+        check=True,
+    )
 
 
 def _require_tooling() -> None:
@@ -591,6 +605,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    os.environ.setdefault("PYTHONUNBUFFERED", "1")
+    _ensure_fixture()
     _require_tooling()
 
     with _exclusive_gate_lock():

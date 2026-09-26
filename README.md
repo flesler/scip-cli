@@ -206,7 +206,7 @@ scip-cli deps greet --paths-only | sort -u
 6. Compacts the database after each reindex (`VACUUM` + WAL checkpoint)
 7. Subsequent queries are SQLite lookups against that cache (not re-indexing)
 
-**Incremental reindex (TypeScript, v3.0+):** plain `scip-cli reindex` in a git worktree is incremental by default — reuses unchanged tsconfig shards via `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`). Dirty shards reindex only changed files (git delta → importer closure → fork `--files`) and upsert into the live `index.db`. Use `--no-incremental` or `--fresh` for a full rebuild; `--unversioned` and non-git projects always full-reindex. Bench locally with `scripts/bench_incremental_gate.sh --branch fixture`.
+**Incremental reindex (TypeScript, v3.0+):** plain `scip-cli reindex` in a git worktree is incremental by default — reuses unchanged tsconfig shards via `shards/manifest.json` (`git_commit` + per-shard `tsconfig_digest`). Dirty shards reindex only changed files (git delta → importer closure → fork `--files`) and upsert into the live `index.db`. Use `--no-incremental` or `--fresh` for a full rebuild; `--unversioned` and non-git projects always full-reindex. Bench locally with `python scripts/bench_incremental_gate.py --branch fixture`.
 
 ## Configuration
 

@@ -3,9 +3,9 @@
 
 Manual only — not part of pre-commit or scripts/test.sh. Requires Node.js + npx.
 
-  scripts/bench_incremental.sh              # run, save latest results to gitignored bench dir
-  scripts/bench_incremental.sh --baseline   # save baseline
-  scripts/bench_incremental.sh --compare    # diff against baseline
+  python scripts/bench_incremental.py              # run, save latest results to gitignored bench dir
+  python scripts/bench_incremental.py --baseline   # save baseline
+  python scripts/bench_incremental.py --compare    # diff against baseline
 
 Incremental reindex is the default in git repos (shard skip + partial --files).
 
@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -50,15 +51,22 @@ class BenchRow:
     note: str
 
 
+def _ensure_fixture() -> None:
+    if FIXTURE_SOURCE.is_dir():
+        return
+    print("Generating incremental bench fixture...")
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "generate_incremental_bench_fixture.py")],
+        cwd=ROOT,
+        check=True,
+    )
+
+
 def _require_tooling() -> None:
     if shutil.which("npx") is None:
         raise SystemExit("npx not found — install Node.js to run incremental benchmarks")
     if shutil.which("scip-cli") is None:
         raise SystemExit("scip-cli not on PATH — run: pip install -e '.[dev]'")
-    if not FIXTURE_SOURCE.is_dir():
-        raise SystemExit(
-            f"fixture missing at {FIXTURE_SOURCE} — run: python scripts/generate_incremental_bench_fixture.py"
-        )
 
 
 def _cache_dir(work_root: Path) -> Path:
@@ -244,7 +252,7 @@ def _write_lines(path: Path, lines: list[str]) -> None:
 
 def _compare(baseline: Path, current: Path) -> None:
     if not baseline.is_file():
-        raise SystemExit(f"No baseline at {baseline} — run: scripts/bench_incremental.sh --baseline")
+        raise SystemExit(f"No baseline at {baseline} — run: python scripts/bench_incremental.py --baseline")
 
     baseline_rows = {}
     for line in baseline.read_text(encoding="utf-8").splitlines():
@@ -279,6 +287,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Also print full JSON rows to stdout")
     args = parser.parse_args()
 
+    _ensure_fixture()
     _require_tooling()
     rows = run_benchmarks()
     lines = _format_lines(rows)
