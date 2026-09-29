@@ -5,6 +5,8 @@
 
 Python CLI for AI agents. Queries SCIP indexes for precise refs, definitions, and repo health analysis — TypeScript/JavaScript, Python, Go, Rust.
 
+**Related (optional):** [scip-atlas](https://github.com/flesler/scip-atlas) builds `atlas.db` (git paths, commits, owners) from this cache's `index.db`. [scip-atlas-web](https://github.com/flesler/scip-atlas-web) packs both into a slim DB and a single-file browser explorer. You do not need them for CLI or agent workflows.
+
 ## Why
 
 AI agents waste tokens on grep and file scanning. scip-cli gives them precise, type-aware code navigation in milliseconds — and `analyze` surfaces dead code, cycles, and coupling so agents (and humans) can fix real problems fast.
