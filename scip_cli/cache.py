@@ -76,7 +76,7 @@ def project_cache_slug(project_root: Path) -> str:
     slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", slug_base).strip("-") or "project"
     if len(slug) > CACHE_SLUG_MAX_LEN:
         slug = slug[:CACHE_SLUG_MAX_LEN].rstrip("-")
-    digest = _project_root_hash(root)[:6]
+    digest = _project_root_hash(root)[:ROOT_HASH_LEN]
     return f"{slug}-{digest}"
 
 

@@ -67,6 +67,8 @@ CHECK_KEYS = frozenset(
         "hotspots",
         "imports_summary",
         "same_file_only",
+        "single_importer_files",
+        "single_use_imports",
         "stale_types",
         "symbol_pressure",
         "test_only",
@@ -126,6 +128,10 @@ FALSE_POSITIVE_PREFACES: dict[str, str] = {
     "dead_in_file": ("Warn: SCIP may miss dynamic loading and export const arrows. " + _RG_STEM),
     "unreferenced_in_file": ("Warn: no index mentions — may still be registered dynamically. " + _RG_STEM),
     "unused_imports": ("Warn: may still be a type-only use SCIP did not bind. " + _RG_STEM),
+    "single_use_imports": ("Warn: one import site and one use in the whole index — not per-file. " + _RG_STEM),
+    "single_importer_files": (
+        "Warn: only one SCIP importer — barrels and dynamic imports are often missing. " + _RG_STEM
+    ),
     "test_only": ("Warn: index may miss production calls, so this can look test-only. " + _RG_STEM),
 }
 

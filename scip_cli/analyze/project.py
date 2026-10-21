@@ -451,6 +451,44 @@ def dead_files(
     return collect_until_limit(limit, fetch_page, accept)
 
 
+def single_importer_files(
+    db,
+    limit: int = DEFAULT_LIMIT,
+    *,
+    include_tests: bool = False,
+    scope: str | None = None,
+) -> list[str]:
+    """Files whose exports are referenced from exactly one other document."""
+    scope_clause, scope_params = path_filter_sql(db, scope, doc_alias="d")
+    sql = f"""
+        SELECT d.relative_path, d.id, MIN(ref_d.relative_path) AS importer_path
+        FROM documents d
+        JOIN defn_enclosing_ranges der ON der.document_id = d.id
+        JOIN mentions m ON m.symbol_id = der.symbol_id AND m.role != 1
+        JOIN chunks c ON m.chunk_id = c.id
+        JOIN documents ref_d ON c.document_id = ref_d.id
+        WHERE ref_d.id != d.id{scope_clause}
+        GROUP BY d.id
+        HAVING COUNT(DISTINCT ref_d.id) = 1
+        ORDER BY d.relative_path
+    """
+
+    def fetch_page(page_size: int, offset: int):
+        return fetch_all(db, sql + " LIMIT ? OFFSET ?", (*scope_params, page_size, offset))
+
+    def accept(row):
+        path, doc_id, importer_path = row
+        if not include_tests and is_test_path(path):
+            return None
+        if is_dynamic_loader_path(path):
+            return None
+        if is_low_signal_dead_file(db, doc_id):
+            return None
+        return f"{path}  importer={importer_path}"
+
+    return collect_until_limit(limit, fetch_page, accept)
+
+
 def top_coupling(
     db,
     limit: int = DEFAULT_LIMIT,
@@ -507,6 +545,12 @@ def run_all(
             dead_exports,
         ),
         Check("dead_files", Priority.HIGH, f"Dead files (no importers){suffix}", dead_files),
+        Check(
+            "single_importer_files",
+            Priority.LOW,
+            f"Single-importer files (one inbound file){suffix}",
+            single_importer_files,
+        ),
         Check("stale_types", Priority.HIGH, f"Stale types (no external consumers){suffix}", stale_types),
         Check("same_file_only", Priority.MEDIUM, f"Same-file only (in-file use, not exported){suffix}", same_file_only),
         Check(

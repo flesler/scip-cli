@@ -31,7 +31,13 @@ def index_python_project(root, project, work_dir, env, *, output_db=None, exclud
     if result.returncode != 0:
         return label, None, indexer_failure_message(result)
     try:
-        convert_scip_to_db(part_scip, db_path, document_path_prefix=project, exclude_globs=exclude_globs)
+        convert_scip_to_db(
+            part_scip,
+            db_path,
+            document_path_prefix=project,
+            exclude_globs=exclude_globs,
+            project_root=root,
+        )
     finally:
         part_scip.unlink(missing_ok=True)
     return label, db_path, None

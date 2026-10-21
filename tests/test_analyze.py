@@ -142,12 +142,12 @@ class TestProjectAnalyze:
         assert len(hit_sections) > 1
         assert any(TRUNCATION_LINE in lines for _title, lines, _preface in sections)
 
-    def test_run_all_returns_nine_sections_without_duplicate_unreferenced(self):
+    def test_run_all_returns_ten_sections_without_duplicate_unreferenced(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500)
-        assert len(sections) == 9
+        assert len(sections) == 10
         titles = [title for title, _lines, _preface in sections]
-        assert sum(1 for t in titles if "[low]" in t) == 4
+        assert sum(1 for t in titles if "[low]" in t) == 5
         assert sum(1 for t in titles if "[medium]" in t) == 1
         assert not any("Unreferenced symbols" in title for title in titles)
         assert any("Dead exports" in title for title in titles)
@@ -257,6 +257,22 @@ class TestProjectAnalyze:
         lines = project_checks.dead_files(b.finish(), limit=20)
         assert "src/jobs/tasks/cleanup.ts" in lines
 
+    def test_single_importer_files_lists_one_inbound_file(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/pkg/only.ts", "onlyFn")
+        b.import_symbol("src/entry.ts", sym)
+        b.reference("src/entry.ts", sym)
+        lines = project_checks.single_importer_files(b.finish(), limit=20)
+        assert any("src/pkg/only.ts" in line and "importer=src/entry.ts" in line for line in lines)
+
+    def test_single_importer_files_skips_two_importers(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/pkg/shared.ts", "sharedFn")
+        b.reference("src/a.ts", sym)
+        b.reference("src/b.ts", sym)
+        lines = project_checks.single_importer_files(b.finish(), limit=20)
+        assert not any("shared.ts" in line for line in lines)
+
 
 class TestFileAnalyze:
     def test_change_surface_lists_exports(self):
@@ -268,6 +284,34 @@ class TestFileAnalyze:
         db = mini_codebase_db()
         lines = file_checks.unused_imports(db, "src/importer.ts", limit=10)
         assert any("deadFn" in line for line in lines)
+
+    def test_single_use_imports_requires_one_import_and_one_use_globally(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/lib/once.ts", "onceFn")
+        b.import_symbol("src/user.ts", sym)
+        b.reference("src/user.ts", sym)
+        lines = file_checks.single_use_imports(b.finish(), "src/user.ts", limit=10)
+        assert any("onceFn" in line for line in lines)
+
+    def test_single_use_imports_skips_many_importers(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/lib/shared.ts", "sharedFn")
+        b.import_symbol("src/a.ts", sym)
+        b.import_symbol("src/b.ts", sym)
+        b.reference("src/a.ts", sym)
+        b.reference("src/b.ts", sym)
+        db = b.finish()
+        assert not file_checks.single_use_imports(db, "src/a.ts", limit=10)
+        assert not file_checks.single_use_imports(db, "src/b.ts", limit=10)
+
+    def test_single_use_imports_skips_many_uses_globally(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/lib/multi.ts", "multiFn")
+        b.import_symbol("src/user.ts", sym)
+        b.reference("src/user.ts", sym)
+        b.reference("src/other.ts", sym)
+        lines = file_checks.single_use_imports(b.finish(), "src/user.ts", limit=10)
+        assert not any("multiFn" in line for line in lines)
 
     def test_file_consumers_lists_consumer(self):
         db = mini_codebase_db()

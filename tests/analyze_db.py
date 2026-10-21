@@ -166,6 +166,23 @@ class AnalyzeDbBuilder:
             (chunk_id, to_sym_id),
         )
 
+    def reference_again(self, from_path: str, to_sym_id: int) -> None:
+        """Second in-file reference in another chunk (distinct mentions row)."""
+        row = self.conn.execute("SELECT id FROM documents WHERE relative_path = ?", (from_path,)).fetchone()
+        if not row:
+            raise ValueError(f"unknown file {from_path}")
+        doc_id = row[0]
+        chunk_id = self._next_chunk
+        self._next_chunk += 1
+        self.conn.execute(
+            "INSERT INTO chunks (id, document_id, start_line, end_line) VALUES (?, ?, 10, 20)",
+            (chunk_id, doc_id),
+        )
+        self.conn.execute(
+            "INSERT OR IGNORE INTO mentions (chunk_id, symbol_id, role) VALUES (?, ?, 0)",
+            (chunk_id, to_sym_id),
+        )
+
     def import_symbol(self, into_path: str, sym_id: int) -> None:
         """Record an import (role=2)."""
         _doc_id, chunk_id = self._ensure_file(into_path)

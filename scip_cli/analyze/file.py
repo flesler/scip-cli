@@ -61,6 +61,38 @@ def unused_imports(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[s
     return [short_name(row[0]) for row in rows]
 
 
+def single_use_imports(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
+    """Import bindings where this symbol is imported once in the index and used once project-wide."""
+    rows = fetch_all(
+        db,
+        """
+        SELECT gs.symbol
+        FROM mentions m
+        JOIN chunks c ON m.chunk_id = c.id
+        JOIN documents imp_d ON c.document_id = imp_d.id
+        JOIN global_symbols gs ON m.symbol_id = gs.id
+        WHERE imp_d.relative_path = ?
+          AND m.role = 2
+          AND (
+              SELECT COUNT(*)
+              FROM mentions u
+              WHERE u.symbol_id = gs.id AND u.role NOT IN (1, 2)
+          ) = 1
+          AND (
+              SELECT COUNT(DISTINCT imp2.id)
+              FROM mentions m2
+              JOIN chunks c2 ON m2.chunk_id = c2.id
+              JOIN documents imp2 ON c2.document_id = imp2.id
+              WHERE m2.symbol_id = gs.id AND m2.role = 2
+          ) = 1
+        ORDER BY gs.symbol
+        LIMIT ?
+        """,
+        (relative_path, limit),
+    )
+    return [short_name(row[0]) for row in rows]
+
+
 def file_consumers(db, relative_path: str, limit: int = DEFAULT_LIMIT) -> list[str]:
     rows = fetch_all(
         db,
@@ -311,6 +343,13 @@ def _file_checks(relative_path: str, *, include_top_symbols: bool) -> list[Check
             _bind_path(dead_in_file, relative_path),
         ),
         Check("unused_imports", Priority.HIGH, f"Unused imports {title}", _bind_path(unused_imports, relative_path)),
+        Check(
+            "single_use_imports",
+            Priority.LOW,
+            f"Single-use imports {title}",
+            _bind_path(single_use_imports, relative_path),
+            false_positive_preface=FALSE_POSITIVE_PREFACES["single_use_imports"],
+        ),
         Check(
             "same_file_only",
             Priority.MEDIUM,

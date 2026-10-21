@@ -76,6 +76,7 @@ def convert_scip_to_db(
     document_path_prefix: Path | str | None = None,
     exclude_globs: tuple[str, ...] | None = None,
     skip_postprocess: bool = False,
+    project_root: Path | str | None = None,
 ):
     """Convert a SCIP protobuf file to a SQLite index at db_path."""
     db_path = Path(db_path)
@@ -108,3 +109,14 @@ def convert_scip_to_db(
     prefix = project_path_prefix(document_path_prefix)
     if prefix is not None:
         prefix_document_paths(db_path, prefix)
+
+    if not skip_postprocess and project_root is not None:
+        with phase("synth_import_mentions"):
+            conn = sqlite3.connect(str(db_path))
+            try:
+                from .import_mentions import synthesize_import_mentions
+
+                synthesize_import_mentions(conn, Path(project_root))
+                conn.commit()
+            finally:
+                conn.close()

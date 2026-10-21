@@ -104,6 +104,7 @@ def index_ts_projects(
                 db_path,
                 exclude_globs=exclude_globs,
                 skip_postprocess=bool(index_files),
+                project_root=root,
             )
     finally:
         part_scip.unlink(missing_ok=True)

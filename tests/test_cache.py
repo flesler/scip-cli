@@ -37,14 +37,14 @@ class TestGetCacheDir:
 
     def test_find_db_returns_existing_index(self, tmp_path):
         cache_dir = get_cache_dir(tmp_path)
-        cache_dir.mkdir(parents=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / "index.db").write_text("x", encoding="utf-8")
         save_index_scope(tmp_path, ["packages/api"])
         assert find_db(tmp_path) == cache_dir / "index.db"
 
     def test_promote_next_index(self, tmp_path):
         cache_dir = get_cache_dir(tmp_path)
-        cache_dir.mkdir(parents=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / "index.db").write_text("live", encoding="utf-8")
         (index_db_path(cache_dir, replace=True)).write_text("next", encoding="utf-8")
 
