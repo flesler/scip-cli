@@ -1,7 +1,6 @@
 """Tests for index-time exclude globs."""
 
 import json
-import shutil
 import sqlite3
 
 import pytest
@@ -14,7 +13,7 @@ from scip_cli.exclude import (
     save_persisted_exclude_globs,
 )
 from scip_cli.indexing.postprocess import postprocess_index
-from tests.e2e_harness import FIXTURE_ROOT, IndexedFixture, index_fixture_project, open_index_db, run_cli
+from tests.e2e_harness import open_index_db, run_cli
 from tests.fixture_catalog import (
     DEFAULT_TEST_EXCLUDE_GLOBS,
     EXCLUDE_SPEC_FILE,
@@ -122,17 +121,6 @@ class TestPruneExcludedDocuments:
         assert paths == {"src/helper.ts"}
         assert "greet" in symbols
         assert "fixtureOnlyHelper" not in symbols
-
-
-@pytest.fixture
-def excluded_fixture(tmp_path):
-    root = tmp_path / "typescript-project"
-    shutil.copytree(FIXTURE_ROOT, root)
-    try:
-        db_path = index_fixture_project(root, exclude_globs=DEFAULT_TEST_EXCLUDE_GLOBS)
-    except RuntimeError as exc:
-        pytest.skip(str(exc))
-    return IndexedFixture(root=root, db_path=db_path)
 
 
 class TestExcludeGlobsE2e:

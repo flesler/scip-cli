@@ -1,22 +1,32 @@
 """Shared pytest fixtures."""
 
-import shutil
-
 import pytest
 
-from tests.e2e_harness import FIXTURE_ROOT, CliRunner, IndexedFixture, index_fixture_project
+from tests.e2e_harness import FIXTURE_ROOT, CliRunner
+from tests.fixture_cache import prepare_cached_indexed_fixture
+from tests.fixture_catalog import DEFAULT_TEST_EXCLUDE_GLOBS
 
 
 @pytest.fixture(scope="session")
-def indexed_fixture(tmp_path_factory):
-    """Copy typescript-project, index once with real tooling, reuse for all e2e tests."""
-    root = tmp_path_factory.mktemp("scip-fixture")
-    shutil.copytree(FIXTURE_ROOT, root, dirs_exist_ok=True)
+def indexed_fixture():
+    """typescript-project indexed once per fixture content (stable $TMPDIR/scip-fixture workspace)."""
     try:
-        db_path = index_fixture_project(root)
+        return prepare_cached_indexed_fixture(FIXTURE_ROOT, cache_key="typescript-default")
     except RuntimeError as exc:
         pytest.skip(str(exc))
-    return IndexedFixture(root=root, db_path=db_path)
+
+
+@pytest.fixture(scope="session")
+def excluded_fixture():
+    """Same fixture with default test exclude globs persisted at index time."""
+    try:
+        return prepare_cached_indexed_fixture(
+            FIXTURE_ROOT,
+            cache_key="typescript-excluded",
+            exclude_globs=DEFAULT_TEST_EXCLUDE_GLOBS,
+        )
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
 
 @pytest.fixture
