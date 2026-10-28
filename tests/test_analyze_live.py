@@ -186,6 +186,34 @@ class TestEntrypointIndex:
         assert index.is_entrypoint("src/index.ts")
         assert index.is_entrypoint("src/bin/cli.ts")
 
+    def test_index_html_vite_entry(self, tmp_path: Path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.tsx").write_text("export {};\n", encoding="utf-8")
+        (tmp_path / "index.html").write_text(
+            '<html><body><script type="module" src="/src/main.tsx"></script></body></html>',
+            encoding="utf-8",
+        )
+        (tmp_path / "package.json").write_text('{"name":"app"}', encoding="utf-8")
+        index = EntrypointIndex(tmp_path)
+        assert index.is_entrypoint("src/main.tsx")
+
+    def test_go_cmd_main(self, tmp_path: Path):
+        (tmp_path / "cmd" / "server").mkdir(parents=True)
+        (tmp_path / "cmd" / "server" / "main.go").write_text("package main\n", encoding="utf-8")
+        (tmp_path / "go.mod").write_text("module example.com/app\n\ngo 1.21\n", encoding="utf-8")
+        index = EntrypointIndex(tmp_path)
+        assert index.is_entrypoint("cmd/server/main.go")
+
+    def test_cargo_bin_and_default_main(self, tmp_path: Path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.rs").write_text("fn main() {}\n", encoding="utf-8")
+        (tmp_path / "Cargo.toml").write_text(
+            '[package]\nname = "app"\nversion = "0.1.0"\n',
+            encoding="utf-8",
+        )
+        index = EntrypointIndex(tmp_path)
+        assert index.is_entrypoint("src/main.rs")
+
     def test_setup_cfg_console_scripts(self, tmp_path: Path):
         (tmp_path / "app").mkdir()
         (tmp_path / "app" / "cli.py").write_text("def main(): pass\n", encoding="utf-8")

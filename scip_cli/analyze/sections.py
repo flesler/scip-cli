@@ -124,7 +124,8 @@ FALSE_POSITIVE_PREFACES: dict[str, str] = {
     "dead_exports": ("Warn: SCIP misses require()/default exports; empty rdeps is not unused. " + _RG_STEM),
     "dead_files": (
         "Warn: SCIP often has no import edge (named import, barrel, require). "
-        + "Shebang, package.json main/bin/scripts (incl. dist→src), and monorepo packages are entrypoints. "
+        + "Shebang, package.json main/bin/scripts (incl. dist→src), index.html script src, "
+        + "and monorepo packages are entrypoints. "
         + _RG_STEM
     ),
     "unreferenced": ("Warn: no index mentions — may still be called dynamically. " + _RG_STEM),

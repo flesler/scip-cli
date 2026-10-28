@@ -103,6 +103,34 @@ def _paths_from_package_json(repo_root: Path, package_rel: Path) -> set[str]:
             if isinstance(value, str):
                 for path in _paths_from_script_command(package_root, value):
                     paths.add(path_in_repo(repo_root, package_rel, path))
+    paths |= _paths_from_index_html(repo_root, package_rel, package_root)
+    return paths
+
+
+_HTML_SCRIPT_SRC = re.compile(
+    r"""<script[^>]+src\s*=\s*["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+
+
+def _paths_from_index_html(repo_root: Path, package_rel: Path, package_root: Path) -> set[str]:
+    """Vite / SPA entry scripts referenced from index.html."""
+    paths: set[str] = set()
+    html_path = package_root / "index.html"
+    if not html_path.is_file():
+        return paths
+    try:
+        text = html_path.read_text(encoding="utf-8")
+    except OSError:
+        return paths
+    for match in _HTML_SCRIPT_SRC.finditer(text):
+        raw = match.group(1).strip()
+        if not raw or raw.startswith(("http://", "https://", "//")):
+            continue
+        if raw.startswith("/"):
+            raw = raw.lstrip("/")
+        for variant in _manifest_path_variants(package_root, raw):
+            paths.add(path_in_repo(repo_root, package_rel, variant))
     return paths
 
 

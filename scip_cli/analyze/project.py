@@ -16,6 +16,7 @@ from .common import (
     fetch_all,
     file_pair_noise,
     is_dynamic_loader_path,
+    is_package_init_module,
     is_test_path,
     short_name,
     stale_type_noise,
@@ -449,6 +450,8 @@ def dead_files(
             return None
         if is_entrypoint_path(path):
             return None
+        if is_package_init_module(path):
+            return None
         if is_low_signal_dead_file(db, doc_id):
             return None
         return path
@@ -488,6 +491,8 @@ def single_importer_files(
         if is_dynamic_loader_path(path):
             return None
         if is_entrypoint_path(path):
+            return None
+        if is_package_init_module(path):
             return None
         if is_low_signal_dead_file(db, doc_id):
             return None

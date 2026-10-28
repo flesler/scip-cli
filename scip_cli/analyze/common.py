@@ -161,6 +161,11 @@ def is_test_path(relative_path: str) -> bool:
     return name == "conftest.py"
 
 
+def is_package_init_module(relative_path: str) -> bool:
+    """Python package __init__.py — import surface, not a nuke candidate for dead_files."""
+    return relative_path.replace("\\", "/").endswith("__init__.py")
+
+
 def is_dynamic_loader_path(relative_path: str) -> bool:
     """True for migration files typically loaded by filename; SCIP has no import edge."""
     p = relative_path.replace("\\", "/").lower()
