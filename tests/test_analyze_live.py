@@ -173,6 +173,19 @@ class TestEntrypointIndex:
         index = EntrypointIndex(tmp_path)
         assert index.is_entrypoint("run.ts")
 
+    def test_main_dist_js_maps_to_src_ts(self, tmp_path: Path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "index.ts").write_text("export {};\n", encoding="utf-8")
+        (tmp_path / "package.json").write_text(
+            '{"main":"dist/index.js","scripts":{"cli":"npm run node -- dist/bin/cli"}}',
+            encoding="utf-8",
+        )
+        (tmp_path / "src" / "bin").mkdir()
+        (tmp_path / "src" / "bin" / "cli.ts").write_text("export function cli() {}\n", encoding="utf-8")
+        index = EntrypointIndex(tmp_path)
+        assert index.is_entrypoint("src/index.ts")
+        assert index.is_entrypoint("src/bin/cli.ts")
+
     def test_setup_cfg_console_scripts(self, tmp_path: Path):
         (tmp_path / "app").mkdir()
         (tmp_path / "app" / "cli.py").write_text("def main(): pass\n", encoding="utf-8")

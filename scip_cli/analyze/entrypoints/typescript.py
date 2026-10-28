@@ -14,19 +14,67 @@ _SCRIPT_PATH = re.compile(
     r"(?:^|[\s|'\"`&;|])((?:[\w.-]+/)+[\w.-]+\.(?:tsx?|jsx?|mjs|cjs)|[\./][\w./-]+\.(?:tsx?|jsx?|mjs|cjs)|[\w][\w.-]*\.(?:tsx?|jsx?|mjs|cjs))(?=$|[\s'\"`&;])",
     re.IGNORECASE,
 )
+_DIST_BIN_PATH = re.compile(
+    r"(?:^|[\s|'\"`&;|])((?:dist|bin)/[\w./-]+?)(?=$|[\s'\"`&;])",
+    re.IGNORECASE,
+)
+
+
+def _manifest_path_variants(package_root: Path, raw: str) -> list[str]:
+    """Map package.json main/bin paths (often dist/*.js) to likely indexed source paths."""
+    text = raw.strip().strip("'\"")
+    if not text:
+        return []
+    candidates = [text]
+    if text.startswith("dist/"):
+        rest = text[5:]
+        candidates.append(f"src/{rest}")
+        if rest.endswith(".js"):
+            candidates.append(f"src/{rest[:-3]}.ts")
+        if not any(rest.endswith(ext) for ext in _JS_EXTENSIONS):
+            for ext in (".ts", ".tsx", ".js"):
+                candidates.append(f"src/{rest}{ext}")
+    if text.endswith(".js"):
+        candidates.append(f"{text[:-3]}.ts")
+    if not any(text.endswith(ext) for ext in _JS_EXTENSIONS):
+        for ext in (".ts", ".tsx", ".js"):
+            candidates.append(f"{text}{ext}")
+
+    variants: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = normalize_path_under_root(package_root, candidate, extensions=_JS_EXTENSIONS)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            variants.append(normalized)
+    return variants
 
 
 def _paths_from_script_command(package_root: Path, command: str) -> list[str]:
     paths: list[str] = []
     seen: set[str] = set()
     for match in _SCRIPT_PATH.finditer(command):
-        raw = match.group(1)
-        normalized = normalize_path_under_root(package_root, raw, extensions=_JS_EXTENSIONS)
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        paths.append(normalized)
+        for variant in _manifest_path_variants(package_root, match.group(1)):
+            if variant not in seen:
+                seen.add(variant)
+                paths.append(variant)
+    for match in _DIST_BIN_PATH.finditer(command):
+        for variant in _manifest_path_variants(package_root, match.group(1)):
+            if variant not in seen:
+                seen.add(variant)
+                paths.append(variant)
     return paths
+
+
+def _remember_manifest_paths(
+    repo_root: Path,
+    package_rel: Path,
+    package_root: Path,
+    raw: str,
+    paths: set[str],
+) -> None:
+    for variant in _manifest_path_variants(package_root, raw):
+        paths.add(path_in_repo(repo_root, package_rel, variant))
 
 
 def _paths_from_package_json(repo_root: Path, package_rel: Path) -> set[str]:
@@ -39,17 +87,16 @@ def _paths_from_package_json(repo_root: Path, package_rel: Path) -> set[str]:
         data = json.loads(pkg_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return paths
+    main_field = data.get("main")
+    if isinstance(main_field, str):
+        _remember_manifest_paths(repo_root, package_rel, package_root, main_field, paths)
     bin_field = data.get("bin")
     if isinstance(bin_field, str):
-        normalized = normalize_path_under_root(package_root, bin_field, extensions=_JS_EXTENSIONS)
-        if normalized:
-            paths.add(path_in_repo(repo_root, package_rel, normalized))
+        _remember_manifest_paths(repo_root, package_rel, package_root, bin_field, paths)
     elif isinstance(bin_field, dict):
         for value in bin_field.values():
             if isinstance(value, str):
-                normalized = normalize_path_under_root(package_root, value, extensions=_JS_EXTENSIONS)
-                if normalized:
-                    paths.add(path_in_repo(repo_root, package_rel, normalized))
+                _remember_manifest_paths(repo_root, package_rel, package_root, value, paths)
     scripts = data.get("scripts")
     if isinstance(scripts, dict):
         for value in scripts.values():
