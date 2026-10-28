@@ -51,6 +51,19 @@ def read_source_lines(
         return None
 
 
+def file_has_shebang(project_root: Path | str, relative_path: str) -> bool:
+    """True when the source file's first line is a shebang."""
+    full_path = _resolve_source_path(project_root, relative_path)
+    if full_path is None or not full_path.is_file():
+        return False
+    try:
+        with open(full_path, "rb") as handle:
+            first = handle.readline(256)
+    except OSError:
+        return False
+    return first.startswith(b"#!")
+
+
 def _fallback_def_location(
     db: sqlite3.Connection, project_root: Path | str, symbol_str: str
 ) -> tuple[str, int, int] | None:

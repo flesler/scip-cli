@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from .common import section
+from .entrypoints import bind_entrypoints, entrypoints_bound, reset_entrypoints
 from .live import bind_live, reset_live
 
 CheckFn = Callable[..., list[str]]
@@ -120,7 +122,11 @@ _RG_STEM = (
 
 FALSE_POSITIVE_PREFACES: dict[str, str] = {
     "dead_exports": ("Warn: SCIP misses require()/default exports; empty rdeps is not unused. " + _RG_STEM),
-    "dead_files": ("Warn: SCIP often has no import edge (named import, barrel, require). " + _RG_STEM),
+    "dead_files": (
+        "Warn: SCIP often has no import edge (named import, barrel, require). "
+        + "Shebang and package.json bin/scripts targets are treated as entrypoints. "
+        + _RG_STEM
+    ),
     "unreferenced": ("Warn: no index mentions — may still be called dynamically. " + _RG_STEM),
     "same_file_only": ("Warn: in-file only in SCIP — callers may be unindexed. " + _RG_STEM),
     "stale_types": ("Warn: type-only imports are often dropped by SCIP. " + _RG_STEM),
@@ -130,7 +136,9 @@ FALSE_POSITIVE_PREFACES: dict[str, str] = {
     "unused_imports": ("Warn: may still be a type-only use SCIP did not bind. " + _RG_STEM),
     "single_use_imports": ("Warn: one import site and one use in the whole index — not per-file. " + _RG_STEM),
     "single_importer_files": (
-        "Warn: only one SCIP importer — barrels and dynamic imports are often missing. " + _RG_STEM
+        "Warn: only one SCIP importer — barrels and dynamic imports are often missing. "
+        + "Rows tagged [test-only] have no production importers in the index. "
+        + _RG_STEM
     ),
     "test_only": ("Warn: index may miss production calls, so this can look test-only. " + _RG_STEM),
 }
@@ -177,6 +185,7 @@ def run_checks(
     budget: RowBudget | None = None,
     check_keys: set[str] | None = None,
     per_check_limit: int | None = None,
+    project_root: Path | str | None = None,
 ) -> list[tuple[str, list[str], str | None]]:
     """Run checks in priority order (high → low). `--limit` is a shared row budget.
 
@@ -195,6 +204,9 @@ def run_checks(
     sections: list[tuple[str, list[str], str | None]] = []
     remaining_after = list(selected)
     token = bind_live(db)
+    entry_token = None
+    if project_root is not None and not entrypoints_bound():
+        entry_token = bind_entrypoints(project_root)
     try:
         for index, check in enumerate(selected):
             if budget_obj.exhausted():
@@ -223,4 +235,6 @@ def run_checks(
             )
         return sections
     finally:
+        if entry_token is not None:
+            reset_entrypoints(entry_token)
         reset_live(token)

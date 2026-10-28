@@ -20,6 +20,7 @@ from .common import (
     short_name,
     stale_type_noise,
 )
+from .entrypoints import is_entrypoint_path
 from .graph import FILE_EDGES_SQL, fetch_file_edges, find_longer_cycles
 from .live import (
     LiveIndex,
@@ -233,6 +234,8 @@ def _collect_dead_export_rows(
 
     def accept(row):
         symbol_id, symbol, path, loc, def_doc_id = row
+        if is_entrypoint_path(path):
+            return None
         if analyze_noise(path, symbol, include_tests=include_tests):
             return None
         if has_same_file_reference_usage(db, symbol_id, def_doc_id):
@@ -444,6 +447,8 @@ def dead_files(
             return None
         if is_dynamic_loader_path(path):
             return None
+        if is_entrypoint_path(path):
+            return None
         if is_low_signal_dead_file(db, doc_id):
             return None
         return path
@@ -482,9 +487,12 @@ def single_importer_files(
             return None
         if is_dynamic_loader_path(path):
             return None
+        if is_entrypoint_path(path):
+            return None
         if is_low_signal_dead_file(db, doc_id):
             return None
-        return f"{path}  importer={importer_path}"
+        suffix = "  [test-only]" if is_test_path(importer_path) else ""
+        return f"{path}  importer={importer_path}{suffix}"
 
     return collect_until_limit(limit, fetch_page, accept)
 
@@ -533,6 +541,7 @@ def run_all(
     budget=None,
     check_keys=None,
     per_check_limit=None,
+    project_root=None,
 ) -> list[tuple[str, list[str], str | None]]:
     suffix = _scope_suffix(scope)
     checks = [
@@ -573,4 +582,5 @@ def run_all(
         budget=budget,
         check_keys=check_keys,
         per_check_limit=per_check_limit,
+        project_root=project_root,
     )

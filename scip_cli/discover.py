@@ -162,6 +162,21 @@ def discover_python_projects(root: Path) -> list[Path]:
     return [Path(".")]
 
 
+def discover_npm_package_dirs(root: Path) -> list[Path]:
+    """Return directories that contain package.json (repo root and monorepo packages).
+
+    Uses the same directory walk as other discover helpers (skips node_modules, .git, …).
+    Does not read every source file — only visits directories and checks for package.json.
+    """
+    root = root.resolve()
+    packages = _walk_marker_files(root, frozenset({"package.json"}))
+    if packages:
+        return sorted(set(packages), key=str)
+    if (root / "package.json").is_file():
+        return [Path(".")]
+    return []
+
+
 def discover_rust_crates(root: Path) -> list[Path]:
     """Return Rust crate directories (Cargo.toml roots) under the repository."""
     root = root.resolve()

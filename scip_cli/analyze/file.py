@@ -382,9 +382,17 @@ def _run_file_checks(
     budget=None,
     check_keys=None,
     per_check_limit=None,
+    project_root=None,
 ) -> list[tuple[str, list[str], str | None]]:
     return run_checks(
-        checks, db, limit, priorities, budget=budget, check_keys=check_keys, per_check_limit=per_check_limit
+        checks,
+        db,
+        limit,
+        priorities,
+        budget=budget,
+        check_keys=check_keys,
+        per_check_limit=per_check_limit,
+        project_root=project_root,
     )
 
 
@@ -396,6 +404,7 @@ def run_all(
     budget=None,
     check_keys=None,
     per_check_limit=None,
+    project_root=None,
 ) -> list[tuple[str, list[str], str | None]]:
     return _run_file_checks(
         _file_checks(relative_path, include_top_symbols=True),
@@ -405,6 +414,7 @@ def run_all(
         budget=budget,
         check_keys=check_keys,
         per_check_limit=per_check_limit,
+        project_root=project_root,
     )
 
 
@@ -416,6 +426,7 @@ def run_all_sections_only(
     budget=None,
     check_keys=None,
     per_check_limit=None,
+    project_root=None,
 ) -> list[tuple[str, list[str], str | None]]:
     """Per-file sections without top-symbols (directory batch)."""
     return _run_file_checks(
@@ -426,4 +437,5 @@ def run_all_sections_only(
         budget=budget,
         check_keys=check_keys,
         per_check_limit=per_check_limit,
+        project_root=project_root,
     )
