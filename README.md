@@ -289,7 +289,7 @@ Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 |---|---|---|
 |**high**|Cycles, dead exports, dead files, stale types (unreferenced is omitted when dead exports is on)|Nuke or fix cycles; delete unused; `_` prefix|
 |**medium**|Same-file only, change surface (file target)|Module-private by usage|
-|**low**|Test-only consumers, coupling, bottlenecks, hotspots|Noisy on Python (index omits many same-file calls); verify with `rg`|
+|**low**|Single-importer files (`[test-only]` when sole importer is tests), test-only consumers, coupling, bottlenecks, hotspots|Noisy on Python (index omits many same-file calls); verify with `rg`|
 
 Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
 
@@ -315,7 +315,7 @@ scip-cli analyze scip_cli --limit 15              # directory: scoped project + 
 
 **Defaults:** project-wide and directory analyze skip `tests/`, `*.test.*`, `*.spec.*`, `conftest.py`, and `__tests__/`. Pass `--include-tests` to include them. File-target analyze always includes that file.
 
-**Limits:** "Dead export" means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Re-run `reindex` after large changes; the index is a snapshot.
+**Limits:** "Dead export" means no cross-file mentions in the index — not unreachable code. Same-file private helpers are expected. Shebang lines and manifest entrypoints (`package.json` main/bin/scripts with dist→src mapping for TypeScript; Python `pyproject`/`setup.py`/`setup.cfg` scripts) are excluded from project-level dead files and dead exports. Re-run `reindex` after large changes; the index is a snapshot.
 
 ## Performance
 
