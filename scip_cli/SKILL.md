@@ -135,7 +135,7 @@ analyze [--limit N] [--per-check-limit N] [--path PATH] [--include-tests] [--pri
 
 Priority **high → medium → low**. `--limit` = total finding rows (default 20); headers/truncation don't count. `--per-check-limit` caps each section. Agents: `--limit 40 --per-check-limit 5`. `--priority high` or `high,medium` (`1`/`2`/`3`) skips lower tiers. `--check NAME` (repeatable/comma) ANDs with priority.
 
-**Easy wins:** cycles, dead exports, dead files (production). Stale types = types with no external refs. Dead = no cross-file refs in index, not `vulture`. Empty `rdeps` on a hit is often a SCIP miss — verify with `rg -F STEM` (basename in `(...)`, same-file hits ignored).
+**Easy wins:** cycles, dead exports, dead files (production). Stale types = types with no external refs. Dead = no cross-file refs in index, not `vulture`. Shebang lines and manifest entrypoints (every `package.json` under the repo for TS; each Python package root for `pyproject`/`setup.py`/`setup.cfg` scripts) are never project-level dead files/exports. `single_importer_files` rows with only test importers are tagged `[test-only]`. File-scoped `analyze path/to/cli.ts` still reports unused symbols in that file. Empty `rdeps` on a hit is often a SCIP miss — verify with `rg -F STEM` (basename in `(...)`, same-file hits ignored).
 
 ### reindex
 
