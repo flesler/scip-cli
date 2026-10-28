@@ -125,7 +125,7 @@ def run_indexer_with_fallback(
             from .github_npm import install_via_github_npm
 
             return install_via_github_npm(npx_package, args, cwd, run_env)
-        return install_via_npx(npx_package, npx_version, args, cwd, run_env)
+        return install_via_npx(npx_package, npx_version, args, cwd, run_env, binary=binary)
 
     if result is None:
         raise RuntimeError(f"Binary '{binary}' not found and no fallback available")

@@ -81,6 +81,24 @@ class TestInstallViaNpx:
                 env={},
             )
 
+    def test_scip_python_binary(self):
+        mock_result = MagicMock()
+        with patch("scip_cli.indexing.runners.run_subprocess", return_value=mock_result) as mock_run:
+            result = install_via_npx(
+                "@sourcegraph/scip-python",
+                None,
+                ["index"],
+                "/tmp",
+                {},
+                binary="scip-python",
+            )
+            assert result is mock_result
+            mock_run.assert_called_once_with(
+                ["npx", "-y", "-p", "@sourcegraph/scip-python", "scip-python", "index"],
+                "/tmp",
+                env={},
+            )
+
 
 class TestInstallViaGoInstall:
     """Tests for install_via_go_install."""
@@ -272,7 +290,14 @@ class TestRunIndexerWithFallback:
                 npx_version="0.4.0",
             )
             assert result is mock_result
-            mock_npx.assert_called_once()
+            mock_npx.assert_called_once_with(
+                "@sourcegraph/scip-typescript",
+                "0.4.0",
+                ["index"],
+                "/tmp",
+                {},
+                binary="scip-typescript",
+            )
 
     def test_go_install_fallback(self):
         """Binary not found, falls back to go install."""
