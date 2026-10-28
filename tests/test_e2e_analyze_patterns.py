@@ -10,8 +10,13 @@ from scip_cli.analyze.common import short_name
 from tests.e2e_harness import open_index_db, run_cli
 from tests.fixture_catalog import (
     CLASS_INFERENCE_CLIENT,
+    CLASSIFY_LEAF_FILE,
+    CLASSIFY_LEAF_TEST_FILE,
+    CLI_ENTRY_FILE,
+    FN_CLI_ENTRY,
     FN_EVICT_ITEM,
     FN_LAZY_PANEL,
+    FN_NPM_SCRIPT,
     FN_ORPHAN_WIDGET,
     FN_SEND,
     HOOK_A_FILE,
@@ -19,6 +24,7 @@ from tests.fixture_catalog import (
     I18N_EN_FILE,
     I18N_INDEX_FILE,
     LAZY_PANEL_FILE,
+    NPM_SCRIPT_ENTRY_FILE,
     TYPE_A_FILE,
     TYPE_B_FILE,
     TYPE_BASE_STREAM,
@@ -60,6 +66,37 @@ class TestAnalyzePatternsE2E:
             assert not _contains(dead, FN_EVICT_ITEM)
         finally:
             db.close()
+
+    def test_cli_entrypoints_not_dead_files(self, cli):
+        result = cli.run("analyze", "--check", "dead_files", "--limit", "200")
+        assert result.returncode == 0
+        assert CLI_ENTRY_FILE not in result.stdout
+        assert NPM_SCRIPT_ENTRY_FILE not in result.stdout
+
+    def test_cli_entrypoints_not_project_dead_exports(self, cli):
+        result = cli.run("analyze", "--check", "dead_exports", "--limit", "200")
+        assert result.returncode == 0
+        assert FN_CLI_ENTRY not in result.stdout
+        assert FN_NPM_SCRIPT not in result.stdout
+
+    def test_file_scoped_dead_in_file_still_runs_on_cli_entry(self, indexed_fixture):
+        from scip_cli.analyze.entrypoints import bind_entrypoints, reset_entrypoints
+
+        db = _db(indexed_fixture)
+        token = bind_entrypoints(indexed_fixture.root)
+        try:
+            lines = file_checks.dead_in_file(db, CLI_ENTRY_FILE, limit=20)
+            assert isinstance(lines, list)
+        finally:
+            reset_entrypoints(token)
+            db.close()
+
+    def test_single_importer_tags_test_only_importer(self, cli):
+        result = cli.run("analyze", "--check", "single_importer_files", "--limit", "200")
+        assert result.returncode == 0
+        assert CLASSIFY_LEAF_FILE in result.stdout
+        assert CLASSIFY_LEAF_TEST_FILE in result.stdout
+        assert "[test-only]" in result.stdout
 
     def test_default_object_export_not_dead(self, indexed_fixture):
         db = _db(indexed_fixture)

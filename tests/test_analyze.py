@@ -264,6 +264,17 @@ class TestProjectAnalyze:
         b.reference("src/entry.ts", sym)
         lines = project_checks.single_importer_files(b.finish(), limit=20)
         assert any("src/pkg/only.ts" in line and "importer=src/entry.ts" in line for line in lines)
+        assert all("[test-only]" not in line for line in lines)
+
+    def test_single_importer_files_tags_test_only_importer(self):
+        b = AnalyzeDbBuilder()
+        sym = b.define("src/heuristic/classifyLeaf.ts", "classifyLeaf")
+        b.import_symbol("src/heuristic/classifyLeaf.test.ts", sym)
+        b.reference("src/heuristic/classifyLeaf.test.ts", sym)
+        lines = project_checks.single_importer_files(b.finish(), limit=20)
+        assert any(
+            "classifyLeaf.ts" in line and "classifyLeaf.test.ts" in line and "[test-only]" in line for line in lines
+        )
 
     def test_single_importer_files_skips_two_importers(self):
         b = AnalyzeDbBuilder()

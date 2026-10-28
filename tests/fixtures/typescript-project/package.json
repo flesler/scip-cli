@@ -1,5 +1,11 @@
 {
   "name": "sample-app",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "bin": {
+    "sample-cli": "bin/cli-entry.ts"
+  },
+  "scripts": {
+    "run-npm-script": "tsx bin/npm-script-only.ts"
+  }
 }

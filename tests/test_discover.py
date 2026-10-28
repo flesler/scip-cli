@@ -5,6 +5,7 @@ from pathlib import Path
 
 from scip_cli.discover import (
     discover_golang_modules,
+    discover_npm_package_dirs,
     discover_python_projects,
     discover_rust_crates,
     discover_typescript_projects,
@@ -171,6 +172,25 @@ class TestDiscoverPythonProjects:
         _write(tmp_path / ".venv" / "lib" / "pkg" / "pyproject.toml", "[project]\nname = 'dep'\n")
 
         assert discover_python_projects(tmp_path) == [Path(".")]
+
+
+class TestDiscoverNpmPackages:
+    def test_monorepo_package_json_dirs(self, tmp_path):
+        _write(tmp_path / "package.json", "{}")
+        _write(tmp_path / "packages" / "api" / "package.json", '{"name":"api"}')
+        _write(tmp_path / "packages" / "web" / "package.json", '{"name":"web"}')
+
+        assert discover_npm_package_dirs(tmp_path) == [
+            Path("."),
+            Path("packages/api"),
+            Path("packages/web"),
+        ]
+
+    def test_skips_node_modules(self, tmp_path):
+        _write(tmp_path / "package.json", "{}")
+        _write(tmp_path / "node_modules" / "dep" / "package.json", '{"name":"dep"}')
+
+        assert discover_npm_package_dirs(tmp_path) == [Path(".")]
 
 
 class TestDiscoverRustCrates:
