@@ -1,5 +1,5 @@
 ---
-name: scip-cli-sql-bench
+name: sql-bench
 description: Read when changing queries.py, analyze SQL, symbols SQL, or sql.py.
 ---
 
@@ -21,7 +21,7 @@ Synthetic scale: `tests/bench_db.py` + `tests/test_bench_queries.py`. Lines `BEN
 
 ## Correctness vs speed
 
-- Behavior / SCIP shapes → fixture e2e (`.cursor/skills/test/SKILL.md`).
+- Behavior / SCIP shapes → fixture e2e (skill `test`).
 - Graph plumbing only → `analyze_db` unit tests.
 
 ## Optional: real cached index

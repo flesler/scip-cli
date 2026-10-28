@@ -1,5 +1,5 @@
 ---
-name: scip-cli-new-command
+name: new-command
 description: Read when adding or changing a scip-cli CLI subcommand.
 ---
 
@@ -15,7 +15,7 @@ User-facing reference lives in `scip_cli/SKILL.md` + `README.md` (must match `sc
 4. **SQL** — keep queries in `scip_cli/queries.py` or `scip_cli/analyze/`, not fat command modules.
 5. **Docs** — quick-guide row + `### <name>` section in `scip_cli/SKILL.md`; bullet in README § Commands.
 6. **Tests** — `tests/test_e2e.py` (or `test_e2e_analyze_patterns.py` for analyze-only); add `scip_cli.commands.<name>.setup` to `tests/e2e_harness.py` `COMMAND_SETUP_PATHS`.
-7. **Verify** — Read `.cursor/skills/test/SKILL.md`; run narrowed pytest then e2e loop.
+7. **Verify** — follow skill `test`; run narrowed pytest then e2e loop.
 
 ## Patterns
 
@@ -31,3 +31,8 @@ User-facing reference lives in `scip_cli/SKILL.md` + `README.md` (must match `sc
 |Handlers|`scip_cli/commands/`|
 |Index open|`scip_cli/session.py`, `scip_cli/indexing/core.py`|
 |User skill install|`scip-cli skill <path>` copies `scip_cli/SKILL.md`|
+
+## Cursor repo conventions
+
+- **Skills** (`.cursor/skills/<name>/`, frontmatter `name:` = folder name): agent reads when the task matches — e.g. `test`, `sql-bench`, `new-command`.
+- **Commands** (`.cursor/commands/`): only workflows **you** invoke with slash — e.g. `dogfood`, `migration-problems`. Never duplicate the same workflow as a skill and a command.

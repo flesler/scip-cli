@@ -7,7 +7,7 @@ alwaysApply: true
 
 **Work from repo root.** CLI usage, flags, and user gotchas: `scip-cli skill` (source: `scip_cli/SKILL.md`). Read once per task — do not duplicate SKILL here.
 
-**Cursor slash workflows:** `.cursor/commands/` (`test`, `dogfood`, `new-command`, `bench`) → on-demand skills under `.cursor/skills/`.
+**Cursor:** Skills in `.cursor/skills/` (`test`, `sql-bench`, `new-command`) — folder name = frontmatter `name:`; agent reads when relevant. Slash commands in `.cursor/commands/` only for workflows you invoke (`dogfood`, `migration-problems`); never pair the same workflow as both.
 
 **Almost always:** bare `scip-cli` on PATH must be **this checkout live** (`pip install -e ".[dev]"`). All examples use `scip-cli` — never `.venv/bin/scip-cli`, `python -m scip_cli`, or other paths. Only swap to PyPI briefly to smoke-test a release.
 

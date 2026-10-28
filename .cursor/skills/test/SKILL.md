@@ -1,5 +1,5 @@
 ---
-name: scip-cli-test
+name: test
 description: Read when running or writing scip-cli tests (pytest, e2e, CI parity).
 ---
 
@@ -16,7 +16,7 @@ Repo root only. Bootstrap: `.cursor/rules/agent.mdc` (editable install, Node for
 |CLI + fixture index|`pytest tests/test_e2e.py tests/test_e2e_analyze_patterns.py`|
 |One class / test|`pytest tests/test_e2e.py::TestQuery -q`|
 |Analyze unit / graph|`pytest tests/test_analyze_graph.py tests/test_analyze.py`|
-|SQL perf (not correctness)|`scripts/bench.sh` — see `.cursor/skills/sql-bench/SKILL.md`|
+|SQL perf (not correctness)|`scripts/bench.sh` — see skill `sql-bench`|
 
 `scripts/test.sh` uses `.venv/bin/{ruff,basedpyright,pytest}`; create venv + `pip install -e ".[dev]"` if missing.
 
