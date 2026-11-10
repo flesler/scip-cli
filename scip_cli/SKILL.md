@@ -123,8 +123,13 @@ query "SELECT m.name AS table_name, p.name AS column_name, p.type FROM sqlite_sc
 ### analyze
 
 ```bash
-analyze [--limit N] [--per-check-limit N] [--path PATH] [--include-tests] [--priority LEVEL] [--check NAME] [target]
+analyze [--list-checks] [--limit N] [--per-check-limit N] [--path PATH] [--include-tests] [--priority LEVEL] [--check NAME] [target]
 ```
+
+**Check names:** `scip-cli analyze --list-checks` (scope + one-line summary; no index required). Glue/slop pass:  
+`scip-cli analyze --check dead_exports,dead_files,single_importer_files,one_line_exports --priority high,low --limit 40`
+
+**Two “single place” checks:** `single_importer_files` (project) = whole file has one inbound importer. `single_use_imports` (file target only) = import binding imported once in that file and used once repo-wide.
 
 |Target|Scope|
 |---|---|
@@ -133,7 +138,7 @@ analyze [--limit N] [--per-check-limit N] [--path PATH] [--include-tests] [--pri
 |file|File dashboards + top symbols by external consumers|
 |symbol|Pressure, consumers, deps, affected|
 
-Priority **high → medium → low**. `[high]` cycles, dead exports, dead files, stale types (project unreferenced omitted when dead exports runs; file unreferenced omitted when dead-in-file runs). `[medium]` same-file-only, change surface (file). `[low]` single-importer files (`[test-only]` tag), test-only consumers, coupling, bottlenecks, hotspots. `--limit` = total finding rows (default 20); headers/truncation don't count. `--per-check-limit` caps each section. Agents: `--limit 40 --per-check-limit 5`. `--priority high` or `high,medium` (`1`/`2`/`3`) skips lower tiers. `--check NAME` (repeatable/comma) ANDs with priority.
+Priority **high → medium → low**. `[high]` cycles, dead exports, dead files, stale types (project unreferenced omitted when dead exports runs; file unreferenced omitted when dead-in-file runs). `[medium]` same-file-only, change surface (file). `[low]` single-importer files (`[test-only]` tag), test-only consumers, coupling, bottlenecks, hotspots, `one_line_exports` (tiny exported call-through functions — verify before inlining). `--limit` = total finding rows (default 20); headers/truncation don't count. `--per-check-limit` caps each section. Agents: `--limit 40 --per-check-limit 5`. `--priority high` or `high,medium` (`1`/`2`/`3`) skips lower tiers. `--check NAME` (repeatable/comma) ANDs with priority.
 
 **Easy wins:** cycles, dead exports, dead files (production). Stale types = types with no external refs. Dead = no cross-file refs in index, not `vulture`. Shebang plus manifest entrypoints (`package.json` main/bin/scripts, dist→src mapping; each Python package for pyproject/setup/setup.cfg) are never project-level dead files/exports. `single_importer_files` rows with only test importers are tagged `[test-only]`. File-scoped `analyze path/to/cli.ts` still reports unused symbols in that file. Empty `rdeps` on a hit is often a SCIP miss — verify with `rg -F STEM` (basename in `(...)`, same-file hits ignored).
 

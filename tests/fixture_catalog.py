@@ -41,6 +41,11 @@ CLASSIFY_LEAF_FILE = "src/heuristic/classifyLeaf.ts"
 CLASSIFY_LEAF_TEST_FILE = "src/heuristic/classifyLeaf.test.ts"
 FN_CLASSIFY_LEAF = "classifyLeaf"
 
+SHIM_FILE = "src/shim/applyGateway.ts"
+FN_POST_VIA_GATEWAY = "postViaGateway"
+RULES_APPLY_FILE = "src/rules/applyRule.ts"
+FN_APPLY_RULE = "applyRule"
+
 FN_LAZY_PANEL = "LazyPanel"
 FN_EVICT_ITEM = "evictItem"
 FN_SEND = "send"

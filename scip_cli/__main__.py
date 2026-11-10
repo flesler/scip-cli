@@ -11,6 +11,7 @@ import sys
 from collections.abc import Callable
 
 from . import __version__
+from .analyze.check_catalog import SLOP_CHECK_BUNDLE
 from .cli_args import (
     add_limit_argument,
     add_names_only_argument,
@@ -143,6 +144,11 @@ def main() -> None:
     analyze_parser = subparsers.add_parser(
         "analyze",
         help="Run SQL-based analysis (project, file, or symbol)",
+        epilog=(
+            f"All --check names: scip-cli analyze --list-checks. "
+            f"Example glue/slop pass: --check {SLOP_CHECK_BUNDLE} --priority high,low"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     analyze_parser.add_argument(
         "target",
@@ -173,6 +179,11 @@ def main() -> None:
         action="append",
         metavar="NAME",
         help="Run only these checks (repeatable or comma-separated). ANDs with --priority",
+    )
+    analyze_parser.add_argument(
+        "--list-checks",
+        action="store_true",
+        help="Print valid --check names (scope + summary) and example recipes, then exit",
     )
 
     # reindex

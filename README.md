@@ -274,11 +274,13 @@ Use `analyze` on the repo itself before broad refactors or agent review — it s
 **Quick pass** (after `scip-cli reindex`):
 
 ```bash
+scip-cli analyze --list-checks                  # all --check NAME values (no index)
 scip-cli analyze --limit 25
 scip-cli analyze --limit 40 --per-check-limit 5   # spread the global budget across checks
 scip-cli analyze --priority high --limit 25   # dead exports & cycles only
 scip-cli analyze --check cycles --limit 25    # one named section
 scip-cli analyze --check dead_files --limit 25
+scip-cli analyze --check dead_exports,dead_files,single_importer_files,one_line_exports --priority high,low --limit 40
 ```
 
 `--limit` is a **global** finding-row budget (truncation markers do not count). `--per-check-limit` (default unlimited) caps each section. Directory analyze spends that same budget on per-file dumps after dashboards.
@@ -289,9 +291,9 @@ Sections are tagged `[high]`, `[medium]`, `[low]` and listed in that order.
 |---|---|---|
 |**high**|Cycles, dead exports, dead files, stale types (unreferenced is omitted when dead exports is on)|Nuke or fix cycles; delete unused; `_` prefix|
 |**medium**|Same-file only, change surface (file target)|Module-private by usage|
-|**low**|Single-importer files (`[test-only]` when sole importer is tests), test-only consumers, coupling, bottlenecks, hotspots|Noisy on Python (index omits many same-file calls); verify with `rg`|
+|**low**|Single-importer files (`[test-only]` when sole importer is tests), test-only consumers, coupling, bottlenecks, hotspots, **one_line_exports** (exported call-through shims)|Noisy on Python (index omits many same-file calls); verify with `rg`. `one_line_exports` uses SCIP def line span (Prettier-wrapped signatures count as extra LOC).|
 
-Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface and unused imports.
+Use `--priority high` for a quick gate; `--priority high,medium` adds context. File drill-down adds change surface, **unused_imports**, and **single_use_imports** (not the same as project **single_importer_files**). Run `scip-cli analyze --list-checks` for the full checklist.
 
 **What to look at first**
 

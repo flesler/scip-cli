@@ -31,7 +31,8 @@ from .live import (
     is_low_signal_dead_file,
     live_for,
 )
-from .sections import Check, Priority, run_checks
+from .oneline import one_line_exports
+from .sections import FALSE_POSITIVE_PREFACES, Check, Priority, run_checks
 
 
 def _scope_suffix(scope: str | None) -> str:
@@ -576,6 +577,13 @@ def run_all(
         Check("top_coupling", Priority.LOW, f"Top coupling (file pairs){suffix}", top_coupling),
         Check("bottlenecks", Priority.LOW, f"Bottlenecks (fan-in x fan-out){suffix}", bottlenecks),
         Check("hotspots", Priority.LOW, f"Hotspots (most referenced){suffix}", hotspots),
+        Check(
+            "one_line_exports",
+            Priority.LOW,
+            f"One-line exports (tiny exported functions){suffix}",
+            one_line_exports,
+            false_positive_preface=FALSE_POSITIVE_PREFACES.get("one_line_exports"),
+        ),
     ]
     return run_checks(
         checks,

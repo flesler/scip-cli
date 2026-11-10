@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from .check_catalog import CHECK_KEYS
 from .common import section
 from .entrypoints import bind_entrypoints, entrypoints_bound, reset_entrypoints
 from .live import bind_live, reset_live
+from .oneline import bind_analyze_root, reset_analyze_root
 
 CheckFn = Callable[..., list[str]]
 
@@ -49,37 +51,6 @@ def parse_priorities(value: str | None) -> set[Priority] | None:
             allowed = ", ".join(p.value for p in Priority)
             raise RuntimeError(f"unknown analyze priority {part!r} (use {allowed} or 1/2/3)") from exc
     return out
-
-
-# Project, file, and symbol Check.key values. --check rejects anything else.
-CHECK_KEYS = frozenset(
-    {
-        "affected",
-        "bottlenecks",
-        "change_surface",
-        "consumer_files",
-        "coupling",
-        "cycles",
-        "dead_exports",
-        "dead_files",
-        "dead_in_file",
-        "def_context",
-        "dependencies",
-        "file_consumers",
-        "hotspots",
-        "imports_summary",
-        "same_file_only",
-        "single_importer_files",
-        "single_use_imports",
-        "stale_types",
-        "symbol_pressure",
-        "test_only",
-        "top_coupling",
-        "top_symbols",
-        "unreferenced",
-        "unused_imports",
-    }
-)
 
 
 def parse_checks(values: list[str] | None) -> set[str] | None:
@@ -142,6 +113,9 @@ FALSE_POSITIVE_PREFACES: dict[str, str] = {
         + _RG_STEM
     ),
     "test_only": ("Warn: index may miss production calls, so this can look test-only. " + _RG_STEM),
+    "one_line_exports": (
+        "Warn: short exports are not always worth inlining — confirm the row is a pointless shim. " + _RG_STEM
+    ),
 }
 
 
@@ -206,6 +180,9 @@ def run_checks(
     remaining_after = list(selected)
     token = bind_live(db)
     entry_token = None
+    root_token = None
+    if project_root is not None:
+        root_token = bind_analyze_root(project_root)
     if project_root is not None and not entrypoints_bound():
         entry_token = bind_entrypoints(project_root)
     try:
@@ -238,4 +215,6 @@ def run_checks(
     finally:
         if entry_token is not None:
             reset_entrypoints(entry_token)
+        if root_token is not None:
+            reset_analyze_root(root_token)
         reset_live(token)

@@ -7,6 +7,7 @@ import sys
 from ..analyze import file as file_checks
 from ..analyze import project as project_checks
 from ..analyze import symbol as symbol_checks
+from ..analyze.check_catalog import format_check_catalog
 from ..analyze.common import is_test_path, section
 from ..analyze.sections import RowBudget, parse_checks, parse_priorities
 from ..analyze.targets import MAX_DIR_FILES, list_dir_files, resolve_analyze_target
@@ -140,6 +141,9 @@ def _dir_sections(
 
 def main(args):
     """Run project, directory, file, or symbol analysis from one optional target."""
+    if getattr(args, "list_checks", False):
+        print(format_check_catalog())
+        return
     db, project_root = setup()
     try:
         path_scope = path_scope_from_args(args, project_root)

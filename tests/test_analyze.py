@@ -94,6 +94,22 @@ class TestProjectAnalyze:
         lines = project_checks.dead_exports(db, limit=20)
         assert any("Orphan" in line or "deadFn" in line for line in lines)
 
+    def test_one_line_exports_finds_thin_delegate(self):
+        b = AnalyzeDbBuilder()
+        callee = b.define("src/lib/callee.ts", "calleeFn", start=0, end=5)
+        wrapper = b.define("src/shim/wrap.ts", "wrapFn", start=0, end=2)
+        b.reference("src/shim/wrap.ts", callee)
+        b.reference("src/user.ts", wrapper)
+        lines = project_checks.one_line_exports(b.finish(), limit=10)
+        assert any("wrapFn" in line and "delegate" in line for line in lines)
+
+    def test_one_line_exports_skips_without_outbound_call(self):
+        b = AnalyzeDbBuilder()
+        fn = b.define("src/h.ts", "greet", start=0, end=5)
+        b.reference("src/user.ts", fn)
+        lines = project_checks.one_line_exports(b.finish(), limit=10)
+        assert not any("greet" in line for line in lines)
+
     def test_unreferenced_finds_orphan(self):
         db = mini_codebase_db()
         lines = project_checks.unreferenced_symbols(db, limit=20)
@@ -145,9 +161,9 @@ class TestProjectAnalyze:
     def test_run_all_returns_ten_sections_without_duplicate_unreferenced(self):
         db = mini_codebase_db()
         sections = project_checks.run_all(db, limit=500)
-        assert len(sections) == 10
+        assert len(sections) == 11
         titles = [title for title, _lines, _preface in sections]
-        assert sum(1 for t in titles if "[low]" in t) == 5
+        assert sum(1 for t in titles if "[low]" in t) == 6
         assert sum(1 for t in titles if "[medium]" in t) == 1
         assert not any("Unreferenced symbols" in title for title in titles)
         assert any("Dead exports" in title for title in titles)

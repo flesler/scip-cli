@@ -18,6 +18,7 @@ from tests.fixture_catalog import (
     FN_LAZY_PANEL,
     FN_NPM_SCRIPT,
     FN_ORPHAN_WIDGET,
+    FN_POST_VIA_GATEWAY,
     FN_SEND,
     HOOK_A_FILE,
     HOOK_B_FILE,
@@ -25,6 +26,7 @@ from tests.fixture_catalog import (
     I18N_INDEX_FILE,
     LAZY_PANEL_FILE,
     NPM_SCRIPT_ENTRY_FILE,
+    SHIM_FILE,
     TYPE_A_FILE,
     TYPE_B_FILE,
     TYPE_BASE_STREAM,
@@ -125,6 +127,28 @@ class TestAnalyzePatternsE2E:
         try:
             dead = project_checks.dead_exports(db, limit=50)
             assert _contains(dead, FN_ORPHAN_WIDGET)
+        finally:
+            db.close()
+
+    def test_one_line_exports_flags_gateway_shims(self, indexed_fixture):
+        db = _db(indexed_fixture)
+        try:
+            from pathlib import Path
+
+            from scip_cli.analyze.oneline import bind_analyze_root, reset_analyze_root
+            from scip_cli.analyze.sections import bind_live, reset_live
+
+            root = Path(indexed_fixture.root)
+            live_token = bind_live(db)
+            root_token = bind_analyze_root(root)
+            try:
+                lines = project_checks.one_line_exports(db, limit=50, include_tests=False)
+            finally:
+                reset_analyze_root(root_token)
+                reset_live(live_token)
+            assert _contains(lines, FN_POST_VIA_GATEWAY)
+            assert _contains_path(lines, SHIM_FILE)
+            assert not _contains(lines, "greet")
         finally:
             db.close()
 

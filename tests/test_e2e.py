@@ -292,6 +292,15 @@ class TestAnalyze:
         assert result.returncode == 1
         assert "unknown analyze check" in result.stderr
 
+    def test_analyze_list_checks(self, cli):
+        result = cli.run("analyze", "--list-checks")
+        assert result.returncode == 0
+        assert "dead_exports" in result.stdout
+        assert "one_line_exports" in result.stdout
+        assert "single_importer_files" in result.stdout
+        assert "single_use_imports" in result.stdout
+        assert "Glue / slop pass" in result.stdout
+
 
 class TestQuery:
     def test_query_tsv_default(self, cli):
