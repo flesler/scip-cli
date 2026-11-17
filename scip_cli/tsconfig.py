@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .discover import SKIP_DIR_NAMES, read_json
+from .discover import SKIP_DIR_NAMES, read_json, tsconfig_project_root
 
 _GLOB_CHARS = frozenset("*?[")
 
@@ -226,6 +226,37 @@ def allow_js_overlay(tsconfig_path: Path) -> dict[str, object] | None:
             "files": absolutize_patterns([*files, *extra], base_dir),
         }
     return None
+
+
+def resolve_tsconfig_for_path_scope(
+    project_dir: Path,
+    *,
+    display_path: str = ".",
+) -> Path | None:
+    """Tsconfig used when matching ``reindex --path`` scope to a project directory.
+
+    Uses ``tsconfig.json`` when present (same default as indexing). With no
+    ``tsconfig.json``, a sole ``tsconfig*.json`` is used; multiple alternatives
+    raise so the user picks ``reindex --tsconfig``.
+    """
+    primary = project_dir / "tsconfig.json"
+    if primary.is_file() and tsconfig_project_root(primary):
+        return primary
+
+    alternatives = [
+        path
+        for path in sorted(project_dir.glob("tsconfig*.json"))
+        if path.name != "tsconfig.json" and tsconfig_project_root(path)
+    ]
+    if not alternatives:
+        return None
+    if len(alternatives) == 1:
+        return alternatives[0]
+
+    names = ", ".join(path.name for path in alternatives)
+    raise RuntimeError(
+        f"No tsconfig.json under {display_path}; multiple tsconfig files: {names}. Use reindex --tsconfig to pick one."
+    )
 
 
 def tsconfig_for_project(root: Path, project: Path) -> Path | None:

@@ -32,7 +32,7 @@ def read_json(path: Path) -> dict[str, object] | None:
         return None
 
 
-def _tsconfig_project_root(path: Path) -> bool:
+def tsconfig_project_root(path: Path) -> bool:
     """Return True when a tsconfig likely describes an indexable project."""
     data = read_json(path)
     if not data:
@@ -72,7 +72,7 @@ def _walk_tsconfig_projects(root: Path) -> list[Path]:
             if not name.startswith("tsconfig") or not name.endswith(".json"):
                 continue
             tsconfig = Path(dirpath) / name
-            if not _tsconfig_project_root(tsconfig):
+            if not tsconfig_project_root(tsconfig):
                 continue
             project_dir = tsconfig.parent.resolve()
             try:

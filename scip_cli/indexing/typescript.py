@@ -34,7 +34,7 @@ def typescript_projects(root: Path) -> list[Path]:
         if tsconfig_files is not None:
             return tsconfig_files
         discovered = list(discover_typescript_projects(root))
-        filtered = projects_matching_scope(discovered, scope.paths)
+        filtered = projects_matching_scope(discovered, scope.paths, repo_root=root)
         if not filtered:
             joined = ", ".join(scope.paths)
             raise RuntimeError(f"No TypeScript projects found under index scope: {joined}")
